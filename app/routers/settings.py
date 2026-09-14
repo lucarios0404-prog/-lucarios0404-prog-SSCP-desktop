@@ -7,7 +7,7 @@ from datetime import datetime
 
 from app.database import get_db
 from app.models.setting import Setting
-from app.core.deps import require_current_user
+from app.core.deps import require_admin
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -37,7 +37,7 @@ def get_or_create_settings(db: Session) -> Setting:
 def view_settings(
     request: Request,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_admin)
 ):
     setting = get_or_create_settings(db)
     return templates.TemplateResponse(
@@ -64,7 +64,7 @@ def update_settings(
     tailscale_ip: str = Form(None),
     sync_interval_minutes: int = Form(5),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_admin)
 ):
     setting = get_or_create_settings(db)
     setting.clinic_name = clinic_name

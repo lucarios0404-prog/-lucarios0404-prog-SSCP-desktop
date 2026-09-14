@@ -8,7 +8,7 @@ import json
 
 from app.database import get_db
 from app.models.setting import Setting
-from app.core.deps import require_current_user
+from app.core.deps import require_admin
 from app.services.sync_service import SyncService
 
 router = APIRouter(prefix="/sync", tags=["sync"])
@@ -19,7 +19,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 async def sync_dashboard(
     request: Request,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_admin)
 ):
     stats = SyncService.get_sync_stats(db)
     setting = db.query(Setting).first()
@@ -51,7 +51,7 @@ async def trigger_sync(
     request: Request,
     remote_url: str = Form("https://sscp.laxarusdevs.com"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_admin)
 ):
     setting = db.query(Setting).first()
     node_ip = setting.tailscale_ip if setting else None
@@ -77,7 +77,7 @@ async def trigger_sync(
 async def push_sync(
     remote_url: str = Form("https://sscp.laxarusdevs.com"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_admin)
 ):
     setting = db.query(Setting).first()
     res = await SyncService.push_to_remote(db, remote_url, node_ip=setting.tailscale_ip if setting else None)
@@ -88,7 +88,7 @@ async def push_sync(
 async def pull_sync(
     remote_url: str = Form("https://sscp.laxarusdevs.com"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_admin)
 ):
     setting = db.query(Setting).first()
     res = await SyncService.pull_from_remote(db, remote_url, node_ip=setting.tailscale_ip if setting else None)
@@ -98,7 +98,7 @@ async def pull_sync(
 @router.get("/export")
 def export_sync_package(
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_admin)
 ):
     package = SyncService.export_full_package(db)
     content = json.dumps(package, indent=2, ensure_ascii=False)
@@ -114,7 +114,7 @@ def export_sync_package(
 async def import_sync_package(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_admin)
 ):
     try:
         content = await file.read()

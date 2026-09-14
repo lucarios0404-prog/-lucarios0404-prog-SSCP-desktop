@@ -43,3 +43,21 @@ def require_current_user(current_user: User = Depends(get_current_user)):
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Usuario inactivo")
     return current_user
+
+def require_admin(current_user: User = Depends(require_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso restringido: Se requieren permisos de Administrador."
+        )
+    return current_user
+
+def require_permission(permission_key: str):
+    def dependency(current_user: User = Depends(require_current_user)):
+        if not current_user.has_permission(permission_key):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acceso restringido: No cuenta con el permiso '{permission_key}' para esta sección."
+            )
+        return current_user
+    return dependency

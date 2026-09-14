@@ -1,0 +1,221 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Usuarios & Permisos — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'users' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Usuarios del Sistema" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+
+                <!-- Header y Acciones -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+                            <i class="fas fa-users-cog text-blue-600"></i>
+                            Gestión de Usuarios & Control de Accesos
+                        </h1>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Cree cuentas para médicos, secretarias o administradores y delimite qué módulos pueden ver y operar en la clínica.
+                        </p>
+                    </div>
+                    <div>
+                        <a href="/users/create" class="inline-flex items-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/20 transition-all">
+                            <i class="fas fa-user-plus mr-2"></i> Crear Nuevo Usuario
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Notificaciones de Éxito o Error -->
+                {% if success == 'creado' %}
+                <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center gap-3">
+                    <i class="fas fa-check-circle text-emerald-600 text-base"></i>
+                    <span>Usuario creado y registrado exitosamente con sus permisos delimitados.</span>
+                </div>
+                {% elif success == 'actualizado' %}
+                <div class="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-sm flex items-center gap-3">
+                    <i class="fas fa-check-circle text-blue-600 text-base"></i>
+                    <span>Datos de usuario y configuración de permisos guardados correctamente.</span>
+                </div>
+                {% elif success == 'eliminado' %}
+                <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-center gap-3">
+                    <i class="fas fa-trash-alt text-amber-600 text-base"></i>
+                    <span>El usuario ha sido eliminado del sistema.</span>
+                </div>
+                {% elif error %}
+                <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-center gap-3">
+                    <i class="fas fa-exclamation-triangle text-red-600 text-base"></i>
+                    <span>{{ error }}</span>
+                </div>
+                {% endif %}
+
+                <!-- Tarjetas de Resumen de Roles -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-500 font-semibold uppercase">Administradores</p>
+                            <p class="text-sm font-bold text-slate-800">Control Total del Sistema</p>
+                            <span class="text-[11px] text-blue-600 font-medium">Acceso a configuración, usuarios y multi-sede</span>
+                        </div>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                            <i class="fas fa-user-md"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-500 font-semibold uppercase">Médicos</p>
+                            <p class="text-sm font-bold text-slate-800">Módulos Clínicos</p>
+                            <span class="text-[11px] text-emerald-600 font-medium">Consultas, recetas rápidas, reposos y referencias</span>
+                        </div>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+                            <i class="fas fa-headset"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-500 font-semibold uppercase">Secretarias / Recepción</p>
+                            <p class="text-sm font-bold text-slate-800">Atención & Caja</p>
+                            <span class="text-[11px] text-amber-600 font-medium">Agendar citas, crear pacientes, cobrar y caja</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de Usuarios -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+                        <h3 class="font-bold text-slate-800 text-sm uppercase tracking-wider flex items-center gap-2">
+                            <i class="fas fa-list text-slate-400"></i>
+                            Cuentas Registradas en la Clínica ({{ users_data|length }})
+                        </h3>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+                                    <th class="py-3.5 px-6">Usuario</th>
+                                    <th class="py-3.5 px-6">Rol del Sistema</th>
+                                    <th class="py-3.5 px-6">Permisos Delimitados</th>
+                                    <th class="py-3.5 px-6">Estado</th>
+                                    <th class="py-3.5 px-6 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-sm">
+                                {% for item in users_data %}
+                                {% set u = item.user %}
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <!-- Usuario -->
+                                    <td class="py-4 px-6">
+                                        <div class="flex items-center gap-3">
+                                            {% if u.role == 'doctor' %}
+                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-sm shadow-emerald-500/20 font-bold shrink-0">
+                                                <i class="fas fa-user-md text-sm"></i>
+                                            </div>
+                                            {% elif u.role == 'secretaria' %}
+                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-sm shadow-amber-500/20 font-bold shrink-0">
+                                                <i class="fas fa-headset text-sm"></i>
+                                            </div>
+                                            {% else %}
+                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm shadow-blue-500/20 font-bold shrink-0">
+                                                <i class="fas fa-shield-alt text-sm"></i>
+                                            </div>
+                                            {% endif %}
+                                            <div>
+                                                <p class="font-bold text-slate-900 flex items-center gap-1.5">
+                                                    {{ u.name or u.email }}
+                                                    {% if u.id == user.id %}
+                                                    <span class="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">Tu cuenta</span>
+                                                    {% endif %}
+                                                </p>
+                                                <p class="text-xs text-slate-500">{{ u.email }}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <!-- Rol -->
+                                    <td class="py-4 px-6">
+                                        {% if u.role == 'doctor' %}
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <i class="fas fa-user-md text-[11px]"></i> {{ item.role_label }}
+                                        </span>
+                                        {% elif u.role == 'secretaria' %}
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                            <i class="fas fa-headset text-[11px]"></i> {{ item.role_label }}
+                                        </span>
+                                        {% else %}
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                            <i class="fas fa-shield-alt text-[11px]"></i> {{ item.role_label }}
+                                        </span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Permisos -->
+                                    <td class="py-4 px-6">
+                                        {% if u.role == 'admin' %}
+                                        <span class="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                                            <i class="fas fa-check-double text-blue-600"></i> Acceso Total (17 módulos)
+                                        </span>
+                                        {% else %}
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-bold text-slate-800">{{ item.perm_count }} módulos habilitados</span>
+                                            {% if item.is_custom %}
+                                            <span class="text-[10px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">Personalizado</span>
+                                            {% else %}
+                                            <span class="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">Por defecto del rol</span>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Estado -->
+                                    <td class="py-4 px-6">
+                                        {% if u.is_active %}
+                                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Activo
+                                        </span>
+                                        {% else %}
+                                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600">
+                                            <span class="w-2 h-2 rounded-full bg-rose-500"></span> Inactivo
+                                        </span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Acciones -->
+                                    <td class="py-4 px-6 text-right">
+                                        <div class="inline-flex items-center gap-2">
+                                            <a href="/users/{{ u.id }}/edit" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-semibold border border-slate-200 transition-colors flex items-center gap-1.5">
+                                                <i class="fas fa-user-edit"></i> Editar & Permisos
+                                            </a>
+
+                                            {% if u.id != user.id %}
+                                            <form action="/users/{{ u.id }}/delete" method="POST" onsubmit="return confirm('¿Seguro que desea eliminar a este usuario de la clínica?');" class="inline">
+                                                <button type="submit" class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Eliminar cuenta">
+                                                    <i class="fas fa-trash-alt text-xs"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

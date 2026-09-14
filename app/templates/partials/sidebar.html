@@ -12,91 +12,150 @@
     </div>
 
     <div class="flex-1 py-5 overflow-y-auto px-3 space-y-6">
+        <!-- Principal -->
         <div>
             <span class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Principal</span>
             <nav class="mt-2 space-y-1">
+                {% if user.has_permission('dashboard') %}
                 <a href="/dashboard" class="{% if active_menu == 'dashboard' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-chart-pie mr-3 text-base {% if active_menu == 'dashboard' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Dashboard
                 </a>
+                {% endif %}
+
+                {% if user.has_permission('patients') %}
                 <a href="/patients" class="{% if active_menu == 'patients' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-user-injured mr-3 text-base {% if active_menu == 'patients' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Pacientes
                 </a>
+                {% endif %}
+
+                {% if user.has_permission('appointments') %}
                 <a href="/appointments" class="{% if active_menu == 'appointments' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-calendar-check mr-3 text-base {% if active_menu == 'appointments' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Citas Médicas
                 </a>
+                {% endif %}
             </nav>
         </div>
 
+        <!-- Módulos Clínicos -->
+        {% if user.has_permission('consultations') or user.has_permission('labs') or user.has_permission('vaccines') or user.has_permission('inventory') %}
         <div>
             <span class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Módulos Clínicos</span>
             <nav class="mt-2 space-y-1">
+                {% if user.has_permission('consultations') %}
                 <a href="/consultations" class="{% if active_menu == 'consultations' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-notes-medical mr-3 text-base {% if active_menu == 'consultations' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Consultas & Historias
                 </a>
+                {% endif %}
+
+                {% if user.has_permission('labs') %}
                 <a href="/lab-results" class="{% if active_menu == 'labs' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-flask mr-3 text-base {% if active_menu == 'labs' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Laboratorio
                 </a>
+                {% endif %}
+
+                {% if user.has_permission('vaccines') %}
                 <a href="/vaccines" class="{% if active_menu == 'vaccines' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-syringe mr-3 text-base {% if active_menu == 'vaccines' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Vacunas
                 </a>
+                {% endif %}
+
+                {% if user.has_permission('inventory') %}
                 <a href="/inventory" class="{% if active_menu == 'inventory' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-boxes mr-3 text-base {% if active_menu == 'inventory' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Inventario & Insumos
                 </a>
+                {% endif %}
             </nav>
         </div>
+        {% endif %}
 
+        <!-- Productividad Médica -->
+        {% if user.has_permission('prescriptions') or user.has_permission('templates') or user.has_permission('licenses') or user.has_permission('references') %}
         <div>
             <span class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Productividad Médica</span>
             <nav class="mt-2 space-y-1">
+                {% if user.has_permission('prescriptions') %}
                 <a href="/prescriptions/quick" class="{% if active_menu == 'quick_prescriptions' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-bolt mr-3 text-base {% if active_menu == 'quick_prescriptions' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Receta Rápida
                 </a>
+                {% endif %}
+
+                {% if user.has_permission('templates') %}
                 <a href="/templates" class="{% if active_menu == 'templates' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-clipboard-list mr-3 text-base {% if active_menu == 'templates' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Plantillas Clínicas
                 </a>
+                {% endif %}
+
+                {% if user.has_permission('licenses') %}
                 <a href="/licenses" class="{% if active_menu == 'licenses' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-file-medical mr-3 text-base {% if active_menu == 'licenses' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Licencias Médicas
                 </a>
+                {% endif %}
+
+                {% if user.has_permission('references') %}
                 <a href="/references" class="{% if active_menu == 'references' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-envelope-open-text mr-3 text-base {% if active_menu == 'references' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Cartas de Referencia
                 </a>
+                {% endif %}
             </nav>
         </div>
+        {% endif %}
 
+        <!-- Administración -->
         <div>
             <span class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Administración</span>
             <nav class="mt-2 space-y-1">
+                {% if user.has_permission('payments') %}
                 <a href="/payments" class="{% if active_menu == 'payments' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-receipt mr-3 text-base {% if active_menu == 'payments' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Facturación & Pagos
                 </a>
+                {% endif %}
+
+                {% if user.has_permission('messages') %}
                 <a href="/messages" class="{% if active_menu == 'messages' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-comments mr-3 text-base {% if active_menu == 'messages' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Mensajes Internos
                 </a>
-                <a href="/settings" class="{% if active_menu == 'settings' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-cog mr-3 text-base {% if active_menu == 'settings' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Configuración
-                </a>
+                {% endif %}
+
+                {% if user.has_permission('reports') %}
                 <a href="/reports" class="{% if active_menu == 'reports' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-chart-simple mr-3 text-base {% if active_menu == 'reports' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Reportes & Analítica
                 </a>
+                {% endif %}
+
+                {% if user.has_permission('users') %}
+                <a href="/users" class="{% if active_menu == 'users' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
+                    <i class="fas fa-users-cog mr-3 text-base {% if active_menu == 'users' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
+                    Usuarios & Permisos
+                </a>
+                {% endif %}
+
+                {% if user.has_permission('settings') %}
+                <a href="/settings" class="{% if active_menu == 'settings' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
+                    <i class="fas fa-cog mr-3 text-base {% if active_menu == 'settings' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
+                    Configuración
+                </a>
+                {% endif %}
+
+                {% if user.has_permission('sync') %}
                 <a href="/sync" class="{% if active_menu == 'sync' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
                     <i class="fas fa-cloud-arrow-up mr-3 text-base {% if active_menu == 'sync' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Sincronización
                 </a>
+                {% endif %}
             </nav>
         </div>
     </div>

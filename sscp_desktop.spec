@@ -66,6 +66,8 @@ hidden_imports = [
     'app.services.audit_service',
     'app.services.patient_service',
     'app.routers.reports',
+    'app.routers.users',
+    'app.core.permissions',
     'qrcode',
     'qrcode.image.pil',
     'PIL',

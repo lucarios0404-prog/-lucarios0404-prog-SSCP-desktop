@@ -1,0 +1,191 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Editar Usuario — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'users' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Editar Usuario" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-4xl mx-auto space-y-6">
+
+                <!-- Header de retorno -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <a href="/users" class="text-xs text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center gap-1.5 mb-2">
+                            <i class="fas fa-arrow-left"></i> Volver al listado de usuarios
+                        </a>
+                        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+                            <i class="fas fa-user-edit text-blue-600"></i>
+                            Editar Usuario: {{ target_user.name or target_user.email }}
+                        </h1>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Modifique los datos de perfil, restablezca la contraseña o ajuste los permisos asignados.
+                        </p>
+                    </div>
+                </div>
+
+                {% if error %}
+                <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-center gap-3">
+                    <i class="fas fa-exclamation-circle text-red-600 text-base"></i>
+                    <span>{{ error }}</span>
+                </div>
+                {% endif %}
+
+                <!-- Formulario -->
+                <form action="/users/{{ target_user.id }}/edit" method="POST" class="space-y-6">
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider pb-3 border-b border-slate-100 flex items-center gap-2">
+                            <i class="fas fa-id-badge text-blue-600"></i>
+                            Perfil y Credenciales de Acceso
+                        </h3>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <!-- Nombre Completo -->
+                            <div>
+                                <label for="name" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                                    Nombre Completo *
+                                </label>
+                                <input type="text" id="name" name="name" value="{{ target_user.name }}" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                            </div>
+
+                            <!-- Correo Electrónico -->
+                            <div>
+                                <label for="email" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                                    Correo Electrónico *
+                                </label>
+                                <input type="email" id="email" name="email" value="{{ target_user.email }}" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                            </div>
+
+                            <!-- Contraseña -->
+                            <div>
+                                <label for="password" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                                    Nueva Contraseña (Opcional)
+                                </label>
+                                <input type="password" id="password" name="password" placeholder="Dejar en blanco para mantener la actual" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                                <span class="text-[11px] text-slate-500 mt-1 block">Solo ingrese un valor si desea cambiar la clave del usuario.</span>
+                            </div>
+
+                            <!-- Rol del Sistema -->
+                            <div>
+                                <label for="role" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                                    Rol Principal *
+                                </label>
+                                <select id="role" name="role" required onchange="onRoleChange(this.value)" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white">
+                                    <option value="doctor" {% if target_user.role == 'doctor' %}selected{% endif %}>🩺 Médico Especialista</option>
+                                    <option value="secretaria" {% if target_user.role == 'secretaria' %}selected{% endif %}>🎧 Secretaria / Recepción</option>
+                                    <option value="admin" {% if target_user.role == 'admin' %}selected{% endif %}>🛡️ Administrador General</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Estado Activo -->
+                        <div class="pt-2">
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="is_active" value="1" {% if target_user.is_active %}checked{% endif %} {% if target_user.id == user.id %}disabled{% endif %} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                                <span class="text-sm font-semibold text-slate-800">
+                                    Cuenta Activa (Permitir acceso al sistema)
+                                    {% if target_user.id == user.id %}
+                                    <span class="text-xs text-slate-400 font-normal">(No puedes desactivar tu propia cuenta activa)</span>
+                                    {% endif %}
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Delimitación de Permisos de Acceso -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                    <i class="fas fa-shield-alt text-blue-600"></i>
+                                    Delimitación de Módulos & Permisos
+                                </h3>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    Active o desactive módulos específicos para este usuario.
+                                </p>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="applyRoleDefaults()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5">
+                                    <i class="fas fa-undo text-[11px]"></i> Restablecer según rol
+                                </button>
+                                <button type="button" onclick="toggleAll(true)" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg transition-all">
+                                    Marcar todos
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Opción de personalizar -->
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="use_custom_perms" name="use_custom_perms" value="1" {% if has_custom %}checked{% endif %} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                                <span class="text-xs font-bold text-slate-800">Personalizar permisos manualmente (Sobrescribe las reglas por defecto del rol)</span>
+                            </label>
+                            <span id="role_preset_badge" class="text-[11px] font-semibold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-full">
+                                Permisos asignados
+                            </span>
+                        </div>
+
+                        <!-- Grilla de Permisos por Categoría -->
+                        <div id="permissions_container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {% for perm in available_permissions %}
+                            <div class="p-3.5 rounded-xl border border-slate-200 hover:border-blue-300 bg-white transition-all flex items-start gap-3 perm-card">
+                                <input type="checkbox" id="perm_{{ perm.key }}" name="custom_permissions" value="{{ perm.key }}" {% if perm.key in current_perms or target_user.role == 'admin' %}checked{% endif %} class="mt-0.5 w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 perm-checkbox">
+                                <div>
+                                    <label for="perm_{{ perm.key }}" class="text-xs font-bold text-slate-900 cursor-pointer block leading-tight">
+                                        {{ perm.label }}
+                                    </label>
+                                    <span class="text-[10px] text-slate-500 mt-1 block leading-tight">{{ perm.description }}</span>
+                                    <span class="inline-block mt-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 uppercase tracking-wider">
+                                        {{ perm.category }}
+                                    </span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Botones de Acción -->
+                    <div class="flex items-center justify-end gap-3 pt-2">
+                        <a href="/users" class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-all">
+                            Cancelar
+                        </a>
+                        <button type="submit" class="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md shadow-blue-600/20 transition-all flex items-center gap-2">
+                            <i class="fas fa-save"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+const roleDefaults = {{ default_permissions_json | safe }};
+
+function onRoleChange(role) {
+    applyRoleDefaults();
+}
+
+function applyRoleDefaults() {
+    const role = document.getElementById('role').value;
+    const defaults = roleDefaults[role] || [];
+    const checkboxes = document.querySelectorAll('.perm-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = defaults.includes(cb.value);
+    });
+}
+
+function toggleAll(status) {
+    document.getElementById('use_custom_perms').checked = true;
+    document.querySelectorAll('.perm-checkbox').forEach(cb => cb.checked = status);
+}
+</script>
+{% endblock %}

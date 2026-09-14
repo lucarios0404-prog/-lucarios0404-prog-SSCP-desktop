@@ -10,7 +10,7 @@ from app.models.patient import Patient
 from app.models.consultation import Consultation
 from app.models.template import ClinicalTemplate
 from app.models.setting import Setting
-from app.core.deps import require_current_user
+from app.core.deps import require_current_user, require_permission
 from app.services.pdf_service import generate_quick_prescription_pdf
 
 router = APIRouter(prefix="/prescriptions", tags=["prescriptions"])
@@ -41,7 +41,7 @@ def quick_prescription_view(
     request: Request,
     patient_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('prescriptions'))
 ):
     patients = db.query(Patient).order_by(Patient.first_name).all()
     selected_patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
@@ -84,7 +84,7 @@ def submit_quick_prescription(
     diagnosis: str = Form("Emisión de Receta Directa"),
     force_override: bool = Form(False),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('prescriptions'))
 ):
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
