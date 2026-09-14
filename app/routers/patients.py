@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from pathlib import Path
 from datetime import datetime, date
 
@@ -49,24 +49,35 @@ async def check_duplicate_patient(
 def list_patients(
     request: Request,
     q: str = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(15, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
     query = db.query(Patient)
-    if q:
-        search = f"%{q.strip()}%"
+    clean_q = q.strip() if q else ""
+    if clean_q:
+        search = f"%{clean_q}%"
         query = query.filter(
             or_(
                 Patient.first_name.ilike(search),
                 Patient.last_name.ilike(search),
+                func.concat(Patient.first_name, " ", Patient.last_name).ilike(search),
                 Patient.document_id.ilike(search),
-                Patient.phone.ilike(search)
+                Patient.phone.ilike(search),
+                Patient.email.ilike(search)
             )
         )
     
-    patients = query.order_by(Patient.last_name).all()
+    total_count = query.count()
+    total_pages = max(1, (total_count + per_page - 1) // per_page)
+    if page > total_pages:
+        page = total_pages
+        
+    offset = (page - 1) * per_page
+    patients = query.order_by(Patient.last_name.asc(), Patient.first_name.asc()).offset(offset).limit(per_page).all()
     
-    # Calcular saldos pendientes para cada paciente (F8)
+    # Calcular saldos pendientes solo para los pacientes visibles en esta página
     patient_cards = []
     for p in patients:
         pending_sum = sum(pay.total for pay in p.payments if pay.status == "pending")
@@ -82,7 +93,13 @@ def list_patients(
         context={
             "user": current_user,
             "patient_cards": patient_cards,
-            "search_query": q or ""
+            "search_query": clean_q,
+            "page": page,
+            "per_page": per_page,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "start_item": offset + 1 if total_count > 0 else 0,
+            "end_item": min(offset + per_page, total_count),
         }
     )
 

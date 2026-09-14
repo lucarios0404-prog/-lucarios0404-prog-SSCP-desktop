@@ -29,23 +29,42 @@
                     </div>
                 </div>
 
-                <!-- Search Bar -->
-                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <form method="get" action="/patients" class="flex items-center gap-3">
+                <!-- Search & Filters Bar -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                    <form method="get" action="/patients" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                         <div class="relative flex-1">
                             <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                                 <i class="fas fa-search"></i>
                             </span>
-                            <input type="text" name="q" value="{{ search_query }}" placeholder="Buscar por nombre, apellido, cédula/DNI o teléfono..." 
-                                class="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            <input type="text" name="q" value="{{ search_query }}" placeholder="Buscar por nombre, apellido, cédula/DNI, teléfono o email..." 
+                                class="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all">
                         </div>
-                        <button type="submit" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-900 transition-colors">
-                            Buscar
-                        </button>
-                        {% if search_query %}
-                        <a href="/patients" class="px-3 py-2 text-sm text-slate-500 hover:text-slate-800">Limpiar</a>
-                        {% endif %}
+                        <div class="flex items-center gap-2">
+                            <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center shadow-sm">
+                                <i class="fas fa-search mr-1.5"></i> Buscar
+                            </button>
+                            {% if search_query %}
+                            <a href="/patients" class="px-3.5 py-2.5 text-sm text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors">
+                                <i class="fas fa-times mr-1"></i> Limpiar
+                            </a>
+                            {% endif %}
+                        </div>
                     </form>
+
+                    <!-- Status / Filter info bar -->
+                    <div class="flex flex-wrap items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100 gap-2">
+                        <div class="flex items-center gap-2">
+                            <span>Mostrando registros <strong>{{ start_item|default(0) }}</strong> - <strong>{{ end_item|default(0) }}</strong> de <strong>{{ total_count|default(0) }}</strong> pacientes</span>
+                            {% if search_query %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-800">
+                                Filtro: "{{ search_query }}"
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div>
+                            Página {{ page|default(1) }} de {{ total_pages|default(1) }}
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Patients Table -->
@@ -68,7 +87,7 @@
                                     <td class="py-4 px-5">
                                         <div class="flex items-center space-x-3">
                                             <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm shrink-0">
-                                                {{ p.first_name[0] }}{{ p.last_name[0] }}
+                                                {{ p.first_name[0] if p.first_name else 'P' }}{{ p.last_name[0] if p.last_name else '' }}
                                             </div>
                                             <div>
                                                 <a href="/patients/{{ p.id }}" class="font-semibold text-slate-900 hover:text-blue-600 transition-colors">
@@ -112,13 +131,75 @@
                                 <tr>
                                     <td colspan="5" class="py-12 text-center text-slate-400">
                                         <i class="fas fa-user-slash text-3xl mb-3 block text-slate-300"></i>
-                                        No se encontraron pacientes registrados.
+                                        {% if search_query %}
+                                        No se encontraron pacientes que coincidan con la búsqueda "{{ search_query }}".
+                                        <div class="mt-2">
+                                            <a href="/patients" class="text-xs text-blue-600 font-semibold hover:underline">Limpiar búsqueda</a>
+                                        </div>
+                                        {% else %}
+                                        No hay pacientes registrados en el sistema.
+                                        <div class="mt-3 flex items-center justify-center gap-3">
+                                            <a href="/patients/create" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors">
+                                                <i class="fas fa-user-plus mr-1.5"></i> Registrar Paciente
+                                            </a>
+                                            <a href="/patients/import" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-semibold hover:bg-emerald-200 transition-colors">
+                                                <i class="fas fa-file-import mr-1.5"></i> Importar de Consulta Práctica
+                                            </a>
+                                        </div>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Pagination Controls -->
+                    {% if (total_pages|default(1)) > 1 %}
+                    <div class="bg-slate-50 px-5 py-3.5 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                        <div class="text-slate-500">
+                            Página <strong>{{ page|default(1) }}</strong> de <strong>{{ total_pages|default(1) }}</strong> (Total: {{ total_count|default(0) }} pacientes)
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <!-- Anterior -->
+                            {% if (page|default(1)) > 1 %}
+                            <a href="/patients?page={{ (page|default(1)) - 1 }}{% if search_query %}&q={{ search_query }}{% endif %}" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition-colors">
+                                <i class="fas fa-chevron-left mr-1"></i> Anterior
+                            </a>
+                            {% else %}
+                            <span class="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 font-semibold cursor-not-allowed">
+                                <i class="fas fa-chevron-left mr-1"></i> Anterior
+                            </span>
+                            {% endif %}
+
+                            <!-- Números de Página -->
+                            {% for p_num in range(1, (total_pages|default(1)) + 1) %}
+                                {% if p_num == (page|default(1)) %}
+                                <span class="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 text-white font-bold shadow-sm">
+                                    {{ p_num }}
+                                </span>
+                                {% elif p_num <= 3 or p_num > (total_pages|default(1)) - 2 or (p_num >= (page|default(1)) - 1 and p_num <= (page|default(1)) + 1) %}
+                                <a href="/patients?page={{ p_num }}{% if search_query %}&q={{ search_query }}{% endif %}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition-colors">
+                                    {{ p_num }}
+                                </a>
+                                {% elif p_num == 4 or p_num == (total_pages|default(1)) - 2 %}
+                                <span class="w-6 text-center text-slate-400 font-bold">...</span>
+                                {% endif %}
+                            {% endfor %}
+
+                            <!-- Siguiente -->
+                            {% if (page|default(1)) < (total_pages|default(1)) %}
+                            <a href="/patients?page={{ (page|default(1)) + 1 }}{% if search_query %}&q={{ search_query }}{% endif %}" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition-colors">
+                                Siguiente <i class="fas fa-chevron-right ml-1"></i>
+                            </a>
+                            {% else %}
+                            <span class="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 font-semibold cursor-not-allowed">
+                                Siguiente <i class="fas fa-chevron-right ml-1"></i>
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </main>
