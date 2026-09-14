@@ -1,0 +1,150 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Nueva Consulta Médica — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'consultations' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Nueva Consulta Médica" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-4xl mx-auto space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Registrar Consulta Médica</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Historia clínica, anamnesis, diagnóstico CIE-10 y prescripción médica.</p>
+                    </div>
+                    <a href="/consultations" class="text-xs text-slate-500 hover:text-slate-800 font-medium">
+                        &larr; Volver al listado
+                    </a>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    <form method="post" action="/consultations/create" class="space-y-6">
+                        {% if selected_appointment_id %}
+                        <input type="hidden" name="appointment_id" value="{{ selected_appointment_id }}">
+                        {% endif %}
+
+                        <!-- Paciente Select -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Paciente <span class="text-red-500">*</span>
+                            </label>
+                            <select name="patient_id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 bg-white">
+                                <option value="">Seleccione el paciente...</option>
+                                {% for p in patients %}
+                                <option value="{{ p.id }}" {% if selected_patient and selected_patient.id == p.id %}selected{% endif %}>
+                                    {{ p.last_name }}, {{ p.first_name }} ({{ p.document_id or 'Sin DNI' }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Motivo de consulta -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Motivo de la Consulta <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="reason" required placeholder="Ej. Dolor abdominal agudo de 2 días de evolución, fiebre y náuseas" 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">
+                        </div>
+
+                        <!-- Síntomas y Examen Físico -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Anamnesis / Síntomas Subjetivos
+                                </label>
+                                <textarea name="symptoms" rows="4" placeholder="Descripción detallada de síntomas relatados por el paciente..." 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500"></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Examen Físico / Signos Observados
+                                </label>
+                                <textarea name="physical_exam" rows="4" placeholder="Inspección, palpación, auscultación, signos vitales..." 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Diagnóstico con CIE-10 Quick Pills -->
+                        <div class="bg-violet-50/50 p-4 rounded-xl border border-violet-100 space-y-3">
+                            <div>
+                                <label class="block text-xs font-bold text-violet-950 uppercase tracking-wider mb-1.5">
+                                    <i class="fas fa-stethoscope mr-1"></i> Diagnóstico y Código CIE-10
+                                </label>
+                                <input type="text" id="diagnosis_input" name="diagnosis" placeholder="Escribe el diagnóstico o selecciona un código CIE-10 sugerido..." 
+                                    class="w-full px-3.5 py-2 text-sm border border-violet-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-violet-500">
+                            </div>
+
+                            <div>
+                                <p class="text-[11px] font-semibold text-violet-900 mb-1.5">Diagnósticos Frecuentes (CIE-10):</p>
+                                <div class="flex flex-wrap gap-1.5">
+                                    {% for item in cie10_common %}
+                                    <button type="button" onclick="setDiagnosis('{{ item.code }} - {{ item.description }}')" 
+                                        class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white text-violet-700 border border-violet-200 hover:bg-violet-600 hover:text-white transition-colors">
+                                        <strong>{{ item.code }}</strong> {{ item.description }}
+                                    </button>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Plan y Tratamiento -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Plan Terapéutico y Conducta Médica
+                            </label>
+                            <textarea name="treatment" rows="3" placeholder="Recomendaciones generales, reposo, dieta, estudios complementarios solicitados..." 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500"></textarea>
+                        </div>
+
+                        <!-- Prescripción / Receta -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
+                                <i class="fas fa-pills text-blue-600 mr-1"></i> Indicaciones Farmacológicas / Receta Médica
+                            </label>
+                            <textarea name="prescription" rows="3" placeholder="Medicamento, Dosis, Vía, Frecuencia y Duración (ej. Amoxicilina 500mg VO cada 8 horas por 7 días)..." 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                        </div>
+
+                        <!-- Notas confidenciales -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Notas Confidenciales / Observaciones Internas
+                            </label>
+                            <textarea name="notes" rows="2" placeholder="Notas internas para el equipo médico..." 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500"></textarea>
+                        </div>
+
+                        <div class="border-t border-slate-100 pt-5 flex items-center justify-end space-x-3">
+                            <a href="/consultations" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">Cancelar</a>
+                            <button type="submit" class="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-violet-500/20 transition-all">
+                                <i class="fas fa-save mr-1.5"></i> Guardar Historia Clínica
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setDiagnosis(text) {
+    const input = document.getElementById('diagnosis_input');
+    if (input.value) {
+        input.value = input.value + '; ' + text;
+    } else {
+        input.value = text;
+    }
+}
+</script>
+{% endblock %}

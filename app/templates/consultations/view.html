@@ -1,0 +1,160 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Consulta Médica #{{ consultation.id }} — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'consultations' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Detalle de Historia Clínica" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-4xl mx-auto space-y-6">
+                <!-- Top Header Navigation -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-center space-x-3">
+                        <a href="/consultations" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100">
+                            <i class="fas fa-arrow-left"></i>
+                        </a>
+                        <div>
+                            <h1 class="text-2xl font-bold text-slate-900">Nota de Consulta #{{ consultation.id }}</h1>
+                            <p class="text-xs text-slate-500">{{ consultation.created_at.strftime("%d de %B de %Y, %H:%M") }}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <!-- F3: Botón de Edición Post-Guardado -->
+                        <a href="/consultations/{{ consultation.id }}/edit" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-sm transition-all">
+                            <i class="fas fa-edit mr-1.5"></i> Editar Consulta (F3)
+                        </a>
+                        <button onclick="window.print()" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold shadow-sm transition-all">
+                            <i class="fas fa-print mr-1.5"></i> Imprimir Nota / Receta
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Patient & Doctor Card -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col sm:flex-row justify-between gap-4">
+                    <div>
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Paciente Atendido</span>
+                        <div class="mt-1">
+                            <a href="/patients/{{ consultation.patient.id }}" class="text-lg font-bold text-blue-600 hover:underline">
+                                {{ consultation.patient.first_name }} {{ consultation.patient.last_name }}
+                            </a>
+                            <div class="text-xs text-slate-500 mt-0.5 space-x-3">
+                                <span>DNI: <strong>{{ consultation.patient.document_id or 'N/D' }}</strong></span>
+                                <span>Tel: <strong>{{ consultation.patient.phone or 'N/D' }}</strong></span>
+                                <span>Sangre: <strong>{{ consultation.patient.blood_type or 'N/D' }}</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Médico Tratante</span>
+                        <p class="text-base font-bold text-slate-800 mt-1">{{ consultation.doctor.name if consultation.doctor else 'Dr. Asignado' }}</p>
+                        <p class="text-xs text-slate-500">{{ consultation.doctor.email if consultation.doctor else '' }}</p>
+                    </div>
+                </div>
+
+                <!-- Clinical Content -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
+                    <!-- Motivo -->
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Motivo de Consulta</h3>
+                        <p class="mt-1.5 text-base font-semibold text-slate-900 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                            {{ consultation.reason }}
+                        </p>
+                    </div>
+
+                    <!-- Síntomas y Examen -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Anamnesis / Síntomas</h3>
+                            <div class="mt-1.5 text-sm text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-100 min-h-[90px] whitespace-pre-line">
+                                {{ consultation.symptoms or 'Sin detalles adicionales registrados.' }}
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Examen Físico</h3>
+                            <div class="mt-1.5 text-sm text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-100 min-h-[90px] whitespace-pre-line">
+                                {{ consultation.physical_exam or 'Sin hallazgos particulares registrados.' }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Diagnóstico CIE-10 -->
+                    <div>
+                        <h3 class="text-xs font-bold text-violet-700 uppercase tracking-wider">Diagnóstico Clínico (CIE-10)</h3>
+                        <div class="mt-1.5 p-3.5 rounded-xl bg-violet-50/80 border border-violet-200 text-violet-900 font-semibold text-sm">
+                            <i class="fas fa-stethoscope mr-2 text-violet-600"></i>
+                            {{ consultation.diagnosis or 'Pendiente de diagnóstico definitivo.' }}
+                        </div>
+                    </div>
+
+                    <!-- Tratamiento -->
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Plan Terapéutico y Conducta</h3>
+                        <div class="mt-1.5 text-sm text-slate-800 bg-slate-50 p-3.5 rounded-xl border border-slate-100 whitespace-pre-line">
+                            {{ consultation.treatment or 'Indicaciones generales sin plan farmacológico especial.' }}
+                        </div>
+                    </div>
+
+                    <!-- Prescripción Farmacológica -->
+                    <div class="border-2 border-dashed border-blue-200 rounded-xl p-5 bg-blue-50/30">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center">
+                                <i class="fas fa-prescription text-blue-600 mr-2 text-base"></i> Prescripción Médica / Receta
+                            </h3>
+                            <span class="text-[10px] text-blue-600 bg-blue-100 px-2 py-0.5 rounded font-semibold">Válida para farmacia</span>
+                        </div>
+                        <div class="text-sm text-slate-800 whitespace-pre-line font-mono bg-white p-3.5 rounded-lg border border-blue-100">
+                            {{ consultation.prescription or 'No se prescribieron medicamentos en esta consulta.' }}
+                        </div>
+                    </div>
+
+                    <!-- Notas Confidenciales -->
+                    {% if consultation.notes %}
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Notas Confidenciales</h3>
+                        <div class="mt-1.5 text-xs text-slate-500 italic bg-slate-50 p-3 rounded-lg">
+                            {{ consultation.notes }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- F3: Registro de Auditoría y Control de Ediciones -->
+                <div class="bg-amber-50/70 rounded-2xl border border-amber-200 p-5">
+                    <div class="flex items-center justify-between border-b border-amber-200/60 pb-3 mb-3">
+                        <h3 class="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center">
+                            <i class="fas fa-shield-alt mr-2 text-amber-600"></i> Registro de Integridad y Auditoría (F3)
+                        </h3>
+                        <span class="text-[11px] text-amber-800 font-semibold">{{ history_entries|length }} evento(s)</span>
+                    </div>
+
+                    <div class="space-y-2 text-xs text-amber-900">
+                        {% for h in history_entries %}
+                        <div class="flex items-start justify-between py-1 border-b border-amber-100/50 last:border-0">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full {% if h.action == 'created' %}bg-emerald-500{% else %}bg-amber-500{% endif %}"></span>
+                                <span>
+                                    <strong>{% if h.action == 'created' %}Creada{% else %}Modificada{% endif %}</strong> por 
+                                    <span class="font-mono">{{ h.user }}</span>
+                                    {% if h.reason %}<span class="italic text-slate-600"> — Motivo: "{{ h.reason }}"</span>{% endif %}
+                                </span>
+                            </div>
+                            <span class="text-[11px] font-mono text-slate-500">{{ h.timestamp }}</span>
+                        </div>
+                        {% else %}
+                        <p class="text-slate-500 italic">Registrada originalmente el {{ consultation.created_at.strftime("%d/%m/%Y %H:%M") }}.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

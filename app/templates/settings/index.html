@@ -1,0 +1,122 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Configuración — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'settings' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Configuración del Sistema" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-4xl mx-auto space-y-6">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900">Configuración del Consultorio y Sistema</h1>
+                    <p class="text-xs text-slate-500 mt-0.5">Parámetros generales de la clínica, membrete de recetas y conectividad multi-sede.</p>
+                </div>
+
+                {% if saved %}
+                <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center space-x-3 text-emerald-800 text-xs font-semibold">
+                    <i class="fas fa-check-circle text-emerald-600 text-base"></i>
+                    <span>¡Configuración guardada exitosamente! Los cambios se aplican de inmediato en todo el sistema.</span>
+                </div>
+                {% endif %}
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    <form method="post" action="/settings" class="space-y-6">
+                        <!-- Sección 1: Datos del Consultorio -->
+                        <div>
+                            <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center">
+                                <i class="fas fa-clinic-medical text-blue-600 mr-2"></i> Datos del Consultorio y Membrete
+                            </h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre de la Clínica / Consultorio <span class="text-red-500">*</span></label>
+                                    <input type="text" name="clinic_name" value="{{ setting.clinic_name }}" required 
+                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre del Doctor Titular</label>
+                                    <input type="text" name="doctor_name" value="{{ setting.doctor_name or '' }}" 
+                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Especialidad Médica</label>
+                                    <input type="text" name="specialty" value="{{ setting.specialty or '' }}" 
+                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Moneda del Sistema</label>
+                                    <select name="currency" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                                        <option value="RD$" {% if setting.currency == 'RD$' %}selected{% endif %}>RD$ (Pesos Dominicanos)</option>
+                                        <option value="USD$" {% if setting.currency == 'USD$' %}selected{% endif %}>USD$ (Dólares)</option>
+                                        <option value="€" {% if setting.currency == '€' %}selected{% endif %}>€ (Euros)</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Teléfono Principal</label>
+                                    <input type="text" name="phone" value="{{ setting.phone or '' }}" 
+                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Correo Electrónico</label>
+                                    <input type="email" name="email" value="{{ setting.email or '' }}" 
+                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                                </div>
+
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Dirección Física</label>
+                                    <input type="text" name="address" value="{{ setting.address or '' }}" 
+                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sección 2: Multi-sede y Sincronización -->
+                        <div class="pt-4 border-t border-slate-100">
+                            <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center">
+                                <i class="fas fa-network-wired text-indigo-600 mr-2"></i> Conectividad Multi-sede & Sincronización (Fase 6)
+                            </h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre de esta Sede</label>
+                                    <input type="text" name="sede_name" value="{{ setting.sede_name }}" required 
+                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Intervalo de Sync Automático</label>
+                                    <select name="sync_interval_minutes" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
+                                        <option value="1" {% if setting.sync_interval_minutes == 1 %}selected{% endif %}>Cada 1 minuto</option>
+                                        <option value="5" {% if setting.sync_interval_minutes == 5 %}selected{% endif %}>Cada 5 minutos (Recomendado)</option>
+                                        <option value="15" {% if setting.sync_interval_minutes == 15 %}selected{% endif %}>Cada 15 minutos</option>
+                                        <option value="30" {% if setting.sync_interval_minutes == 30 %}selected{% endif %}>Cada 30 minutos</option>
+                                    </select>
+                                </div>
+
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">IP de Tailscale (VPN Multi-sede)</label>
+                                    <input type="text" name="tailscale_ip" value="{{ setting.tailscale_ip or '' }}" placeholder="Ej. 100.x.y.z (Obtenida desde la app de Tailscale)" 
+                                        class="w-full px-3.5 py-2 text-sm font-mono border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
+                                    <p class="mt-1 text-[11px] text-slate-400">Permite enlazar de forma segura múltiples consultorios a través de internet sin abrir puertos.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-slate-100 pt-5 flex items-center justify-end space-x-3">
+                            <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold shadow-md transition-all">
+                                <i class="fas fa-save mr-1.5"></i> Guardar Cambios
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

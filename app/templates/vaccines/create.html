@@ -1,0 +1,107 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Registrar Vacuna (F12) — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'consultations' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Registrar Vacuna (F12)" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-3xl mx-auto space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Registrar Dosis de Vacuna</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Control de esquema de inmunización por paciente (F12).</p>
+                    </div>
+                    <a href="/vaccines" class="text-xs text-slate-500 hover:text-slate-800 font-medium">
+                        &larr; Volver al listado
+                    </a>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    <form method="post" action="/vaccines/create" class="space-y-6">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Paciente <span class="text-red-500">*</span></label>
+                            <select name="patient_id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white">
+                                <option value="">Seleccione el paciente...</option>
+                                {% for p in patients %}
+                                <option value="{{ p.id }}" {% if selected_patient and selected_patient.id == p.id %}selected{% endif %}>
+                                    {{ p.last_name }}, {{ p.first_name }} ({{ p.document_id or 'Sin DNI' }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Vacuna / Biológico <span class="text-red-500">*</span></label>
+                                <input type="text" id="vaccine_input" name="vaccine_name" required placeholder="Ej. Hepatitis B" 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Dosis <span class="text-red-500">*</span></label>
+                                <select name="dose" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg bg-white">
+                                    <option value="1ra Dosis">1ra Dosis</option>
+                                    <option value="2da Dosis">2da Dosis</option>
+                                    <option value="3ra Dosis">3ra Dosis</option>
+                                    <option value="Dosis de Refuerzo">Dosis de Refuerzo</option>
+                                    <option value="Dosis Única">Dosis Única</option>
+                                    <option value="Refuerzo Anual">Refuerzo Anual</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Plantillas de vacunas comunes -->
+                        <div>
+                            <p class="text-[11px] font-semibold text-slate-500 mb-1.5">Biológicos Frecuentes:</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                {% for v in common_vaccines %}
+                                <button type="button" onclick="document.getElementById('vaccine_input').value='{{ v.name }}'"
+                                    class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 hover:bg-cyan-100 hover:text-cyan-800 transition-colors">
+                                    {{ v.name }}
+                                </button>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Fecha de Aplicación <span class="text-red-500">*</span></label>
+                                <input type="date" name="application_date" value="{{ today }}" required class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Próximo Refuerzo</label>
+                                <input type="date" name="next_due_date" value="{{ next_year }}" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nº de Lote</label>
+                                <input type="text" name="lot_number" placeholder="Ej. LOT-9982B" class="w-full px-3.5 py-2 text-sm font-mono border border-slate-200 rounded-lg">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Observaciones / Reacciones Adversas Previas</label>
+                            <input type="text" name="notes" placeholder="Tolerancia adecuada, sin reacciones inmediatas..." class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg">
+                        </div>
+
+                        <div class="border-t border-slate-100 pt-5 flex items-center justify-end space-x-3">
+                            <a href="/vaccines" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">Cancelar</a>
+                            <button type="submit" class="px-5 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-cyan-500/20">
+                                <i class="fas fa-syringe mr-1.5"></i> Guardar Registro de Vacuna
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

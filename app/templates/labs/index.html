@@ -1,0 +1,82 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Resultados de Laboratorio — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'consultations' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Resultados de Laboratorio" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Resultados de Laboratorio & Diagnósticos</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Control de analíticas, perfiles bioquímicos, alertas de valores fuera de rango y archivo.</p>
+                    </div>
+                    <a href="/lab-results/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-md shadow-teal-500/20 transition-all">
+                        <i class="fas fa-vial mr-2"></i> Registrar Resultado
+                    </a>
+                </div>
+
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-slate-700 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3.5 px-5">Fecha</th>
+                                    <th class="py-3.5 px-5">Paciente</th>
+                                    <th class="py-3.5 px-5">Estudio / Prueba</th>
+                                    <th class="py-3.5 px-5">Categoría</th>
+                                    <th class="py-3.5 px-5">Hallazgos / Conclusión</th>
+                                    <th class="py-3.5 px-5">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for r in results %}
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-4 px-5 whitespace-nowrap font-mono text-xs text-slate-900">
+                                        {{ r.result_date.strftime("%d/%m/%Y") }}
+                                    </td>
+                                    <td class="py-4 px-5 font-semibold text-slate-900">
+                                        <a href="/patients/{{ r.patient.id }}" class="hover:text-blue-600">
+                                            {{ r.patient.first_name }} {{ r.patient.last_name }}
+                                        </a>
+                                        <span class="block text-[11px] text-slate-400">DNI: {{ r.patient.document_id or 'N/D' }}</span>
+                                    </td>
+                                    <td class="py-4 px-5 font-semibold text-slate-800">{{ r.test_name }}</td>
+                                    <td class="py-4 px-5 text-xs text-slate-500">{{ r.test_category }}</td>
+                                    <td class="py-4 px-5 text-xs text-slate-700 max-w-xs truncate">{{ r.summary_findings }}</td>
+                                    <td class="py-4 px-5 whitespace-nowrap">
+                                        {% if r.is_abnormal %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                                            <i class="fas fa-exclamation-triangle mr-1"></i> Anormal
+                                        </span>
+                                        {% else %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                                            <i class="fas fa-check-circle mr-1"></i> Normal
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="py-12 text-center text-slate-400">
+                                        <i class="fas fa-flask text-3xl mb-3 block text-slate-300"></i>
+                                        No hay resultados de laboratorio registrados.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

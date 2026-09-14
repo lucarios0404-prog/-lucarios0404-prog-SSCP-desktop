@@ -1,0 +1,170 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Agendar Cita — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'appointments' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Agendar Cita Médica" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-3xl mx-auto space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Agendar Cita Médica</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Programa una cita individual o recurrente con atajos de calendario.</p>
+                    </div>
+                    <a href="/appointments" class="text-xs text-slate-500 hover:text-slate-800 font-medium">
+                        &larr; Volver a la agenda
+                    </a>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    <form method="post" action="/appointments/create" class="space-y-6">
+                        <!-- Paciente Select -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Paciente <span class="text-red-500">*</span>
+                            </label>
+                            <select name="patient_id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white">
+                                <option value="">Seleccione un paciente...</option>
+                                {% for p in patients %}
+                                <option value="{{ p.id }}" {% if selected_patient_id == p.id %}selected{% endif %}>
+                                    {{ p.last_name }}, {{ p.first_name }} ({{ p.document_id or 'Sin DNI' }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <p class="mt-1 text-[11px] text-slate-400">¿No está en la lista? <a href="/patients/create" class="text-blue-600 hover:underline">Registrar nuevo paciente</a>.</p>
+                        </div>
+
+                        <!-- F1: Selector de fecha con atajos rápidos -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+                                <i class="fas fa-calendar-alt text-blue-600 mr-1.5"></i> Fecha de la Cita (F1: Atajos Rápidos)
+                            </label>
+                            
+                            <div class="flex flex-wrap gap-2 mb-3">
+                                <button type="button" onclick="document.getElementById('appointment_date').value='{{ quick_dates.today }}'" 
+                                    class="px-3 py-1 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                                    Hoy
+                                </button>
+                                <button type="button" onclick="document.getElementById('appointment_date').value='{{ quick_dates.plus_7 }}'" 
+                                    class="px-3 py-1 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                                    +7 Días (1 semana)
+                                </button>
+                                <button type="button" onclick="document.getElementById('appointment_date').value='{{ quick_dates.plus_15 }}'" 
+                                    class="px-3 py-1 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                                    +15 Días (Quincena)
+                                </button>
+                                <button type="button" onclick="document.getElementById('appointment_date').value='{{ quick_dates.plus_30 }}'" 
+                                    class="px-3 py-1 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                                    +30 Días (1 Mes)
+                                </button>
+                            </div>
+
+                            <input type="date" id="appointment_date" name="date" value="{{ initial_date }}" required 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                        </div>
+
+                        <!-- Horarios -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Hora de Inicio <span class="text-red-500">*</span></label>
+                                <input type="time" id="start_time" name="start_time" value="09:00" required onchange="autoSetEndTime()"
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Hora de Fin <span class="text-red-500">*</span></label>
+                                <input type="time" id="end_time" name="end_time" value="09:30" required 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                        </div>
+
+                        <!-- Motivo y Notas -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Motivo de la Cita <span class="text-red-500">*</span></label>
+                            <input type="text" name="reason" required placeholder="Ej. Consulta de rutina, Seguimiento de tratamiento, Dolor articular" 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Notas Adicionales</label>
+                            <textarea name="notes" rows="2" placeholder="Indicaciones previas, paciente en ayunas, traer estudios..." 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"></textarea>
+                        </div>
+
+                        <!-- F14: Citas Recurrentes -->
+                        <div class="bg-indigo-50/70 p-4 rounded-xl border border-indigo-100 space-y-3">
+                            <div class="flex items-center">
+                                <input type="checkbox" id="is_recurring" name="is_recurring" value="true" onchange="toggleRecurrenceFields()"
+                                    class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500">
+                                <label for="is_recurring" class="ml-2.5 text-xs font-bold text-indigo-900 cursor-pointer">
+                                    <i class="fas fa-redo-alt mr-1"></i> Programar como Cita Recurrente (F14)
+                                </label>
+                            </div>
+
+                            <div id="recurrence_options" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-indigo-950 uppercase tracking-wider mb-1">Repeticiones (Meses / Ocurrencias)</label>
+                                    <select name="recurrence_count" class="w-full px-3 py-1.5 text-xs border border-indigo-200 rounded-lg bg-white">
+                                        <option value="2">2 citas (Mes 1 y Mes 2)</option>
+                                        <option value="3" selected>3 citas (Trimestral)</option>
+                                        <option value="6">6 citas (Semestral)</option>
+                                        <option value="12">12 citas (Anual)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-indigo-950 uppercase tracking-wider mb-1">Frecuencia / Intervalo</label>
+                                    <select name="recurrence_interval_days" class="w-full px-3 py-1.5 text-xs border border-indigo-200 rounded-lg bg-white">
+                                        <option value="7">Cada 7 días (Semanal)</option>
+                                        <option value="15">Cada 15 días (Quincenal)</option>
+                                        <option value="30" selected>Cada 30 días (Mensual)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-slate-100 pt-5 flex items-center justify-end space-x-3">
+                            <a href="/appointments" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">Cancelar</a>
+                            <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-blue-500/20 transition-all">
+                                <i class="fas fa-check mr-1.5"></i> Confirmar y Agendar Cita
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function autoSetEndTime() {
+    const start = document.getElementById('start_time').value;
+    if (start) {
+        const [h, m] = start.split(':').map(Number);
+        const d = new Date();
+        d.setHours(h);
+        d.setMinutes(m + 30);
+        const endH = String(d.getHours()).padStart(2, '0');
+        const endM = String(d.getMinutes()).padStart(2, '0');
+        document.getElementById('end_time').value = `${endH}:${endM}`;
+    }
+}
+
+function toggleRecurrenceFields() {
+    const check = document.getElementById('is_recurring').checked;
+    const opts = document.getElementById('recurrence_options');
+    if (check) {
+        opts.classList.remove('hidden');
+    } else {
+        opts.classList.add('hidden');
+    }
+}
+</script>
+{% endblock %}

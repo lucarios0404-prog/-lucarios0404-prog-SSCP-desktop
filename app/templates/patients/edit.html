@@ -1,0 +1,102 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Editar Paciente — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'patients' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Editar Paciente" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-4xl mx-auto space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Editar Datos del Paciente</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Modifica los datos personales y de contacto de {{ patient.first_name }} {{ patient.last_name }}.</p>
+                    </div>
+                    <a href="/patients/{{ patient.id }}" class="text-xs text-slate-500 hover:text-slate-800 font-medium">
+                        &larr; Volver a la ficha
+                    </a>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    <form method="post" action="/patients/{{ patient.id }}/edit" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre <span class="text-red-500">*</span></label>
+                                <input type="text" name="first_name" value="{{ patient.first_name }}" required class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Apellido <span class="text-red-500">*</span></label>
+                                <input type="text" name="last_name" value="{{ patient.last_name }}" required class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Cédula / DNI / Pasaporte</label>
+                                <input type="text" name="document_id" value="{{ patient.document_id or '' }}" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Fecha de Nacimiento</label>
+                                <input type="date" name="date_of_birth" value="{{ patient.date_of_birth.strftime('%Y-%m-%d') if patient.date_of_birth else '' }}" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Género</label>
+                                <select name="gender" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                                    <option value="">Seleccione...</option>
+                                    <option value="M" {% if patient.gender == 'M' %}selected{% endif %}>Masculino</option>
+                                    <option value="F" {% if patient.gender == 'F' %}selected{% endif %}>Femenino</option>
+                                    <option value="O" {% if patient.gender == 'O' %}selected{% endif %}>Otro</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Tipo de Sangre</label>
+                                <select name="blood_type" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                                    <option value="">Desconocido</option>
+                                    {% for bt in ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'] %}
+                                    <option value="{{ bt }}" {% if patient.blood_type == bt %}selected{% endif %}>{{ bt }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Teléfono / WhatsApp</label>
+                                <input type="text" name="phone" value="{{ patient.phone or '' }}" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Correo Electrónico</label>
+                                <input type="email" name="email" value="{{ patient.email or '' }}" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Dirección de Residencia</label>
+                                <input type="text" name="address" value="{{ patient.address or '' }}" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Contacto de Emergencia</label>
+                                <input type="text" name="emergency_contact_name" value="{{ patient.emergency_contact_name or '' }}" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Teléfono de Emergencia</label>
+                                <input type="text" name="emergency_contact_phone" value="{{ patient.emergency_contact_phone or '' }}" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                        </div>
+
+                        <div class="border-t border-slate-100 pt-5 flex items-center justify-end space-x-3">
+                            <a href="/patients/{{ patient.id }}" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">Cancelar</a>
+                            <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-blue-500/20 transition-all">
+                                <i class="fas fa-save mr-1.5"></i> Actualizar Paciente
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

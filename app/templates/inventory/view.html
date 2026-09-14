@@ -1,0 +1,211 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}{{ item.name }} — Inventario SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'inventory' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Detalle del Artículo & Movimientos" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-6xl mx-auto space-y-6">
+                <!-- Top Back Bar -->
+                <div class="flex items-center justify-between">
+                    <a href="/inventory" class="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors">
+                        <i class="fas fa-arrow-left mr-1.5"></i> Volver a Inventario
+                    </a>
+                    <div class="flex items-center space-x-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold {% if item.stock == 0 %}bg-rose-100 text-rose-700 border border-rose-200{% elif item.stock <= item.min_stock %}bg-amber-100 text-amber-700 border border-amber-200{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                            {% if item.stock == 0 %}Agotado{% elif item.stock <= item.min_stock %}Alerta: Stock Bajo{% else %}Stock Óptimo{% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Main Overview & Action Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Column 1 & 2: Item Details & Movement Form -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <!-- Item Header Card -->
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                                <div>
+                                    <span class="text-[11px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full">
+                                        {{ item.category }}
+                                    </span>
+                                    <h1 class="text-2xl font-bold text-slate-900 mt-2">{{ item.name }}</h1>
+                                    {% if item.description %}
+                                    <p class="text-xs text-slate-500 mt-1">{{ item.description }}</p>
+                                    {% endif %}
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs text-slate-400 block uppercase font-bold">Existencia</span>
+                                    <div class="text-3xl font-black text-slate-900">
+                                        {{ item.stock }} <span class="text-sm font-semibold text-slate-500">{{ item.unit }}</span>
+                                    </div>
+                                    <span class="text-[11px] text-slate-400 block mt-0.5">Mínimo sugerido: {{ item.min_stock }} {{ item.unit }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Register New Movement Form -->
+                            <div class="pt-6">
+                                <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center">
+                                    <i class="fas fa-dolly text-blue-600 mr-2"></i> Registrar Movimiento de Stock
+                                </h3>
+                                <form method="POST" action="/inventory/{{ item.id }}/movement" class="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-4">
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                                Tipo de Movimiento
+                                            </label>
+                                            <select name="type" required class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                                <option value="in">📥 Entrada (Compra / Suministro)</option>
+                                                <option value="out">📤 Salida (Uso / Consumo paciente)</option>
+                                                <option value="adjustment">⚙️ Ajuste Manual de Inventario</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                                Cantidad ({{ item.unit }})
+                                            </label>
+                                            <input type="number" name="quantity" min="1" required placeholder="Ej: 10" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none font-bold">
+                                        </div>
+
+                                        <div class="sm:col-span-1 flex items-end">
+                                            <button type="submit" class="w-full py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all">
+                                                <i class="fas fa-check mr-1.5"></i> Aplicar
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                            Motivo / Nota (Opcional)
+                                        </label>
+                                        <input type="text" name="notes" placeholder="Ej: Compra a droguería Fact #882, o aplicado a paciente..." class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Movement History Table -->
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                            <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center">
+                                <i class="fas fa-history text-slate-600 mr-2"></i> Historial de Movimientos (Kardex)
+                            </h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs text-slate-600">
+                                    <thead class="bg-slate-50 text-slate-700 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
+                                        <tr>
+                                            <th class="py-2.5 px-4">Fecha y Hora</th>
+                                            <th class="py-2.5 px-4">Tipo</th>
+                                            <th class="py-2.5 px-4">Cantidad</th>
+                                            <th class="py-2.5 px-4">Motivo / Detalle</th>
+                                            <th class="py-2.5 px-4">Usuario</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        {% for mov in movements %}
+                                        <tr class="hover:bg-slate-50/80">
+                                            <td class="py-3 px-4 whitespace-nowrap font-mono text-slate-500">
+                                                {{ mov.created_at.strftime("%d/%m/%Y %H:%M") if mov.created_at else 'N/D' }}
+                                            </td>
+                                            <td class="py-3 px-4 whitespace-nowrap">
+                                                {% if mov.type == 'in' %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                                                    Entrada
+                                                </span>
+                                                {% elif mov.type == 'out' %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">
+                                                    Salida
+                                                </span>
+                                                {% else %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">
+                                                    Ajuste
+                                                </span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="py-3 px-4 font-bold whitespace-nowrap {% if mov.type == 'in' %}text-emerald-600{% elif mov.type == 'out' %}text-rose-600{% else %}text-blue-600{% endif %}">
+                                                {% if mov.type == 'in' %}+{% elif mov.type == 'out' %}-{% endif %}{{ mov.quantity }} {{ item.unit }}
+                                            </td>
+                                            <td class="py-3 px-4 text-slate-700">
+                                                {{ mov.notes or 'Sin observaciones' }}
+                                            </td>
+                                            <td class="py-3 px-4 whitespace-nowrap text-slate-400">
+                                                {{ mov.user.name or mov.user.email if mov.user else 'Sistema' }}
+                                            </td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="5" class="py-8 text-center text-slate-400">
+                                                No hay movimientos registrados para este artículo.
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Column 3: Quick Edit Parameters Card -->
+                    <div class="space-y-6">
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                            <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center">
+                                <i class="fas fa-edit text-slate-600 mr-2"></i> Modificar Parámetros
+                            </h3>
+                            <form method="POST" action="/inventory/{{ item.id }}/edit" class="space-y-4 text-xs">
+                                <div>
+                                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Nombre</label>
+                                    <input type="text" name="name" value="{{ item.name }}" required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                </div>
+
+                                <div>
+                                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Categoría</label>
+                                    <select name="category" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                        {% for cat in categories %}
+                                        <option value="{{ cat }}" {% if item.category == cat %}selected{% endif %}>{{ cat }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Stock Mínimo (Alerta)</label>
+                                    <input type="number" name="min_stock" value="{{ item.min_stock }}" min="0" required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                </div>
+
+                                <div>
+                                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Unidad de Medida</label>
+                                    <select name="unit" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                        {% for u in units %}
+                                        <option value="{{ u }}" {% if item.unit == u %}selected{% endif %}>{{ u }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Precio Unitario (RD$)</label>
+                                    <input type="number" step="0.01" name="price" value="{{ item.price }}" min="0" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                </div>
+
+                                <div>
+                                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Descripción</label>
+                                    <textarea name="description" rows="2" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none">{{ item.description or '' }}</textarea>
+                                </div>
+
+                                <button type="submit" class="w-full py-2 px-4 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-semibold transition-all">
+                                    Guardar Cambios
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,157 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Editar Consulta #{{ consultation.id }} — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'consultations' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Editar Historia Médica (F3)" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-4xl mx-auto space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Editar Consulta #{{ consultation.id }}</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Modificación autorizada de historia clínica (F3: Queda constancia en registro de auditoría).</p>
+                    </div>
+                    <a href="/consultations/{{ consultation.id }}" class="text-xs text-slate-500 hover:text-slate-800 font-medium">
+                        &larr; Volver al detalle
+                    </a>
+                </div>
+
+                <!-- Alert Notice -->
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start space-x-3 text-amber-800 text-xs">
+                    <i class="fas fa-exclamation-triangle text-amber-600 text-base mt-0.5 shrink-0"></i>
+                    <div>
+                        <strong class="font-bold">Aviso de Auditoría Médica:</strong> Todos los cambios realizados a esta consulta quedarán grabados permanentemente con tu usuario, fecha, hora y el motivo de cambio que especifiques abajo.
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    <form method="post" action="/consultations/{{ consultation.id }}/edit" class="space-y-6">
+                        <!-- Paciente Fijo -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex items-center justify-between">
+                            <div>
+                                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Paciente</span>
+                                <h3 class="text-base font-bold text-slate-900">{{ consultation.patient.first_name }} {{ consultation.patient.last_name }}</h3>
+                            </div>
+                            <span class="text-xs text-slate-500 font-mono">DNI: {{ consultation.patient.document_id or 'N/D' }}</span>
+                        </div>
+
+                        <!-- Motivo de la modificación (F3) -->
+                        <div class="bg-amber-50/50 p-4 rounded-xl border border-amber-200">
+                            <label class="block text-xs font-bold text-amber-950 uppercase tracking-wider mb-1.5">
+                                Motivo de la Modificación (Requerido para Auditoría) <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="edit_reason" required placeholder="Ej. Corrección de posología, actualización de notas o diagnóstico" 
+                                class="w-full px-3.5 py-2 text-sm border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        </div>
+
+                        <!-- Motivo de la consulta -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Motivo de la Consulta <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="reason" value="{{ consultation.reason }}" required 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">
+                        </div>
+
+                        <!-- Síntomas y Examen Físico -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Anamnesis / Síntomas Subjetivos
+                                </label>
+                                <textarea name="symptoms" rows="4" 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">{{ consultation.symptoms or '' }}</textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Examen Físico / Signos Observados
+                                </label>
+                                <textarea name="physical_exam" rows="4" 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">{{ consultation.physical_exam or '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <!-- Diagnóstico -->
+                        <div class="bg-violet-50/50 p-4 rounded-xl border border-violet-100 space-y-3">
+                            <div>
+                                <label class="block text-xs font-bold text-violet-950 uppercase tracking-wider mb-1.5">
+                                    <i class="fas fa-stethoscope mr-1"></i> Diagnóstico y Código CIE-10
+                                </label>
+                                <input type="text" id="diagnosis_input" name="diagnosis" value="{{ consultation.diagnosis or '' }}" 
+                                    class="w-full px-3.5 py-2 text-sm border border-violet-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-violet-500">
+                            </div>
+
+                            <div>
+                                <p class="text-[11px] font-semibold text-violet-900 mb-1.5">Sugerencias CIE-10:</p>
+                                <div class="flex flex-wrap gap-1.5">
+                                    {% for item in cie10_common %}
+                                    <button type="button" onclick="setDiagnosis('{{ item.code }} - {{ item.description }}')" 
+                                        class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white text-violet-700 border border-violet-200 hover:bg-violet-600 hover:text-white transition-colors">
+                                        <strong>{{ item.code }}</strong> {{ item.description }}
+                                    </button>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Plan y Tratamiento -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Plan Terapéutico y Conducta Médica
+                            </label>
+                            <textarea name="treatment" rows="3" 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">{{ consultation.treatment or '' }}</textarea>
+                        </div>
+
+                        <!-- Prescripción / Receta -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
+                                <i class="fas fa-pills text-blue-600 mr-1"></i> Prescripción Farmacológica / Receta
+                            </label>
+                            <textarea name="prescription" rows="3" 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">{{ consultation.prescription or '' }}</textarea>
+                        </div>
+
+                        <!-- Notas confidenciales -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Notas Confidenciales
+                            </label>
+                            <textarea name="notes" rows="2" 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">{{ consultation.notes or '' }}</textarea>
+                        </div>
+
+                        <div class="border-t border-slate-100 pt-5 flex items-center justify-end space-x-3">
+                            <a href="/consultations/{{ consultation.id }}" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">Cancelar</a>
+                            <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-amber-500/20 transition-all">
+                                <i class="fas fa-check mr-1.5"></i> Guardar Cambios y Registrar Auditoría (F3)
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setDiagnosis(text) {
+    const input = document.getElementById('diagnosis_input');
+    if (input.value) {
+        input.value = input.value + '; ' + text;
+    } else {
+        input.value = text;
+    }
+}
+</script>
+{% endblock %}

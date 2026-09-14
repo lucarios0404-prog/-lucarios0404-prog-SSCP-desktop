@@ -1,0 +1,295 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Signos Vitales de {{ patient.first_name }} {{ patient.last_name }} — SSCP Desktop{% endblock %}
+
+{% block head %}
+<!-- Chart.js para F11: Gráficas de evolución -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'patients' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Evolución de Signos Vitales (F11)" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+                <!-- Patient Info Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-center space-x-3">
+                        <a href="/patients/{{ patient.id }}" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100">
+                            <i class="fas fa-arrow-left"></i>
+                        </a>
+                        <div>
+                            <h1 class="text-2xl font-bold text-slate-900">Curva de Signos Vitales — {{ patient.first_name }} {{ patient.last_name }}</h1>
+                            <p class="text-xs text-slate-500">Monitoreo hemodinámico continuo, curvas de tensión arterial, peso y glucosa (F11).</p>
+                        </div>
+                    </div>
+
+                    <a href="/patients/{{ patient.id }}" class="inline-flex items-center px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-all">
+                        <i class="fas fa-id-card-alt mr-1.5"></i> Ficha del Paciente
+                    </a>
+                </div>
+
+                <!-- F11: Interactive Evolution Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Chart 1: Blood Pressure & Heart Rate -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center">
+                                <i class="fas fa-heartbeat text-rose-500 mr-2 text-base"></i> Presión Arterial & Pulso (F11)
+                            </h3>
+                            <span class="text-[11px] text-slate-400 font-medium">mmHg / bpm</span>
+                        </div>
+                        <div class="relative h-64">
+                            <canvas id="bpChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 2: Weight & Glucose -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center">
+                                <i class="fas fa-weight text-blue-600 mr-2 text-base"></i> Evolución de Peso & Glucosa (F11)
+                            </h3>
+                            <span class="text-[11px] text-slate-400 font-medium">kg / mg/dL</span>
+                        </div>
+                        <div class="relative h-64">
+                            <canvas id="weightChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Registration Form + History Table Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Form Column -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center">
+                            <i class="fas fa-plus-circle text-blue-600 mr-2"></i> Registrar Nueva Toma
+                        </h3>
+
+                        <form method="post" action="/vitals/patient/{{ patient.id }}/create" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Presión Sistólica</label>
+                                    <input type="number" name="systolic_bp" placeholder="120" class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Presión Diastólica</label>
+                                    <input type="number" name="diastolic_bp" placeholder="80" class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Pulso / FC (bpm)</label>
+                                    <input type="number" name="heart_rate" placeholder="75" class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Temperatura (°C)</label>
+                                    <input type="number" step="0.1" name="temperature_c" placeholder="36.5" class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Peso (kg)</label>
+                                    <input type="number" step="0.1" id="in_weight" name="weight_kg" placeholder="70.5" oninput="calcBMI()" class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Talla (cm)</label>
+                                    <input type="number" step="0.1" id="in_height" name="height_cm" placeholder="175" oninput="calcBMI()" class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">SatO2 (%)</label>
+                                    <input type="number" step="0.1" name="oxygen_saturation" placeholder="98" class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Glucosa (mg/dL)</label>
+                                    <input type="number" step="0.1" name="glucose_mg_dl" placeholder="95" class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
+                                </div>
+                            </div>
+
+                            <div id="bmi_preview" class="hidden p-2 rounded-lg bg-blue-50 text-blue-800 text-xs font-semibold text-center">
+                                IMC Calculado: <span id="bmi_val"></span> kg/m²
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Observaciones</label>
+                                <input type="text" name="notes" placeholder="Toma en reposo, paciente en ayunas..." class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
+                            </div>
+
+                            <button type="submit" class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-md transition-all">
+                                <i class="fas fa-save mr-1"></i> Guardar Medición
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- History Table Column -->
+                    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center">
+                            <i class="fas fa-history text-indigo-600 mr-2"></i> Historial Cronológico de Tomas
+                        </h3>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs text-slate-600">
+                                <thead class="bg-slate-50 text-slate-700 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
+                                    <tr>
+                                        <th class="py-2.5 px-3">Fecha</th>
+                                        <th class="py-2.5 px-3">PA (mmHg)</th>
+                                        <th class="py-2.5 px-3">FC / Pulso</th>
+                                        <th class="py-2.5 px-3">Peso / IMC</th>
+                                        <th class="py-2.5 px-3">Temp / SatO2</th>
+                                        <th class="py-2.5 px-3">Glucosa</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    {% for v in vitals %}
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="py-2.5 px-3 font-semibold text-slate-900">{{ v.recorded_at.strftime("%d/%m/%Y %H:%M") }}</td>
+                                        <td class="py-2.5 px-3 font-mono">
+                                            {% if v.systolic_bp and v.diastolic_bp %}
+                                            <span class="font-bold {% if v.systolic_bp >= 140 or v.diastolic_bp >= 90 %}text-rose-600{% else %}text-slate-900{% endif %}">
+                                                {{ v.systolic_bp }}/{{ v.diastolic_bp }}
+                                            </span>
+                                            {% else %}N/D{% endif %}
+                                        </td>
+                                        <td class="py-2.5 px-3 font-mono">{{ v.heart_rate or 'N/D' }} bpm</td>
+                                        <td class="py-2.5 px-3">
+                                            {{ v.weight_kg ~ ' kg' if v.weight_kg else 'N/D' }}
+                                            {% if v.bmi %}<span class="text-[10px] text-slate-400 block font-mono">IMC: {{ v.bmi }}</span>{% endif %}
+                                        </td>
+                                        <td class="py-2.5 px-3">
+                                            {{ v.temperature_c ~ '°C' if v.temperature_c else 'N/D' }}
+                                            {% if v.oxygen_saturation %}<span class="text-[10px] text-blue-600 block">{{ v.oxygen_saturation }}% Sat</span>{% endif %}
+                                        </td>
+                                        <td class="py-2.5 px-3 font-mono font-bold text-amber-700">
+                                            {{ (v.glucose_mg_dl|string ~ ' mg/dL') if v.glucose_mg_dl else 'N/D' }}
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="py-8 text-center text-slate-400 italic">No hay mediciones registradas para este paciente.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function calcBMI() {
+    const w = parseFloat(document.getElementById('in_weight').value);
+    const h = parseFloat(document.getElementById('in_height').value);
+    const prev = document.getElementById('bmi_preview');
+    if (w > 0 && h > 0) {
+        const hm = h / 100;
+        const bmi = (w / (hm * hm)).toFixed(1);
+        document.getElementById('bmi_val').innerText = bmi;
+        prev.classList.remove('hidden');
+    } else {
+        prev.classList.add('hidden');
+    }
+}
+
+// Inicializar Chart.js con los datos de F11
+const labels = {{ chart_dates | tojson }};
+const systolics = {{ chart_systolics | tojson }};
+const diastolics = {{ chart_diastolics | tojson }};
+const heartRates = {{ chart_heart_rates | tojson }};
+const weights = {{ chart_weights | tojson }};
+const glucoses = {{ chart_glucoses | tojson }};
+
+// Chart 1: Presión Arterial
+const ctxBp = document.getElementById('bpChart').getContext('2d');
+new Chart(ctxBp, {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [
+            {
+                label: 'Sistólica (mmHg)',
+                data: systolics,
+                borderColor: '#e11d48',
+                backgroundColor: 'rgba(225, 29, 72, 0.1)',
+                tension: 0.3,
+                fill: false
+            },
+            {
+                label: 'Diastólica (mmHg)',
+                data: diastolics,
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                tension: 0.3,
+                fill: false
+            },
+            {
+                label: 'Pulso (bpm)',
+                data: heartRates,
+                borderColor: '#6366f1',
+                borderDash: [5, 5],
+                tension: 0.3,
+                fill: false
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: { min: 40, max: 200 }
+        }
+    }
+});
+
+// Chart 2: Peso y Glucosa
+const ctxWeight = document.getElementById('weightChart').getContext('2d');
+new Chart(ctxWeight, {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [
+            {
+                label: 'Peso (kg)',
+                data: weights,
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.15)',
+                tension: 0.3,
+                fill: true,
+                yAxisID: 'y'
+            },
+            {
+                label: 'Glucosa (mg/dL)',
+                data: glucoses,
+                borderColor: '#059669',
+                tension: 0.3,
+                fill: false,
+                yAxisID: 'y1'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: { type: 'linear', position: 'left' },
+            y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } }
+        }
+    }
+});
+</script>
+{% endblock %}

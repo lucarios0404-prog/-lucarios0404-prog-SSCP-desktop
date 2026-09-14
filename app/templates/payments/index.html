@@ -1,0 +1,220 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Facturación y Pagos — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'payments' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Facturación & Cobros" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+                <!-- Header Actions -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Facturación & Pagos</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Control de ingresos, cobro de consultas y cuentas por cobrar (F13).</p>
+                    </div>
+                    <a href="/payments/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-md shadow-emerald-500/20 transition-all">
+                        <i class="fas fa-plus-circle mr-2"></i> Registrar Nuevo Pago / Cobro
+                    </a>
+                </div>
+
+                <!-- KPI Totals -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Cobrado (Ingresos)</p>
+                            <h3 class="text-2xl font-bold text-emerald-600 mt-1">RD$ {{ "%.2f"|format(total_cobrado) }}</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+                            <i class="fas fa-hand-holding-usd"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cuentas por Cobrar (F13)</p>
+                            <h3 class="text-2xl font-bold text-amber-600 mt-1">RD$ {{ "%.2f"|format(total_pendiente) }}</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
+                            <i class="fas fa-file-invoice-dollar"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pacientes con Deuda</p>
+                            <h3 class="text-2xl font-bold text-red-600 mt-1">{{ debtors|length }}</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-xl font-bold">
+                            <i class="fas fa-users-slash"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabs Navigation -->
+                <div class="border-b border-slate-200 flex space-x-6">
+                    <a href="/payments?status=all" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'all' %}border-blue-600 text-blue-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+                        <i class="fas fa-list mr-1.5"></i> Todos los Pagos
+                    </a>
+                    <a href="/payments?status=paid" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'paid' %}border-emerald-600 text-emerald-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+                        <i class="fas fa-check-circle mr-1.5"></i> Cobrados
+                    </a>
+                    <a href="/payments?status=pending" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'pending' %}border-amber-600 text-amber-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+                        <i class="fas fa-clock mr-1.5"></i> Pendientes de Pago
+                    </a>
+                    <a href="/payments?status=receivables" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'receivables' %}border-red-600 text-red-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+                        <i class="fas fa-exclamation-triangle mr-1.5"></i> Cuentas por Cobrar (F13)
+                    </a>
+                </div>
+
+                <!-- Table Content -->
+                {% if status_filter == 'receivables' %}
+                <!-- Debtor Patients List (F13) -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-5 py-3.5 bg-red-50/50 border-b border-red-100 flex items-center justify-between">
+                        <span class="text-xs font-bold text-red-900 uppercase tracking-wider">
+                            <i class="fas fa-users mr-1.5"></i> Pacientes con Saldo Deudor Pendiente
+                        </span>
+                        <span class="text-xs text-red-700 font-semibold">{{ debtors|length }} pacientes</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-slate-700 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3.5 px-5">Paciente</th>
+                                    <th class="py-3.5 px-5">Teléfono</th>
+                                    <th class="py-3.5 px-5">Facturas Pendientes</th>
+                                    <th class="py-3.5 px-5">Deuda Total</th>
+                                    <th class="py-3.5 px-5 text-right">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for d in debtors %}
+                                <tr class="hover:bg-red-50/20 transition-colors">
+                                    <td class="py-4 px-5 font-semibold text-slate-900">
+                                        <a href="/patients/{{ d.patient.id }}" class="hover:text-blue-600">
+                                            {{ d.patient.first_name }} {{ d.patient.last_name }}
+                                        </a>
+                                        <span class="block text-[11px] text-slate-400">DNI: {{ d.patient.document_id or 'Sin DNI' }}</span>
+                                    </td>
+                                    <td class="py-4 px-5 text-xs text-slate-600">{{ d.patient.phone or 'Sin teléfono' }}</td>
+                                    <td class="py-4 px-5">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-800">
+                                            {{ d.pending_count }} recibo(s)
+                                        </span>
+                                    </td>
+                                    <td class="py-4 px-5 font-bold text-red-600 text-base">
+                                        RD$ {{ "%.2f"|format(d.total_debt) }}
+                                    </td>
+                                    <td class="py-4 px-5 text-right">
+                                        <a href="/patients/{{ d.patient.id }}" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-semibold shadow-sm transition-all">
+                                            <i class="fas fa-hand-holding-usd mr-1.5"></i> Gestionar Cobro
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="py-12 text-center text-slate-400">
+                                        <i class="fas fa-smile text-3xl mb-3 block text-emerald-400"></i>
+                                        ¡Excelente! No hay pacientes con deuda pendiente en este momento.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% else %}
+                <!-- Standard Payments Table -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-slate-700 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3.5 px-5">Recibo / Fecha</th>
+                                    <th class="py-3.5 px-5">Paciente</th>
+                                    <th class="py-3.5 px-5">Servicio</th>
+                                    <th class="py-3.5 px-5">Método</th>
+                                    <th class="py-3.5 px-5">Total</th>
+                                    <th class="py-3.5 px-5">Estado</th>
+                                    <th class="py-3.5 px-5 text-right">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for p in payments %}
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-4 px-5 whitespace-nowrap">
+                                        <span class="font-mono text-xs font-bold text-slate-900">{{ p.receipt_number or ('REC-' ~ p.id) }}</span>
+                                        <span class="block text-[11px] text-slate-400">{{ p.created_at.strftime("%d/%m/%Y %H:%M") }}</span>
+                                    </td>
+                                    <td class="py-4 px-5 font-semibold text-slate-900">
+                                        {% if p.patient %}
+                                        <a href="/patients/{{ p.patient.id }}" class="hover:text-blue-600">
+                                            {{ p.patient.first_name }} {{ p.patient.last_name }}
+                                        </a>
+                                        {% else %}
+                                        <span class="text-slate-400 italic">Paciente N/D</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-4 px-5 text-xs text-slate-700">{{ p.service_name }}</td>
+                                    <td class="py-4 px-5 whitespace-nowrap">
+                                        <span class="inline-flex items-center text-xs text-slate-600 font-medium">
+                                            {% if p.payment_method == 'cash' %}💵 Efectivo
+                                            {% elif p.payment_method == 'card' %}💳 Tarjeta
+                                            {% elif p.payment_method == 'transfer' %}🏦 Transferencia
+                                            {% elif p.payment_method == 'insurance' %}🏥 Seguro Médico
+                                            {% else %}{{ p.payment_method }}{% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="py-4 px-5 whitespace-nowrap font-bold text-slate-900">
+                                        RD$ {{ "%.2f"|format(p.total) }}
+                                        {% if p.discount and p.discount > 0 %}
+                                        <span class="block text-[10px] text-emerald-600 font-normal">Desc: -RD$ {{ "%.2f"|format(p.discount) }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-4 px-5 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold
+                                            {% if p.status == 'paid' %}bg-emerald-100 text-emerald-800 border border-emerald-200
+                                            {% elif p.status == 'pending' %}bg-amber-100 text-amber-800 border border-amber-200
+                                            {% else %}bg-red-100 text-red-800 border border-red-200{% endif %}">
+                                            {% if p.status == 'paid' %}<i class="fas fa-check-circle mr-1"></i> Cobrado
+                                            {% elif p.status == 'pending' %}<i class="fas fa-clock mr-1"></i> Pendiente
+                                            {% else %}{{ p.status }}{% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="py-4 px-5 text-right whitespace-nowrap">
+                                        {% if p.status == 'pending' %}
+                                        <form method="post" action="/payments/{{ p.id }}/pay" class="inline">
+                                            <button type="submit" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all">
+                                                <i class="fas fa-check mr-1"></i> Cobrar Ahora
+                                            </button>
+                                        </form>
+                                        {% else %}
+                                        <span class="text-xs text-slate-400 font-mono">OK</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="7" class="py-12 text-center text-slate-400">
+                                        <i class="fas fa-receipt text-3xl mb-3 block text-slate-300"></i>
+                                        No hay registros de facturación para este filtro.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

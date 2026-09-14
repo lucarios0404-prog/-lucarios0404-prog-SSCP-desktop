@@ -1,0 +1,170 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Ficha de {{ patient.first_name }} {{ patient.last_name }} — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'patients' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Ficha Integral del Paciente" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+                <!-- Patient Profile Card -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div class="flex items-start space-x-4">
+                            <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-2xl shadow-lg shadow-blue-500/20 shrink-0">
+                                {{ patient.first_name[0] }}{{ patient.last_name[0] }}
+                            </div>
+                            <div>
+                                <div class="flex items-center space-x-3 flex-wrap gap-y-1">
+                                    <h1 class="text-2xl font-bold text-slate-900">{{ patient.first_name }} {{ patient.last_name }}</h1>
+                                    
+                                    <!-- F8: Badge de Saldo Pendiente -->
+                                    {% if balance_due > 0 %}
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                                        <i class="fas fa-exclamation-triangle mr-1.5"></i> Saldo Pendiente: RD$ {{ "%.2f"|format(balance_due) }}
+                                    </span>
+                                    {% else %}
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                                        <i class="fas fa-check-circle mr-1.5"></i> Al día (Sin deuda)
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                                    <span><i class="fas fa-id-card mr-1 text-slate-400"></i> DNI: <strong>{{ patient.document_id or 'N/D' }}</strong></span>
+                                    <span><i class="fas fa-phone mr-1 text-slate-400"></i> {{ patient.phone or 'Sin teléfono' }}</span>
+                                    <span><i class="fas fa-envelope mr-1 text-slate-400"></i> {{ patient.email or 'Sin correo' }}</span>
+                                    <span><i class="fas fa-tint mr-1 text-red-400"></i> Sangre: <strong>{{ patient.blood_type or 'N/D' }}</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Direct Action Buttons -->
+                        <div class="flex flex-wrap gap-2 md:self-center">
+                            <a href="/appointments/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-all">
+                                <i class="fas fa-calendar-plus mr-1.5"></i> Agendar Cita
+                            </a>
+                            <a href="/consultations/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-sm transition-all">
+                                <i class="fas fa-stethoscope mr-1.5"></i> Consulta
+                            </a>
+                            <a href="/vitals/patient/{{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm transition-all">
+                                <i class="fas fa-heartbeat mr-1.5"></i> Signos & Curvas
+                            </a>
+                            <a href="/lab-results?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold shadow-sm transition-all">
+                                <i class="fas fa-flask mr-1.5"></i> Laboratorio
+                            </a>
+                            <a href="/vaccines?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm transition-all">
+                                <i class="fas fa-syringe mr-1.5"></i> Vacunas
+                            </a>
+                            <a href="/payments/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-all">
+                                <i class="fas fa-receipt mr-1.5"></i> Cobrar
+                            </a>
+                            <a href="/patients/{{ patient.id }}/edit" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all">
+                                <i class="fas fa-edit mr-1"></i> Editar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Three Sections Layout -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Column 1: Consultations History -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h3 class="text-sm font-bold text-slate-800 flex items-center">
+                                <i class="fas fa-notes-medical text-violet-600 mr-2"></i> Historias Clínicas ({{ consultations|length }})
+                            </h3>
+                            <a href="/consultations/create?patient_id={{ patient.id }}" class="text-xs text-violet-600 font-semibold hover:underline">+ Nueva</a>
+                        </div>
+                        <div class="space-y-3 flex-1 overflow-y-auto max-h-96">
+                            {% for c in consultations %}
+                            <div class="p-3.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition-colors">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold text-slate-800">{{ c.created_at.strftime("%d/%m/%Y") }}</span>
+                                    <a href="/consultations/{{ c.id }}" class="text-xs text-violet-600 font-semibold hover:underline">Ver nota &rarr;</a>
+                                </div>
+                                <p class="text-xs font-medium text-slate-700 mt-1.5">{{ c.reason }}</p>
+                                {% if c.diagnosis %}
+                                <div class="mt-2 text-[11px] bg-violet-100/60 text-violet-800 px-2 py-0.5 rounded font-mono">
+                                    {{ c.diagnosis }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <p class="text-xs text-slate-400 text-center py-8">Sin consultas registradas.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Appointments History -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h3 class="text-sm font-bold text-slate-800 flex items-center">
+                                <i class="fas fa-calendar-alt text-indigo-600 mr-2"></i> Citas del Paciente ({{ appointments|length }})
+                            </h3>
+                            <a href="/appointments/create?patient_id={{ patient.id }}" class="text-xs text-indigo-600 font-semibold hover:underline">+ Agendar</a>
+                        </div>
+                        <div class="space-y-3 flex-1 overflow-y-auto max-h-96">
+                            {% for a in appointments %}
+                            <div class="p-3.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition-colors">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold text-slate-800">{{ a.date.strftime("%d/%m/%Y") }} • {{ a.start_time.strftime("%H:%M") }}</span>
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {% if a.status == 'Confirmada' %}bg-blue-100 text-blue-700{% elif a.status == 'Completada' %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                                        {{ a.status }}
+                                    </span>
+                                </div>
+                                <p class="text-xs text-slate-600 mt-1">{{ a.reason }}</p>
+                            </div>
+                            {% else %}
+                            <p class="text-xs text-slate-400 text-center py-8">Sin citas registradas.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Column 3: Billing & Payments -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h3 class="text-sm font-bold text-slate-800 flex items-center">
+                                <i class="fas fa-receipt text-emerald-600 mr-2"></i> Facturación & Pagos ({{ payments|length }})
+                            </h3>
+                            <a href="/payments/create?patient_id={{ patient.id }}" class="text-xs text-emerald-600 font-semibold hover:underline">+ Cobro</a>
+                        </div>
+                        <div class="space-y-3 flex-1 overflow-y-auto max-h-96">
+                            {% for p in payments %}
+                            <div class="p-3.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition-colors">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold text-slate-800">{{ p.receipt_number or 'Recibo' }}</span>
+                                    <span class="text-xs font-bold {% if p.status == 'paid' %}text-emerald-700{% else %}text-red-600{% endif %}">
+                                        RD$ {{ "%.2f"|format(p.total) }}
+                                    </span>
+                                </div>
+                                <div class="flex items-center justify-between mt-1 text-[11px] text-slate-500">
+                                    <span>{{ p.service_name }}</span>
+                                    <span class="uppercase font-semibold text-[10px] px-1.5 py-0.5 rounded {% if p.status == 'paid' %}bg-emerald-100 text-emerald-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+                                        {{ p.status }}
+                                    </span>
+                                </div>
+                                {% if p.status == 'pending' %}
+                                <form method="post" action="/payments/{{ p.id }}/pay" class="mt-2 text-right">
+                                    <button type="submit" class="text-[11px] text-emerald-600 hover:text-emerald-800 font-semibold">
+                                        <i class="fas fa-check-circle mr-1"></i> Marcar como Cobrado
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <p class="text-xs text-slate-400 text-center py-8">Sin pagos registrados.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

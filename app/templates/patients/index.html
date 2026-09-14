@@ -1,0 +1,122 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Pacientes — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'patients' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Directorio de Pacientes" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+                <!-- Header Actions & Search -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Listado de Pacientes</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Gestión de historias clínicas, citas y estado financiero.</p>
+                    </div>
+                    <a href="/patients/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md shadow-blue-500/20 transition-all">
+                        <i class="fas fa-user-plus mr-2"></i> Nuevo Paciente
+                    </a>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <form method="get" action="/patients" class="flex items-center gap-3">
+                        <div class="relative flex-1">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" name="q" value="{{ search_query }}" placeholder="Buscar por nombre, apellido, cédula/DNI o teléfono..." 
+                                class="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                        </div>
+                        <button type="submit" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-900 transition-colors">
+                            Buscar
+                        </button>
+                        {% if search_query %}
+                        <a href="/patients" class="px-3 py-2 text-sm text-slate-500 hover:text-slate-800">Limpiar</a>
+                        {% endif %}
+                    </form>
+                </div>
+
+                <!-- Patients Table -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-slate-700 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3.5 px-5">Paciente</th>
+                                    <th class="py-3.5 px-5">Identificación / Cédula</th>
+                                    <th class="py-3.5 px-5">Teléfono / Email</th>
+                                    <th class="py-3.5 px-5">Saldo Pendiente (F8)</th>
+                                    <th class="py-3.5 px-5 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for card in patient_cards %}
+                                {% set p = card.patient %}
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-4 px-5">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm shrink-0">
+                                                {{ p.first_name[0] }}{{ p.last_name[0] }}
+                                            </div>
+                                            <div>
+                                                <a href="/patients/{{ p.id }}" class="font-semibold text-slate-900 hover:text-blue-600 transition-colors">
+                                                    {{ p.first_name }} {{ p.last_name }}
+                                                </a>
+                                                <span class="block text-[11px] text-slate-400">Reg: {{ p.created_at.strftime("%d/%m/%Y") if p.created_at else "N/D" }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-4 px-5 font-mono text-xs text-slate-700">
+                                        {{ p.document_id or 'Sin DNI' }}
+                                    </td>
+                                    <td class="py-4 px-5 text-xs text-slate-600">
+                                        <div><i class="fas fa-phone-alt text-slate-400 mr-1.5 text-[10px]"></i>{{ p.phone or 'Sin teléfono' }}</div>
+                                        {% if p.email %}<div class="text-slate-400 text-[11px]"><i class="fas fa-envelope mr-1.5 text-[10px]"></i>{{ p.email }}</div>{% endif %}
+                                    </td>
+                                    <td class="py-4 px-5">
+                                        {% if card.has_debt %}
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                                            <i class="fas fa-exclamation-circle mr-1"></i> RD$ {{ "%.2f"|format(card.balance_due) }}
+                                        </span>
+                                        {% else %}
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                                            <i class="fas fa-check-circle mr-1"></i> Al día
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-4 px-5 text-right space-x-2">
+                                        <a href="/patients/{{ p.id }}" class="inline-flex items-center px-2.5 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-lg text-xs font-medium transition-colors" title="Ver Ficha">
+                                            <i class="fas fa-id-card-alt mr-1"></i> Ficha
+                                        </a>
+                                        <a href="/appointments/create?patient_id={{ p.id }}" class="inline-flex items-center px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 rounded-lg text-xs font-medium transition-colors" title="Agendar Cita">
+                                            <i class="fas fa-calendar-plus mr-1"></i> Cita
+                                        </a>
+                                        <a href="/consultations/create?patient_id={{ p.id }}" class="inline-flex items-center px-2.5 py-1.5 bg-slate-100 hover:bg-violet-50 text-slate-700 hover:text-violet-600 rounded-lg text-xs font-medium transition-colors" title="Nueva Consulta">
+                                            <i class="fas fa-notes-medical mr-1"></i> Consulta
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="py-12 text-center text-slate-400">
+                                        <i class="fas fa-user-slash text-3xl mb-3 block text-slate-300"></i>
+                                        No se encontraron pacientes registrados.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

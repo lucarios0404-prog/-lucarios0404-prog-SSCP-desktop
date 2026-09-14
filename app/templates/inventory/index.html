@@ -1,0 +1,207 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Inventario de Medicamentos e Insumos — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'inventory' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Gestión de Inventario" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+                <!-- Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Control de Inventario & Suministros</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Control de existencias, medicamentos, material gastable, alertas de stock mínimo y registro de movimientos.</p>
+                    </div>
+                    <a href="/inventory/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md shadow-blue-500/20 transition-all">
+                        <i class="fas fa-plus mr-2"></i> Nuevo Artículo
+                    </a>
+                </div>
+
+                <!-- KPI Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
+                            <i class="fas fa-boxes"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Total Artículos</span>
+                            <h3 class="text-2xl font-black text-slate-900">{{ total_items }}</h3>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                        <div class="w-12 h-12 rounded-xl {% if low_stock_count > 0 %}bg-amber-50 text-amber-600{% else %}bg-emerald-50 text-emerald-600{% endif %} flex items-center justify-center text-xl font-bold">
+                            <i class="fas {% if low_stock_count > 0 %}fa-exclamation-triangle{% else %}fa-check-circle{% endif %}"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Alertas Stock Bajo</span>
+                            <h3 class="text-2xl font-black {% if low_stock_count > 0 %}text-amber-600{% else %}text-emerald-600{% endif %}">{{ low_stock_count }}</h3>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                        <div class="w-12 h-12 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center text-xl font-bold">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Valor Estimado</span>
+                            <h3 class="text-2xl font-black text-slate-900">RD$ {{ "%.2f"|format(total_inventory_value) }}</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters & Search -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+                    <form method="GET" action="/inventory" class="flex flex-1 flex-col sm:flex-row items-center gap-3 w-full">
+                        <div class="relative flex-1 w-full">
+                            <i class="fas fa-search absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                            <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre o descripción..." class="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                        <div class="w-full sm:w-48">
+                            <select name="category" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <option value="">Todas las categorías</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg transition-all">
+                            Filtrar
+                        </button>
+                        {% if q or selected_category %}
+                        <a href="/inventory" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded-lg transition-all">
+                            Limpiar
+                        </a>
+                        {% endif %}
+                    </form>
+                </div>
+
+                <!-- Main Inventory Table -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-slate-700 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3.5 px-5">Artículo</th>
+                                    <th class="py-3.5 px-5">Categoría</th>
+                                    <th class="py-3.5 px-5">Existencia Actual</th>
+                                    <th class="py-3.5 px-5">Mínimo</th>
+                                    <th class="py-3.5 px-5">Precio/Costo</th>
+                                    <th class="py-3.5 px-5">Estado</th>
+                                    <th class="py-3.5 px-5 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for item in items %}
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-4 px-5">
+                                        <a href="/inventory/{{ item.id }}" class="font-semibold text-slate-900 hover:text-blue-600 transition-colors">
+                                            {{ item.name }}
+                                        </a>
+                                        {% if item.description %}
+                                        <p class="text-xs text-slate-400 truncate max-w-xs">{{ item.description }}</p>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-4 px-5 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                                            {{ item.category }}
+                                        </span>
+                                    </td>
+                                    <td class="py-4 px-5 whitespace-nowrap">
+                                        <span class="font-bold text-base text-slate-900">{{ item.stock }}</span>
+                                        <span class="text-xs text-slate-400 font-medium">{{ item.unit }}</span>
+                                    </td>
+                                    <td class="py-4 px-5 whitespace-nowrap font-mono text-xs text-slate-500">
+                                        {{ item.min_stock }} {{ item.unit }}
+                                    </td>
+                                    <td class="py-4 px-5 whitespace-nowrap font-mono text-xs text-slate-700">
+                                        RD$ {{ "%.2f"|format(item.price) }}
+                                    </td>
+                                    <td class="py-4 px-5 whitespace-nowrap">
+                                        {% if item.stock == 0 %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                                            <i class="fas fa-times-circle mr-1"></i> Agotado
+                                        </span>
+                                        {% elif item.stock <= item.min_stock %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                                            <i class="fas fa-exclamation-circle mr-1"></i> Stock Bajo
+                                        </span>
+                                        {% else %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                                            <i class="fas fa-check mr-1"></i> Óptimo
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-4 px-5 text-right whitespace-nowrap">
+                                        <a href="/inventory/{{ item.id }}" class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold mr-1 transition-colors">
+                                            <i class="fas fa-exchange-alt mr-1"></i> Movimientos
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="7" class="py-12 text-center text-slate-400">
+                                        <i class="fas fa-box-open text-3xl mb-3 block text-slate-300"></i>
+                                        No se encontraron artículos en el inventario.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Recent Movements Log -->
+                {% if recent_movements %}
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                    <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center">
+                        <i class="fas fa-history text-blue-600 mr-2"></i> Últimos Movimientos Registrados
+                    </h3>
+                    <div class="divide-y divide-slate-100 text-xs">
+                        {% for mov in recent_movements %}
+                        <div class="py-2.5 flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                {% if mov.type == 'in' %}
+                                <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[10px]">
+                                    <i class="fas fa-arrow-down"></i>
+                                </span>
+                                {% elif mov.type == 'out' %}
+                                <span class="w-6 h-6 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-[10px]">
+                                    <i class="fas fa-arrow-up"></i>
+                                </span>
+                                {% else %}
+                                <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-[10px]">
+                                    <i class="fas fa-sliders-h"></i>
+                                </span>
+                                {% endif %}
+                                <div>
+                                    <span class="font-semibold text-slate-800">{{ mov.item.name }}</span>
+                                    <span class="text-slate-400">({{ mov.type|upper }})</span>
+                                    {% if mov.notes %}
+                                    <span class="text-slate-500 italic block sm:inline sm:ml-2">— {{ mov.notes }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="font-bold {% if mov.type == 'in' %}text-emerald-600{% elif mov.type == 'out' %}text-rose-600{% else %}text-blue-600{% endif %}">
+                                    {% if mov.type == 'in' %}+{% elif mov.type == 'out' %}-{% endif %}{{ mov.quantity }} {{ mov.item.unit }}
+                                </span>
+                                <span class="text-[10px] text-slate-400 block">{{ mov.created_at.strftime("%d/%m/%Y %H:%M") if mov.created_at else '' }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

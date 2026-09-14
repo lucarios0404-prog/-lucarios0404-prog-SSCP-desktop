@@ -1,0 +1,86 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Registro de Vacunas (F12) — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'consultations' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Control de Inmunizaciones (F12)" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Carnet y Esquema de Vacunación (F12)</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Control de vacunas aplicadas, lotes de biológicos y fechas de próximos refuerzos.</p>
+                    </div>
+                    <a href="/vaccines/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold shadow-md shadow-cyan-500/20 transition-all">
+                        <i class="fas fa-syringe mr-2"></i> Registrar Vacuna
+                    </a>
+                </div>
+
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-slate-700 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3.5 px-5">Fecha Aplicación</th>
+                                    <th class="py-3.5 px-5">Paciente</th>
+                                    <th class="py-3.5 px-5">Vacuna / Biológico</th>
+                                    <th class="py-3.5 px-5">Dosis</th>
+                                    <th class="py-3.5 px-5">Lote</th>
+                                    <th class="py-3.5 px-5">Próximo Refuerzo</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for v in records %}
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-4 px-5 whitespace-nowrap font-mono text-xs text-slate-900">
+                                        {{ v.application_date.strftime("%d/%m/%Y") }}
+                                    </td>
+                                    <td class="py-4 px-5 font-semibold text-slate-900">
+                                        <a href="/patients/{{ v.patient.id }}" class="hover:text-blue-600">
+                                            {{ v.patient.first_name }} {{ v.patient.last_name }}
+                                        </a>
+                                        <span class="block text-[11px] text-slate-400">DNI: {{ v.patient.document_id or 'N/D' }}</span>
+                                    </td>
+                                    <td class="py-4 px-5 font-bold text-slate-800">
+                                        <i class="fas fa-shield-virus text-cyan-600 mr-1.5"></i>{{ v.vaccine_name }}
+                                    </td>
+                                    <td class="py-4 px-5">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-cyan-50 text-cyan-800 border border-cyan-200">
+                                            {{ v.dose }}
+                                        </span>
+                                    </td>
+                                    <td class="py-4 px-5 font-mono text-xs text-slate-500">{{ v.lot_number or 'N/D' }}</td>
+                                    <td class="py-4 px-5 whitespace-nowrap">
+                                        {% if v.next_due_date %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                            <i class="far fa-calendar-alt mr-1"></i> {{ v.next_due_date.strftime("%d/%m/%Y") }}
+                                        </span>
+                                        {% else %}
+                                        <span class="text-xs text-slate-400">Esquema completo</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="py-12 text-center text-slate-400">
+                                        <i class="fas fa-syringe text-3xl mb-3 block text-slate-300"></i>
+                                        No hay registros de vacunación ingresados.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

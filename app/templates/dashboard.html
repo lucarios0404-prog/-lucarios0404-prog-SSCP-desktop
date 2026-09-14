@@ -1,0 +1,152 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Dashboard — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'dashboard' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Panel de Control" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+                <!-- Welcome Banner -->
+                <div class="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 rounded-2xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
+                    <div class="relative z-10 max-w-2xl">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-blue-100 backdrop-blur-sm mb-3">
+                            <i class="fas fa-shield-alt mr-1.5"></i> Sistema Clínico de Escritorio v1.0
+                        </span>
+                        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">Bienvenido, {{ user.name or user.email }}</h1>
+                        <p class="mt-2 text-blue-100 text-sm md:text-base leading-relaxed">
+                            Gestiona pacientes, citas, historias clínicas y facturación local con respaldo y sincronización multi-sede.
+                        </p>
+                        <div class="mt-6 flex flex-wrap gap-3">
+                            <a href="/patients/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-white text-blue-700 font-semibold text-sm hover:bg-blue-50 shadow transition-all">
+                                <i class="fas fa-user-plus mr-2"></i> Nuevo Paciente
+                            </a>
+                            <a href="/appointments/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-blue-600/60 hover:bg-blue-600 text-white font-semibold text-sm border border-white/30 backdrop-blur-sm transition-all">
+                                <i class="fas fa-calendar-plus mr-2"></i> Agendar Cita
+                            </a>
+                            <a href="/consultations/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-indigo-600/60 hover:bg-indigo-600 text-white font-semibold text-sm border border-white/30 backdrop-blur-sm transition-all">
+                                <i class="fas fa-stethoscope mr-2"></i> Nueva Consulta
+                            </a>
+                            <a href="/payments/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-emerald-600/60 hover:bg-emerald-600 text-white font-semibold text-sm border border-white/30 backdrop-blur-sm transition-all">
+                                <i class="fas fa-receipt mr-2"></i> Registrar Pago
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Pacientes</p>
+                            <h3 class="text-2xl font-bold text-slate-900 mt-1">{{ total_patients | default(0) }}</h3>
+                            <a href="/patients" class="text-xs text-blue-600 font-medium hover:underline mt-2 inline-block">Ver listado &rarr;</a>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Citas Programadas</p>
+                            <h3 class="text-2xl font-bold text-indigo-900 mt-1">{{ total_appointments | default(0) }}</h3>
+                            <a href="/appointments" class="text-xs text-indigo-600 font-medium hover:underline mt-2 inline-block">Ver calendario &rarr;</a>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl font-bold">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Consultas Médicas</p>
+                            <h3 class="text-2xl font-bold text-violet-900 mt-1">{{ total_consultations | default(0) }}</h3>
+                            <a href="/consultations" class="text-xs text-violet-600 font-medium hover:underline mt-2 inline-block">Historias clínicas &rarr;</a>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center text-xl font-bold">
+                            <i class="fas fa-notes-medical"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Saldo por Cobrar (F13)</p>
+                            <h3 class="text-2xl font-bold text-amber-600 mt-1">RD$ {{ "%.2f"|format(total_pending_debt|default(0.0)) }}</h3>
+                            <a href="/payments?status=pending" class="text-xs text-amber-600 font-medium hover:underline mt-2 inline-block">Cobros pendientes &rarr;</a>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
+                            <i class="fas fa-hand-holding-usd"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Recent Appointments -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h3 class="text-base font-bold text-slate-800 flex items-center">
+                                <i class="fas fa-calendar-day text-blue-600 mr-2"></i> Próximas Citas
+                            </h3>
+                            <a href="/appointments" class="text-xs text-blue-600 hover:underline font-semibold">Ver todas</a>
+                        </div>
+                        {% if recent_appointments %}
+                        <div class="divide-y divide-slate-100">
+                            {% for a in recent_appointments %}
+                            <div class="py-3 flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900">{{ a.patient.first_name }} {{ a.patient.last_name }}</p>
+                                    <p class="text-xs text-slate-500">{{ a.date.strftime("%d/%m/%Y") }} • {{ a.start_time.strftime("%H:%M") }} • {{ a.reason }}</p>
+                                </div>
+                                <span class="px-2.5 py-1 text-xs rounded-full font-medium {% if a.status == 'Confirmada' %}bg-blue-100 text-blue-800{% elif a.status == 'Completada' %}bg-emerald-100 text-emerald-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+                                    {{ a.status }}
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-xs text-slate-400 py-6 text-center">No hay citas programadas recientemente.</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Recent Consultations -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h3 class="text-base font-bold text-slate-800 flex items-center">
+                                <i class="fas fa-history text-indigo-600 mr-2"></i> Consultas Recientes
+                            </h3>
+                            <a href="/consultations" class="text-xs text-indigo-600 hover:underline font-semibold">Ver todas</a>
+                        </div>
+                        {% if recent_consultations %}
+                        <div class="divide-y divide-slate-100">
+                            {% for c in recent_consultations %}
+                            <div class="py-3 flex items-center justify-between">
+                                <div>
+                                    <a href="/consultations/{{ c.id }}" class="text-sm font-semibold text-indigo-600 hover:underline">
+                                        {{ c.patient.first_name }} {{ c.patient.last_name }}
+                                    </a>
+                                    <p class="text-xs text-slate-500">{{ c.created_at.strftime("%d/%m/%Y %H:%M") }} • {{ c.reason }}</p>
+                                </div>
+                                <a href="/consultations/{{ c.id }}" class="text-xs text-slate-400 hover:text-indigo-600 p-1">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-xs text-slate-400 py-6 text-center">No hay historias médicas registradas aún.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

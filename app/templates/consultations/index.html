@@ -1,0 +1,110 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Consultas Médicas — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'consultations' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Consultas e Historias Médicas" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+                <!-- Header Actions -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Historias Clínicas y Consultas</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Registro de diagnósticos CIE-10, notas médicas, recetas y control de cambios (F3).</p>
+                    </div>
+                    <a href="/consultations/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold shadow-md shadow-violet-500/20 transition-all">
+                        <i class="fas fa-stethoscope mr-2"></i> Nueva Consulta Médica
+                    </a>
+                </div>
+
+                <!-- Consultations Table -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-slate-700 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3.5 px-5">Fecha y Hora</th>
+                                    <th class="py-3.5 px-5">Paciente</th>
+                                    <th class="py-3.5 px-5">Motivo de Consulta</th>
+                                    <th class="py-3.5 px-5">Diagnóstico / CIE-10</th>
+                                    <th class="py-3.5 px-5">Doctor / Auditoría</th>
+                                    <th class="py-3.5 px-5 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for c in consultations %}
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-4 px-5 whitespace-nowrap">
+                                        <div class="font-semibold text-slate-900">{{ c.created_at.strftime("%d/%m/%Y") }}</div>
+                                        <span class="text-xs text-slate-400">{{ c.created_at.strftime("%H:%M") }}</span>
+                                    </td>
+                                    <td class="py-4 px-5">
+                                        <div class="flex items-center space-x-2.5">
+                                            <div class="w-8 h-8 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                                {{ (c.patient.first_name[0] if c.patient else 'P') }}{{ (c.patient.last_name[0] if c.patient else '') }}
+                                            </div>
+                                            <div>
+                                                {% if c.patient %}
+                                                <a href="/patients/{{ c.patient.id }}" class="font-bold text-slate-900 hover:text-violet-600 transition-colors">
+                                                    {{ c.patient.first_name }} {{ c.patient.last_name }}
+                                                </a>
+                                                <span class="block text-[11px] text-slate-400">DNI: {{ c.patient.document_id or 'Sin DNI' }}</span>
+                                                {% else %}
+                                                <span class="text-slate-400 italic">Paciente eliminado</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-4 px-5 text-slate-800 font-medium">
+                                        {{ c.reason }}
+                                    </td>
+                                    <td class="py-4 px-5">
+                                        {% if c.diagnosis %}
+                                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+                                            {{ c.diagnosis }}
+                                        </span>
+                                        {% else %}
+                                        <span class="text-xs text-slate-400 italic">Sin diagnóstico registrado</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-4 px-5 text-xs text-slate-500 whitespace-nowrap">
+                                        <div><i class="fas fa-user-md text-slate-400 mr-1"></i>{{ c.doctor.name if c.doctor else 'Doctor' }}</div>
+                                        {% if c.updated_by %}
+                                        <span class="inline-flex items-center text-[10px] text-amber-600 font-semibold mt-0.5">
+                                            <i class="fas fa-history mr-1"></i> Editado por {{ c.updated_by.name or c.updated_by.email }} (F3)
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-4 px-5 text-right whitespace-nowrap space-x-1.5">
+                                        <a href="/consultations/{{ c.id }}" class="inline-flex items-center px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-lg text-xs font-semibold transition-colors">
+                                            <i class="fas fa-eye mr-1"></i> Ver Ficha
+                                        </a>
+                                        <a href="/consultations/{{ c.id }}/edit" class="inline-flex items-center px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors" title="Editar Consulta (F3)">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="py-12 text-center text-slate-400">
+                                        <i class="fas fa-notes-medical text-3xl mb-3 block text-slate-300"></i>
+                                        No hay historias clínicas ni consultas registradas.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

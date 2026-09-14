@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+jinja2
+python-multipart
+passlib[bcrypt]
+python-jose[cryptography]
+alembic
+pydantic
+pydantic-settings
+requests
+httpx
+pyinstaller
