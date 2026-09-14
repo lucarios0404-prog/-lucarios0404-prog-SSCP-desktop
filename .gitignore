@@ -57,3 +57,7 @@ $RECYCLE.BIN/
 # Environment variables
 .env
 .env.local
+
+# Tools & Archives
+tools/
+*.zip

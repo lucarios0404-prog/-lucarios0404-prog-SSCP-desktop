@@ -4,22 +4,25 @@ echo =======================================================
 echo Compilador de Instalador Windows NSIS - SSCP Desktop
 echo =======================================================
 
-where makensis >nul 2>nul
-if %ERRORLEVEL% EQU 0 (
-    echo [OK] Compilador NSIS detectado en PATH.
+set MAKENSIS_BIN=
+if exist "tools\nsis-3.10\makensis.exe" set MAKENSIS_BIN=tools\nsis-3.10\makensis.exe
+if not defined MAKENSIS_BIN if exist "C:\Program Files (x86)\NSIS\makensis.exe" set MAKENSIS_BIN="C:\Program Files (x86)\NSIS\makensis.exe"
+if not defined MAKENSIS_BIN where makensis >nul 2>nul && set MAKENSIS_BIN=makensis
+
+if defined MAKENSIS_BIN (
+    echo [OK] Compilador NSIS detectado: %MAKENSIS_BIN%
     echo Generando dist\SSCP_Desktop_Setup_v1.0.0.exe...
-    makensis installer.nsi
+    %MAKENSIS_BIN% installer.nsi
     if %ERRORLEVEL% EQU 0 (
-        echo [EXITO] Instalador creado en dist\SSCP_Desktop_Setup_v1.0.0.exe
+        echo.
+        echo =======================================================
+        echo [EXITO] Instalador creado en:
+        echo dist\SSCP_Desktop_Setup_v1.0.0.exe
+        echo =======================================================
     ) else (
         echo [ERROR] Error durante la compilacion de NSIS.
     )
 ) else (
-    echo [AVISO] 'makensis' no se encuentra en el PATH del sistema.
-    echo Para generar el instalador .exe ejecutable de instalacion:
-    echo 1. Descargue NSIS desde https://nsis.sourceforge.io/Download
-    echo 2. Ejecute: makensis.exe installer.nsi
-    echo.
-    echo Nota: El paquete portable ejecutable ya esta 100%% compilado en:
-    echo       dist\SSCP-Desktop\SSCP-Desktop.exe
+    echo [AVISO] 'makensis' no se encuentra en el sistema.
+    echo Descargue NSIS o ejecute tools\nsis-3.10\makensis.exe
 )

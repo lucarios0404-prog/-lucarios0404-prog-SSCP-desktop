@@ -108,6 +108,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='static/app_icon.ico',
 )
 
 coll = COLLECT(

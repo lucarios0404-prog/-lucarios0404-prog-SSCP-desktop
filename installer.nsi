@@ -23,8 +23,8 @@ RequestExecutionLevel admin
 
 ; Interfaz Moderna (MUI2)
 !define MUI_ABORTWARNING
-!define MUI_ICON "static\favicon.ico"
-!define MUI_UNICON "static\favicon.ico"
+!define MUI_ICON "static\app_icon.ico"
+!define MUI_UNICON "static\app_icon.ico"
 
 ; Páginas del Asistente de Instalación
 !insertmacro MUI_PAGE_WELCOME
