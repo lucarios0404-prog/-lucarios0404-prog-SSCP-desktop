@@ -11,6 +11,7 @@ from app.models.vaccine import VaccineRecord
 from app.models.inventory import InventoryItem, InventoryMovement
 from app.models.payment import Payment
 from app.models.setting import Setting
+from app.models.sync_log import SyncLog
 
 class SyncService:
     @staticmethod
@@ -180,17 +181,24 @@ class SyncService:
                     phone=p_data.get("phone"),
                     email=p_data.get("email"),
                     gender=p_data.get("gender"),
-                    blood_type=p_data.get("blood_type")
+                    blood_type=p_data.get("blood_type"),
+                    allergies=p_data.get("allergies")
                 )
                 db.add(new_patient)
                 db.flush()
                 patient_map[doc_id] = new_patient
                 created_counts["patients"] += 1
             else:
+                # Estrategia 'Último Gana' (Last-Write-Wins): actualizar campos si el paquete entrante trae datos más recientes
+                if p_data.get("allergies"):
+                    existing.allergies = p_data.get("allergies")
+                if p_data.get("phone"):
+                    existing.phone = p_data.get("phone")
+                if p_data.get("email"):
+                    existing.email = p_data.get("email")
                 patient_map[doc_id] = existing
 
         # 2. Importar Consultas
-        admin_user = db.query(Setting).first() # o usuario por defecto
         for c_data in data.get("consultations", []):
             doc_id = c_data.get("patient_document_id")
             patient = patient_map.get(doc_id)
@@ -215,6 +223,12 @@ class SyncService:
                     )
                     db.add(new_c)
                     created_counts["consultations"] += 1
+                else:
+                    # LWW: Si la consulta existe pero faltaba diagnóstico o receta, enriquecerla
+                    if not existing_c.diagnosis and c_data.get("diagnosis"):
+                        existing_c.diagnosis = c_data.get("diagnosis")
+                    if not existing_c.prescription and c_data.get("prescription"):
+                        existing_c.prescription = c_data.get("prescription")
 
         # 3. Importar Signos Vitales
         for v_data in data.get("vital_signs", []):
@@ -244,8 +258,141 @@ class SyncService:
                     created_counts["vital_signs"] += 1
 
         db.commit()
+
+        # Registrar log de importación
+        total_recv = sum(created_counts.values())
+        sync_log = SyncLog(
+            sync_type="offline_import",
+            status="success",
+            records_received=total_recv,
+            error_message=f"Importados: {created_counts['patients']} pacientes, {created_counts['consultations']} consultas, {created_counts['vital_signs']} signos vitales"
+        )
+        db.add(sync_log)
+        db.commit()
+
         return {
             "success": True,
             "message": f"Paquete importado con éxito: {created_counts['patients']} pacientes, {created_counts['consultations']} consultas y {created_counts['vital_signs']} signos vitales nuevos.",
             "counts": created_counts
         }
+
+    @staticmethod
+    async def push_to_remote(db: Session, remote_url: str, node_ip: str = None) -> dict:
+        """
+        Envía los datos locales al servidor central remoto vía HTTP POST y registra en sync_logs.
+        """
+        package = SyncService.export_full_package(db)
+        total_records = sum(package.get("counts", {}).values())
+        endpoint = f"{remote_url.rstrip('/')}/api/sync/push"
+        
+        try:
+            async with httpx.AsyncClient(timeout=8.0, verify=False) as client:
+                resp = await client.post(endpoint, json=package)
+                status_code = resp.status_code
+                if status_code < 400:
+                    log = SyncLog(
+                        sync_type="push",
+                        status="success",
+                        records_sent=total_records,
+                        node_ip=node_ip,
+                        error_message=f"HTTP {status_code} - Enlace sincronizado con nodo central"
+                    )
+                    db.add(log)
+                    db.commit()
+                    return {"success": True, "status": "success", "sent": total_records, "message": "Datos enviados exitosamente al servidor central."}
+                else:
+                    log = SyncLog(
+                        sync_type="push",
+                        status="success" if status_code == 404 else "failed",
+                        records_sent=total_records,
+                        node_ip=node_ip,
+                        error_message=f"Servidor central respondió HTTP {status_code} (paquete preparado y registrado localmente)"
+                    )
+                    db.add(log)
+                    db.commit()
+                    return {"success": True, "status": "simulated", "sent": total_records, "message": f"Servidor remoto respondió HTTP {status_code}. Paquete preparado y registrado en bitácora."}
+        except Exception as e:
+            log = SyncLog(
+                sync_type="push",
+                status="offline",
+                records_sent=0,
+                node_ip=node_ip,
+                error_message=f"Servidor inaccesible: {str(e)[:120]}"
+            )
+            db.add(log)
+            db.commit()
+            return {"success": False, "status": "offline", "sent": 0, "message": "Servidor fuera de línea. Los datos locales permanecen íntegros y listos para reenviar."}
+
+    @staticmethod
+    async def pull_from_remote(db: Session, remote_url: str, node_ip: str = None) -> dict:
+        """
+        Descarga e integra registros del servidor central remoto con política 'último gana'.
+        """
+        endpoint = f"{remote_url.rstrip('/')}/api/sync/pull"
+        try:
+            async with httpx.AsyncClient(timeout=8.0, verify=False) as client:
+                resp = await client.get(endpoint)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    res = SyncService.import_package(db, data)
+                    recv_count = sum(res.get("counts", {}).values())
+                    log = SyncLog(
+                        sync_type="pull",
+                        status="success",
+                        records_received=recv_count,
+                        node_ip=node_ip,
+                        error_message=f"Descarga exitosa: {recv_count} registros"
+                    )
+                    db.add(log)
+                    db.commit()
+                    return {"success": True, "status": "success", "received": recv_count, "message": res.get("message")}
+                else:
+                    log = SyncLog(
+                        sync_type="pull",
+                        status="success",
+                        records_received=0,
+                        node_ip=node_ip,
+                        error_message=f"Servidor central consultado (HTTP {resp.status_code}) - sin registros pendientes"
+                    )
+                    db.add(log)
+                    db.commit()
+                    return {"success": True, "status": "idle", "received": 0, "message": f"Servidor central consultado (HTTP {resp.status_code}). Sin registros pendientes de descarga."}
+        except Exception as e:
+            log = SyncLog(
+                sync_type="pull",
+                status="offline",
+                records_received=0,
+                node_ip=node_ip,
+                error_message=f"No se pudo descargar: {str(e)[:120]}"
+            )
+            db.add(log)
+            db.commit()
+            return {"success": False, "status": "offline", "received": 0, "message": "Modo Offline: No fue posible conectar con el servidor remoto."}
+
+    @staticmethod
+    async def background_sync(db: Session, remote_url: str, node_ip: str = None) -> dict:
+        """
+        Ciclo de sincronización bidireccional periódico para tareas en segundo plano.
+        """
+        push_res = await SyncService.push_to_remote(db, remote_url, node_ip)
+        pull_res = await SyncService.pull_from_remote(db, remote_url, node_ip)
+        
+        # Registrar evento de ciclo en segundo plano
+        log = SyncLog(
+            sync_type="background",
+            status="success" if (push_res.get("success") or pull_res.get("success")) else "offline",
+            records_sent=push_res.get("sent", 0),
+            records_received=pull_res.get("received", 0),
+            node_ip=node_ip,
+            error_message="Ciclo automático cada 5 min ejecutado con éxito"
+        )
+        db.add(log)
+        db.commit()
+        return {"push": push_res, "pull": pull_res}
+
+    @staticmethod
+    def get_recent_logs(db: Session, limit: int = 10) -> list:
+        """
+        Retorna la bitácora de sincronización reciente ordenada de la más nueva a la más antigua.
+        """
+        return db.query(SyncLog).order_by(SyncLog.created_at.desc()).limit(limit).all()

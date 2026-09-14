@@ -1,0 +1,111 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Nueva Carta de Referencia (F10) — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'references' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Emitir Carta de Referencia" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-3xl mx-auto space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Emisión de Carta de Referencia / Interconsulta (F10)</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Derivación médica estructurada para especialistas o interconsultas externas.</p>
+                    </div>
+                    <a href="/references" class="text-slate-500 hover:text-slate-800 text-xs font-semibold py-2 px-3 rounded-lg border border-slate-200 hover:bg-slate-100">
+                        Volver a Referencias
+                    </a>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    <form method="post" action="/references/create" class="space-y-5">
+                        <!-- Selección de Paciente -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Paciente a Derivar <span class="text-red-500">*</span>
+                            </label>
+                            <select name="patient_id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                                <option value="">-- Seleccionar paciente --</option>
+                                {% for p in patients %}
+                                <option value="{{ p.id }}" {% if selected_patient and selected_patient.id == p.id %}selected{% endif %}>
+                                    {{ p.first_name }} {{ p.last_name }} (DNI: {{ p.document_id or 'N/D' }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Cargar plantilla si hay -->
+                        {% if templates %}
+                        <div class="p-3 bg-indigo-50/50 border border-indigo-200 rounded-xl">
+                            <label class="block text-[11px] font-bold text-indigo-900 uppercase tracking-wider mb-1">
+                                <i class="fas fa-file-waveform mr-1 text-indigo-600"></i> Cargar desde Plantilla de Referencia (F4)
+                            </label>
+                            <select onchange="document.getElementById('clinical_summary').value = this.value" class="w-full text-xs py-1.5 px-2.5 border border-slate-200 rounded-lg bg-white">
+                                <option value="">-- Seleccione una plantilla --</option>
+                                {% for t in templates %}
+                                <option value="{{ t.content }}">{{ t.title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Médico o Especialidad Destino <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text" name="referred_to_doctor_or_specialty" required placeholder="Ej. Dr. Ramírez / Cardiología, Traumatología..."
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Institución / Clínica Destino
+                                </label>
+                                <input type="text" name="institution" placeholder="Ej. Centro Médico UCE, Hospital Plaza de la Salud..."
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Motivo Principal de la Referencia <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="reason_for_referral" required placeholder="Ej. Evaluación de soplo cardíaco en foco aórtico, valoración quirúrgica..."
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Resumen Clínico, Evolución y Hallazgos Relevantes
+                            </label>
+                            <textarea id="clinical_summary" name="clinical_summary" rows="4" placeholder="Paciente hipertenso de 5 años de evolución, en tratamiento con ARA II. En control actual se detecta..."
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30"></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Notas Adicionales / Exámenes y Estudios Adjuntos
+                            </label>
+                            <textarea name="notes" rows="2" placeholder="Se anexan resultados de perfil lipídico y ecocardiograma previo..."
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30"></textarea>
+                        </div>
+
+                        <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100">
+                            <button type="submit" class="py-3 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all flex items-center space-x-2">
+                                <i class="fas fa-file-pdf"></i>
+                                <span>Emitir Carta y Descargar PDF</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

@@ -346,3 +346,246 @@ def generate_consultation_report_pdf(consultation, setting=None, vitals=None) ->
     doc.build(story)
     buffer.seek(0)
     return buffer
+
+def generate_quick_prescription_pdf(patient, prescription_text: str, diagnosis: str = None, setting=None, doctor_name: str = None) -> io.BytesIO:
+    """
+    Genera el PDF de Receta Rápida (F2) sin necesidad de una consulta médica completa.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    styles = _get_styles()
+    story = []
+
+    clinic_name = getattr(setting, "clinic_name", "Centro Médico SSCP") if setting else "Centro Médico SSCP"
+    doc_name = doctor_name or (getattr(setting, "doctor_name", "Dr. Especialista") if setting else "Dr. Especialista")
+    specialty = getattr(setting, "specialty", "Medicina General") if setting else "Medicina General"
+    phone = getattr(setting, "phone", "") if setting else ""
+    email = getattr(setting, "email", "") if setting else ""
+    address = getattr(setting, "address", "") if setting else ""
+
+    # Membrete
+    header_data = [
+        [
+            Paragraph(f"<b>{clinic_name}</b><br/><font size=10 color='#0d9488'>RECETA MÉDICA DIRECTA</font>", styles["title"]),
+            Paragraph(f"<b>{doc_name}</b><br/>{specialty}<br/>Tel: {phone}<br/>{email}", styles["subtitle"])
+        ]
+    ]
+    h_table = Table(header_data, colWidths=[3.8 * inch, 3.2 * inch])
+    story.append(h_table)
+    story.append(HRFlowable(width="100%", thickness=2, color=PRIMARY_COLOR, spaceBefore=4, spaceAfter=12))
+
+    # Paciente
+    p_name = f"{patient.first_name} {patient.last_name}" if patient else "Paciente"
+    doc_id = getattr(patient, "document_id", "N/D") if patient else "N/D"
+    allergies = getattr(patient, "allergies", "Ninguna") or "Ninguna"
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    p_data = [
+        [
+            Paragraph(f"<b>Paciente:</b> {p_name} (DNI: {doc_id})", styles["body"]),
+            Paragraph(f"<b>Fecha:</b> {now_str}", styles["body"])
+        ],
+        [
+            Paragraph(f"<b>Alergias Conocidas:</b> <font color='#b91c1c'>{allergies}</font>", styles["body"]),
+            Paragraph(f"<b>Tipo:</b> Emisión Rápida", styles["body"])
+        ]
+    ]
+    ptable = Table(p_data, colWidths=[4.6 * inch, 2.4 * inch])
+    ptable.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), BG_LIGHT),
+        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
+        ('PADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(ptable)
+    story.append(Spacer(1, 14))
+
+    # Diagnóstico
+    if diagnosis and diagnosis.strip():
+        story.append(Paragraph("<b>Diagnóstico / Indicación Clínica:</b>", styles["section"]))
+        story.append(Paragraph(diagnosis.replace("\n", "<br/>"), styles["body"]))
+        story.append(Spacer(1, 10))
+
+    # Prescripción
+    story.append(Paragraph("<b>Rp. / Medicación y Prescripción</b>", styles["section"]))
+    rx_fmt = (prescription_text or "Sin prescripción").replace("\n", "<br/>")
+    rx_t = Table([[Paragraph(rx_fmt, styles["rx"])]], colWidths=[7.0 * inch])
+    rx_t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#f0fdfa")),
+        ('BOX', (0, 0), (-1, -1), 1, SECONDARY_COLOR),
+        ('PADDING', (0, 0), (-1, -1), 12),
+    ]))
+    story.append(rx_t)
+
+    # Firma
+    story.append(Spacer(1, 40))
+    sig_data = [
+        [
+            Paragraph(f"<font size=8 color='#64748b'>{address}</font>", styles["body"]),
+            Paragraph(f"________________________________________<br/><b>{doc_name}</b><br/>{specialty}", styles["body"])
+        ]
+    ]
+    sig_t = Table(sig_data, colWidths=[3.8 * inch, 3.2 * inch])
+    sig_t.setStyle(TableStyle([('ALIGN', (1, 0), (1, 0), 'CENTER')]))
+    story.append(KeepTogether(sig_t))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+def generate_medical_license_pdf(license, setting=None) -> io.BytesIO:
+    """
+    Genera el Certificado Oficial de Licencia Médica / Reposo Laboral (F5).
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    styles = _get_styles()
+    story = []
+
+    clinic_name = getattr(setting, "clinic_name", "Centro Médico SSCP") if setting else "Centro Médico SSCP"
+    doctor_name = getattr(setting, "doctor_name", "Dr. Especialista") if setting else "Dr. Especialista"
+    specialty = getattr(setting, "specialty", "Medicina General") if setting else "Medicina General"
+    phone = getattr(setting, "phone", "") if setting else ""
+    address = getattr(setting, "address", "") if setting else ""
+
+    # Membrete
+    header_data = [
+        [
+            Paragraph(f"<b>{clinic_name}</b>", styles["title"]),
+            Paragraph(f"<b>{doctor_name}</b><br/>{specialty}<br/>Tel: {phone}", styles["subtitle"])
+        ]
+    ]
+    h_table = Table(header_data, colWidths=[4.0 * inch, 3.0 * inch])
+    story.append(h_table)
+    story.append(HRFlowable(width="100%", thickness=2, color=PRIMARY_COLOR, spaceBefore=4, spaceAfter=18))
+
+    # Título del Certificado
+    title_p = Paragraph("<font size=14 color='#0f766e'><b>CERTIFICADO MÉDICO DE LICENCIA / REPOSO</b></font>", styles["title"])
+    story.append(title_p)
+    story.append(Spacer(1, 12))
+
+    dest = license.workplace_or_school or "A QUIEN PUEDA INTERESAR"
+    story.append(Paragraph(f"<b>Dirigido a:</b> {dest}", styles["body_bold"]))
+    story.append(Spacer(1, 12))
+
+    patient = license.patient
+    p_name = f"{patient.first_name} {patient.last_name}" if patient else "El paciente"
+    doc_id = getattr(patient, "document_id", "N/D") if patient else "N/D"
+    start_str = license.start_date.strftime("%d/%m/%Y")
+    end_str = license.end_date.strftime("%d/%m/%Y")
+
+    cert_text = (
+        f"Por medio de la presente certifico que he examinado clínicamente a <b>{p_name}</b>, "
+        f"portador(a) del documento de identidad <b>{doc_id}</b>, diagnosticándole:<br/><br/>"
+        f"<b>DIAGNÓSTICO:</b> {license.diagnosis}<br/><br/>"
+        f"Por tal motivo, se indica reposo médico por un período de <b>{license.days_rest} día(s)</b>, "
+        f"comprendido desde el día <b>{start_str}</b> hasta el día <b>{end_str}</b> inclusive, "
+        f"debiendo reincorporarse a sus labores habituales al término del mismo."
+    )
+    story.append(Paragraph(cert_text, styles["body"]))
+    story.append(Spacer(1, 14))
+
+    if license.notes and license.notes.strip():
+        story.append(Paragraph(f"<b>Observaciones e Indicaciones Médicas:</b><br/>{license.notes}", styles["body"]))
+        story.append(Spacer(1, 14))
+
+    # Fecha y lugar
+    today_str = datetime.now().strftime("%d de %B de %Y")
+    story.append(Paragraph(f"Expedido para los fines pertinentes en fecha {today_str}.", styles["body"]))
+    story.append(Spacer(1, 45))
+
+    # Firma
+    sig_data = [
+        [
+            Paragraph(f"<font size=8 color='#64748b'>{address}</font>", styles["body"]),
+            Paragraph(f"________________________________________<br/><b>{doctor_name}</b><br/>{specialty}", styles["body"])
+        ]
+    ]
+    sig_t = Table(sig_data, colWidths=[3.8 * inch, 3.2 * inch])
+    sig_t.setStyle(TableStyle([('ALIGN', (1, 0), (1, 0), 'CENTER')]))
+    story.append(KeepTogether(sig_t))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+def generate_medical_reference_pdf(reference, setting=None) -> io.BytesIO:
+    """
+    Genera la Carta Oficial de Referencia e Interconsulta Médica (F10).
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    styles = _get_styles()
+    story = []
+
+    clinic_name = getattr(setting, "clinic_name", "Centro Médico SSCP") if setting else "Centro Médico SSCP"
+    doctor_name = getattr(setting, "doctor_name", "Dr. Especialista") if setting else "Dr. Especialista"
+    specialty = getattr(setting, "specialty", "Medicina General") if setting else "Medicina General"
+    phone = getattr(setting, "phone", "") if setting else ""
+    address = getattr(setting, "address", "") if setting else ""
+
+    # Membrete
+    header_data = [
+        [
+            Paragraph(f"<b>{clinic_name}</b>", styles["title"]),
+            Paragraph(f"<b>{doctor_name}</b><br/>{specialty}<br/>Tel: {phone}", styles["subtitle"])
+        ]
+    ]
+    h_table = Table(header_data, colWidths=[4.0 * inch, 3.0 * inch])
+    story.append(h_table)
+    story.append(HRFlowable(width="100%", thickness=2, color=PRIMARY_COLOR, spaceBefore=4, spaceAfter=18))
+
+    story.append(Paragraph("<font size=14 color='#0f766e'><b>CARTA DE REFERENCIA E INTERCONSULTA MÉDICA</b></font>", styles["title"]))
+    story.append(Spacer(1, 14))
+
+    patient = reference.patient
+    p_name = f"{patient.first_name} {patient.last_name}" if patient else "Paciente"
+    doc_id = getattr(patient, "document_id", "N/D") if patient else "N/D"
+    allergies = getattr(patient, "allergies", "Ninguna") or "Ninguna"
+
+    ref_info = [
+        [
+            Paragraph(f"<b>Dirigido a:</b> {reference.referred_to_doctor_or_specialty}", styles["body"]),
+            Paragraph(f"<b>Institución:</b> {reference.institution or 'Centro de Referencia'}", styles["body"])
+        ],
+        [
+            Paragraph(f"<b>Paciente:</b> {p_name} (DNI: {doc_id})", styles["body"]),
+            Paragraph(f"<b>Alergias:</b> <font color='#b91c1c'>{allergies}</font>", styles["body"])
+        ]
+    ]
+    rtable = Table(ref_info, colWidths=[3.5 * inch, 3.5 * inch])
+    rtable.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), BG_LIGHT),
+        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
+        ('PADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(rtable)
+    story.append(Spacer(1, 14))
+
+    story.append(Paragraph("<b>Motivo de la Derivación:</b>", styles["section"]))
+    story.append(Paragraph(reference.reason_for_referral.replace("\n", "<br/>"), styles["body"]))
+    story.append(Spacer(1, 10))
+
+    if reference.clinical_summary and reference.clinical_summary.strip():
+        story.append(Paragraph("<b>Resumen Clínico y Hallazgos Relevantes:</b>", styles["section"]))
+        story.append(Paragraph(reference.clinical_summary.replace("\n", "<br/>"), styles["body"]))
+        story.append(Spacer(1, 10))
+
+    if reference.notes and reference.notes.strip():
+        story.append(Paragraph("<b>Notas Adicionales / Exámenes Adjuntos:</b>", styles["section"]))
+        story.append(Paragraph(reference.notes.replace("\n", "<br/>"), styles["body"]))
+        story.append(Spacer(1, 10))
+
+    story.append(Spacer(1, 35))
+    sig_data = [
+        [
+            Paragraph(f"<font size=8 color='#64748b'>{address}</font>", styles["body"]),
+            Paragraph(f"________________________________________<br/><b>{doctor_name}</b><br/>{specialty}", styles["body"])
+        ]
+    ]
+    sig_t = Table(sig_data, colWidths=[3.8 * inch, 3.2 * inch])
+    sig_t.setStyle(TableStyle([('ALIGN', (1, 0), (1, 0), 'CENTER')]))
+    story.append(KeepTogether(sig_t))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer

@@ -15,6 +15,7 @@ class Patient(Base):
     email = Column(String, nullable=True)
     address = Column(Text, nullable=True)
     blood_type = Column(String, nullable=True)
+    allergies = Column(Text, nullable=True) # Alergias conocidas (ej. Penicilina, Sulfas, etc.)
     
     # Datos de contacto de emergencia
     emergency_contact_name = Column(String, nullable=True)

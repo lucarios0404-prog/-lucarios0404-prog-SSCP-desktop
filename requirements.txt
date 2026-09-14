@@ -12,3 +12,4 @@ requests
 httpx
 pyinstaller
 reportlab
+qrcode[pil]

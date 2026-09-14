@@ -1,0 +1,114 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Sistema de Plantillas Clínicas (F4) — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'templates' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Plantillas Clínicas" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-5xl mx-auto space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Plantillas Clínicas Predefinidas (F4)</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Acelera la redacción médica de recetas, historias clínicas, licencias y referencias con un solo clic.</p>
+                    </div>
+                </div>
+
+                <!-- Filtros por Categoría -->
+                <div class="flex space-x-2 border-b border-slate-200 pb-3">
+                    <a href="/templates" class="px-3 py-1.5 rounded-lg text-xs font-bold {% if not selected_category %}bg-slate-900 text-white{% else %}text-slate-600 hover:bg-slate-200{% endif %}">
+                        Todas
+                    </a>
+                    <a href="/templates?category=prescription" class="px-3 py-1.5 rounded-lg text-xs font-bold {% if selected_category == 'prescription' %}bg-teal-600 text-white{% else %}text-slate-600 hover:bg-slate-200{% endif %}">
+                        <i class="fas fa-prescription mr-1"></i> Recetas
+                    </a>
+                    <a href="/templates?category=consultation" class="px-3 py-1.5 rounded-lg text-xs font-bold {% if selected_category == 'consultation' %}bg-blue-600 text-white{% else %}text-slate-600 hover:bg-slate-200{% endif %}">
+                        <i class="fas fa-notes-medical mr-1"></i> Historias Clínicas
+                    </a>
+                    <a href="/templates?category=license" class="px-3 py-1.5 rounded-lg text-xs font-bold {% if selected_category == 'license' %}bg-amber-600 text-white{% else %}text-slate-600 hover:bg-slate-200{% endif %}">
+                        <i class="fas fa-file-signature mr-1"></i> Licencias Médicas
+                    </a>
+                    <a href="/templates?category=reference" class="px-3 py-1.5 rounded-lg text-xs font-bold {% if selected_category == 'reference' %}bg-indigo-600 text-white{% else %}text-slate-600 hover:bg-slate-200{% endif %}">
+                        <i class="fas fa-share-nodes mr-1"></i> Referencias
+                    </a>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Formulario de Creación de Plantilla -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm h-fit">
+                        <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center">
+                            <i class="fas fa-plus-circle text-teal-600 mr-2"></i> Nueva Plantilla
+                        </h2>
+                        <form method="post" action="/templates/create" class="space-y-4">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Categoría</label>
+                                <select name="category" required class="w-full text-xs py-2 px-3 border border-slate-200 rounded-lg">
+                                    <option value="prescription" {% if selected_category == 'prescription' %}selected{% endif %}>Receta Médica</option>
+                                    <option value="consultation" {% if selected_category == 'consultation' %}selected{% endif %}>Nota de Consulta</option>
+                                    <option value="license" {% if selected_category == 'license' %}selected{% endif %}>Licencia / Reposo</option>
+                                    <option value="reference" {% if selected_category == 'reference' %}selected{% endif %}>Carta de Referencia</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Título de la Plantilla</label>
+                                <input type="text" name="title" required placeholder="Ej. Esquema Faringitis Adulto, Reposo Lumbalgia..."
+                                    class="w-full text-xs py-2 px-3 border border-slate-200 rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Contenido de la Plantilla</label>
+                                <textarea name="content" rows="6" required placeholder="Escriba el texto predefinido..."
+                                    class="w-full text-xs font-mono py-2 px-3 border border-slate-200 rounded-lg"></textarea>
+                            </div>
+                            <button type="submit" class="w-full py-2.5 px-4 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-sm">
+                                Guardar Plantilla
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Listado de Plantillas -->
+                    <div class="lg:col-span-2 space-y-4">
+                        {% if not templates %}
+                        <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400">
+                            <i class="fas fa-folder-open text-4xl mb-3 text-slate-300"></i>
+                            <p class="text-sm font-bold">No hay plantillas en esta categoría.</p>
+                            <p class="text-xs mt-1">Crea tu primera plantilla utilizando el formulario de la izquierda.</p>
+                        </div>
+                        {% endif %}
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {% for t in templates %}
+                            <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between space-y-3">
+                                <div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md 
+                                            {% if t.category == 'prescription' %}bg-teal-100 text-teal-800
+                                            {% elif t.category == 'consultation' %}bg-blue-100 text-blue-800
+                                            {% elif t.category == 'license' %}bg-amber-100 text-amber-800
+                                            {% else %}bg-indigo-100 text-indigo-800{% endif %}">
+                                            {{ t.category }}
+                                        </span>
+                                        <form method="post" action="/templates/{{ t.id }}/delete" onsubmit="return confirm('¿Eliminar esta plantilla?');">
+                                            <button type="submit" class="text-slate-400 hover:text-red-600 text-xs">
+                                                <i class="fas fa-trash-can"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                    <h3 class="text-sm font-bold text-slate-800 mt-2">{{ t.title }}</h3>
+                                    <p class="text-xs text-slate-600 mt-1 font-mono whitespace-pre-wrap bg-slate-50 p-2 rounded-lg border border-slate-100 max-h-32 overflow-y-auto">{{ t.content }}</p>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

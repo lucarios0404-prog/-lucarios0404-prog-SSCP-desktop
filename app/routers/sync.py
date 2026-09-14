@@ -29,6 +29,7 @@ async def sync_dashboard(
 
     # Chequeo no bloqueante rápido
     conn_result = await SyncService.check_connection(remote_url, timeout=1.5)
+    recent_logs = SyncService.get_recent_logs(db, limit=10)
 
     return templates.TemplateResponse(
         request=request,
@@ -39,6 +40,7 @@ async def sync_dashboard(
             "setting": setting,
             "remote_url": remote_url,
             "connection": conn_result,
+            "recent_logs": recent_logs,
             "message": request.query_params.get("msg"),
             "msg_type": request.query_params.get("type", "info")
         }
@@ -51,22 +53,47 @@ async def trigger_sync(
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
-    conn = await SyncService.check_connection(remote_url, timeout=3.0)
-    
-    # Actualizar fecha de sync en settings
     setting = db.query(Setting).first()
+    node_ip = setting.tailscale_ip if setting else None
+    
+    # Ejecutar Push y Pull con política último gana
+    push_res = await SyncService.push_to_remote(db, remote_url, node_ip)
+    pull_res = await SyncService.pull_from_remote(db, remote_url, node_ip)
+
     if setting:
         setting.updated_at = datetime.utcnow()
         db.commit()
 
-    if conn["online"]:
-        msg = f"Sincronización completada con éxito. Servidor en línea (HTTP {conn['status_code']})."
+    if push_res.get("success") or pull_res.get("success"):
+        msg = f"Sincronización completada. Subidos: {push_res.get('sent', 0)} registros. Recibidos: {pull_res.get('received', 0)} registros."
         msg_type = "success"
     else:
-        msg = f"Modo Offline: No se pudo conectar al servidor central ({conn['message']}). Los cambios se mantienen guardados localmente."
+        msg = f"Modo Offline: No se pudo conectar al servidor central ({push_res.get('message')}). Los datos están protegidos en SQLite local."
         msg_type = "warning"
 
     return RedirectResponse(url=f"/sync?msg={msg}&type={msg_type}", status_code=303)
+
+@router.post("/push")
+async def push_sync(
+    remote_url: str = Form("https://sscp.laxarusdevs.com"),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    setting = db.query(Setting).first()
+    res = await SyncService.push_to_remote(db, remote_url, node_ip=setting.tailscale_ip if setting else None)
+    msg_type = "success" if res.get("success") else "warning"
+    return RedirectResponse(url=f"/sync?msg={res.get('message')}&type={msg_type}", status_code=303)
+
+@router.post("/pull")
+async def pull_sync(
+    remote_url: str = Form("https://sscp.laxarusdevs.com"),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    setting = db.query(Setting).first()
+    res = await SyncService.pull_from_remote(db, remote_url, node_ip=setting.tailscale_ip if setting else None)
+    msg_type = "success" if res.get("success") else "warning"
+    return RedirectResponse(url=f"/sync?msg={res.get('message')}&type={msg_type}", status_code=303)
 
 @router.get("/export")
 def export_sync_package(

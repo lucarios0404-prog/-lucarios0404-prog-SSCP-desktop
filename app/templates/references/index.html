@@ -1,0 +1,80 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Cartas de Referencia (F10) — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'references' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Cartas de Referencia e Interconsulta" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-5xl mx-auto space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Cartas de Referencia e Interconsulta (F10)</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Derivación formal de pacientes a especialistas o centros de salud de segundo/tercer nivel.</p>
+                    </div>
+                    <a href="/references/create" class="inline-flex items-center px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition-all">
+                        <i class="fas fa-plus mr-1.5"></i> Nueva Carta de Referencia
+                    </a>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                    <th class="py-3 px-4">Paciente</th>
+                                    <th class="py-3 px-4">Derivado a</th>
+                                    <th class="py-3 px-4">Institución</th>
+                                    <th class="py-3 px-4">Motivo de Referencia</th>
+                                    <th class="py-3 px-4">Fecha</th>
+                                    <th class="py-3 px-4 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
+                                {% if not references %}
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-slate-400">
+                                        No se han emitido cartas de referencia registradas.
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% for r in references %}
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-3.5 px-4 font-bold text-slate-900">
+                                        {{ r.patient.first_name }} {{ r.patient.last_name }}
+                                        <div class="text-[10px] text-slate-400 font-normal">DNI: {{ r.patient.document_id or 'N/D' }}</div>
+                                    </td>
+                                    <td class="py-3.5 px-4 font-semibold text-indigo-700">
+                                        {{ r.referred_to_doctor_or_specialty }}
+                                    </td>
+                                    <td class="py-3.5 px-4 text-slate-500">
+                                        {{ r.institution or 'N/D' }}
+                                    </td>
+                                    <td class="py-3.5 px-4 max-w-[200px] truncate" title="{{ r.reason_for_referral }}">
+                                        {{ r.reason_for_referral }}
+                                    </td>
+                                    <td class="py-3.5 px-4 text-slate-500">
+                                        {{ r.created_at.strftime("%d/%m/%Y") if r.created_at else '' }}
+                                    </td>
+                                    <td class="py-3.5 px-4 text-right">
+                                        <a href="/references/{{ r.id }}/pdf" target="_blank" class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold">
+                                            <i class="fas fa-file-pdf mr-1"></i> Descargar PDF
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

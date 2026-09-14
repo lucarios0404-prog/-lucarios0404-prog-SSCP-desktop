@@ -1,12 +1,16 @@
+import asyncio
+from contextlib import asynccontextmanager
+import sys
+from pathlib import Path
+from datetime import date
+from sqlalchemy.orm import Session
+
 from fastapi import FastAPI, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
-from pathlib import Path
-from sqlalchemy.orm import Session
-from datetime import date
 
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.models.patient import Patient
 from app.models.appointment import Appointment
 from app.models.consultation import Consultation
@@ -24,11 +28,41 @@ from app.routers import (
     messages,
     inventory,
     sync,
+    quick_prescriptions,
+    templates as clinical_templates,
+    medical_licenses,
+    medical_references,
 )
 from app.core.deps import get_current_user
-import sys
 
-app = FastAPI(title="SSCP Desktop")
+async def run_periodic_sync():
+    """Tarea en segundo plano: sincronización periódica cada 5 minutos (Fase 6)"""
+    while True:
+        try:
+            await asyncio.sleep(300)  # 5 minutos
+            from app.services.sync_service import SyncService
+            from app.models.setting import Setting
+            with SessionLocal() as db:
+                setting = db.query(Setting).first()
+                remote_url = setting.email if (setting and "http" in (setting.email or "")) else "https://sscp.laxarusdevs.com"
+                node_ip = setting.tailscale_ip if setting else None
+                await SyncService.background_sync(db, remote_url, node_ip)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[Auto-Sync Background] Error no crítico: {e}")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    sync_task = asyncio.create_task(run_periodic_sync())
+    yield
+    sync_task.cancel()
+    try:
+        await sync_task
+    except asyncio.CancelledError:
+        pass
+
+app = FastAPI(title="SSCP Desktop", lifespan=lifespan)
 
 # Soporte para PyInstaller (empaquetado .exe) y desarrollo local
 BASE_DIR = Path(sys._MEIPASS).resolve() if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
@@ -36,7 +70,7 @@ BASE_DIR = Path(sys._MEIPASS).resolve() if getattr(sys, 'frozen', False) else Pa
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
-# Incluir todos los módulos Core y Clínicos
+# Incluir todos los módulos Core, Clínicos y de Productividad (Fase 4 y Fase 6)
 app.include_router(auth.router)
 app.include_router(patients.router)
 app.include_router(appointments.router)
@@ -49,6 +83,10 @@ app.include_router(vaccines.router)
 app.include_router(messages.router)
 app.include_router(inventory.router)
 app.include_router(sync.router)
+app.include_router(quick_prescriptions.router)
+app.include_router(clinical_templates.router)
+app.include_router(medical_licenses.router)
+app.include_router(medical_references.router)
 
 @app.get("/")
 async def root(request: Request, current_user = Depends(get_current_user)):

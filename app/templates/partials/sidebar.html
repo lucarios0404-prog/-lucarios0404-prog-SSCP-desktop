@@ -53,6 +53,28 @@
         </div>
 
         <div>
+            <span class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Productividad Médica (F4)</span>
+            <nav class="mt-2 space-y-1">
+                <a href="/prescriptions/quick" class="{% if active_menu == 'quick_prescriptions' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
+                    <i class="fas fa-bolt mr-3 text-base {% if active_menu == 'quick_prescriptions' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
+                    Receta Rápida (F2)
+                </a>
+                <a href="/templates" class="{% if active_menu == 'templates' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
+                    <i class="fas fa-clipboard-list mr-3 text-base {% if active_menu == 'templates' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
+                    Plantillas Clínicas (F4)
+                </a>
+                <a href="/licenses" class="{% if active_menu == 'licenses' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
+                    <i class="fas fa-file-medical mr-3 text-base {% if active_menu == 'licenses' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
+                    Licencias Médicas (F5)
+                </a>
+                <a href="/references" class="{% if active_menu == 'references' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
+                    <i class="fas fa-envelope-open-text mr-3 text-base {% if active_menu == 'references' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
+                    Cartas de Referencia (F10)
+                </a>
+            </nav>
+        </div>
+
+        <div>
             <span class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Administración</span>
             <nav class="mt-2 space-y-1">
                 <a href="/payments" class="{% if active_menu == 'payments' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">

@@ -1,0 +1,82 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Licencias Médicas (F5) — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'licenses' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Licencias y Reposos Médicos" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-5xl mx-auto space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Certificados de Licencia Médica (F5)</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Control de permisos laborales, reposos médicos emitidos y reimpresión en PDF oficial.</p>
+                    </div>
+                    <a href="/licenses/create" class="inline-flex items-center px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md shadow-amber-600/30 transition-all">
+                        <i class="fas fa-plus mr-1.5"></i> Emitir Licencia Médica
+                    </a>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                    <th class="py-3 px-4">Paciente</th>
+                                    <th class="py-3 px-4">Diagnóstico</th>
+                                    <th class="py-3 px-4">Días Reposo</th>
+                                    <th class="py-3 px-4">Período</th>
+                                    <th class="py-3 px-4">Lugar / Empresa</th>
+                                    <th class="py-3 px-4 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
+                                {% if not licenses %}
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-slate-400">
+                                        No se han emitido licencias médicas registradas.
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% for l in licenses %}
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-3.5 px-4 font-bold text-slate-900">
+                                        {{ l.patient.first_name }} {{ l.patient.last_name }}
+                                        <div class="text-[10px] text-slate-400 font-normal">DNI: {{ l.patient.document_id or 'N/D' }}</div>
+                                    </td>
+                                    <td class="py-3.5 px-4 max-w-[200px] truncate" title="{{ l.diagnosis }}">
+                                        {{ l.diagnosis }}
+                                    </td>
+                                    <td class="py-3.5 px-4">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md font-bold text-amber-800 bg-amber-100">
+                                            {{ l.days_rest }} días
+                                        </span>
+                                    </td>
+                                    <td class="py-3.5 px-4 text-slate-600">
+                                        {{ l.start_date.strftime("%d/%m/%Y") }} al {{ l.end_date.strftime("%d/%m/%Y") }}
+                                    </td>
+                                    <td class="py-3.5 px-4 text-slate-500">
+                                        {{ l.workplace_or_school or 'General' }}
+                                    </td>
+                                    <td class="py-3.5 px-4 text-right">
+                                        <a href="/licenses/{{ l.id }}/pdf" target="_blank" class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold">
+                                            <i class="fas fa-file-pdf mr-1"></i> Descargar PDF
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

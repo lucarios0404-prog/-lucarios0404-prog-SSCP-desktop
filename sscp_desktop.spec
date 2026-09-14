@@ -51,6 +51,21 @@ hidden_imports = [
     'app.routers.messages',
     'app.routers.inventory',
     'app.routers.sync',
+    'app.routers.quick_prescriptions',
+    'app.routers.templates',
+    'app.routers.medical_licenses',
+    'app.routers.medical_references',
+    'app.models.template',
+    'app.models.medical_license',
+    'app.models.medical_reference',
+    'app.models.sync_log',
+    'app.services.qr_service',
+    'app.services.pdf_service',
+    'app.services.sync_service',
+    'qrcode',
+    'qrcode.image.pil',
+    'PIL',
+    'PIL.Image',
 ]
 
 a = Analysis(

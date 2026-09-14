@@ -41,27 +41,52 @@
                                     <span><i class="fas fa-envelope mr-1 text-slate-400"></i> {{ patient.email or 'Sin correo' }}</span>
                                     <span><i class="fas fa-tint mr-1 text-red-400"></i> Sangre: <strong>{{ patient.blood_type or 'N/D' }}</strong></span>
                                 </div>
+                                {% if patient.allergies %}
+                                <div class="mt-2.5 inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-300">
+                                    <i class="fas fa-circle-exclamation mr-1.5 text-red-600"></i> Alergias del Paciente (F6): {{ patient.allergies }}
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
 
+                        <!-- F17: Código QR del Paciente -->
+                        {% if qr_code_base64 %}
+                        <div class="flex flex-col items-center justify-center p-2 bg-slate-50 rounded-2xl border border-slate-200 shrink-0">
+                            <img src="{{ qr_code_base64 }}" alt="QR Paciente" class="w-20 h-20 rounded-xl shadow-xs">
+                            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1"><i class="fas fa-qrcode mr-0.5"></i> QR Paciente</span>
+                        </div>
+                        {% endif %}
+
                         <!-- Direct Action Buttons -->
                         <div class="flex flex-wrap gap-2 md:self-center">
-                            <a href="/appointments/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-all">
-                                <i class="fas fa-calendar-plus mr-1.5"></i> Agendar Cita
+                            <!-- F2: Receta Rápida -->
+                            <a href="/prescriptions/quick?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm transition-all">
+                                <i class="fas fa-prescription mr-1.5"></i> Receta Rápida (F2)
+                            </a>
+                            <!-- F5: Licencia Médica -->
+                            <a href="/licenses/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-sm transition-all">
+                                <i class="fas fa-file-signature mr-1.5"></i> Licencia (F5)
+                            </a>
+                            <!-- F10: Carta de Referencia -->
+                            <a href="/references/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-all">
+                                <i class="fas fa-share-nodes mr-1.5"></i> Referencia (F10)
+                            </a>
+                            <a href="/appointments/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all">
+                                <i class="fas fa-calendar-plus mr-1.5"></i> Cita
                             </a>
                             <a href="/consultations/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-sm transition-all">
                                 <i class="fas fa-stethoscope mr-1.5"></i> Consulta
                             </a>
                             <a href="/vitals/patient/{{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm transition-all">
-                                <i class="fas fa-heartbeat mr-1.5"></i> Signos & Curvas
+                                <i class="fas fa-heartbeat mr-1.5"></i> Signos
                             </a>
                             <a href="/lab-results?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold shadow-sm transition-all">
-                                <i class="fas fa-flask mr-1.5"></i> Laboratorio
+                                <i class="fas fa-flask mr-1.5"></i> Labs
                             </a>
-                            <a href="/vaccines?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm transition-all">
+                            <a href="/vaccines?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-all">
                                 <i class="fas fa-syringe mr-1.5"></i> Vacunas
                             </a>
-                            <a href="/payments/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-all">
+                            <a href="/payments/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-all">
                                 <i class="fas fa-receipt mr-1.5"></i> Cobrar
                             </a>
                             <a href="/patients/{{ patient.id }}/edit" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all">

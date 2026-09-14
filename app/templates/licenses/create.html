@@ -1,0 +1,133 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Nueva Licencia Médica (F5) — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'licenses' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Emitir Licencia Médica" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-3xl mx-auto space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Emisión de Licencia / Reposo Médico (F5)</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Genera un certificado médico oficial con días de reposo y validez legal.</p>
+                    </div>
+                    <a href="/licenses" class="text-slate-500 hover:text-slate-800 text-xs font-semibold py-2 px-3 rounded-lg border border-slate-200 hover:bg-slate-100">
+                        Volver a Licencias
+                    </a>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    <form method="post" action="/licenses/create" class="space-y-5">
+                        <!-- Selección de Paciente -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Paciente <span class="text-red-500">*</span>
+                            </label>
+                            <select name="patient_id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30">
+                                <option value="">-- Seleccionar paciente --</option>
+                                {% for p in patients %}
+                                <option value="{{ p.id }}" {% if selected_patient and selected_patient.id == p.id %}selected{% endif %}>
+                                    {{ p.first_name }} {{ p.last_name }} (DNI: {{ p.document_id or 'N/D' }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Cargar plantilla si hay -->
+                        {% if templates %}
+                        <div class="p-3 bg-amber-50/50 border border-amber-200 rounded-xl">
+                            <label class="block text-[11px] font-bold text-amber-900 uppercase tracking-wider mb-1">
+                                <i class="fas fa-file-lines mr-1 text-amber-600"></i> Cargar desde Plantilla de Reposo (F4)
+                            </label>
+                            <select onchange="document.getElementById('notes').value = this.value" class="w-full text-xs py-1.5 px-2.5 border border-slate-200 rounded-lg bg-white">
+                                <option value="">-- Seleccione una plantilla --</option>
+                                {% for t in templates %}
+                                <option value="{{ t.content }}">{{ t.title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+
+                        <!-- Diagnóstico -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Diagnóstico Médico Justificativo <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="diagnosis" required placeholder="Ej. Síndrome gripal severo con compromiso respiratorio alto, Lumbago agudo..."
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30">
+                        </div>
+
+                        <!-- Días y Fechas de Reposo -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Días de Reposo <span class="text-red-500">*</span>
+                                </label>
+                                <input type="number" id="days_rest" name="days_rest" min="1" max="90" value="3" required onchange="calculateEndDate()"
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Fecha de Inicio <span class="text-red-500">*</span>
+                                </label>
+                                <input type="date" id="start_date" name="start_date" value="{{ today }}" required onchange="calculateEndDate()"
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Fecha de Término <span class="text-red-500">*</span>
+                                </label>
+                                <input type="date" id="end_date" name="end_date" value="{{ tomorrow }}" required
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30">
+                            </div>
+                        </div>
+
+                        <!-- Dirigido a -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Dirigido a (Empresa, Escuela o Institución)
+                            </label>
+                            <input type="text" name="workplace_or_school" placeholder="Ej. A quien pueda interesar, Banco Reservas, MINERD..."
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30">
+                        </div>
+
+                        <!-- Observaciones -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Observaciones e Indicaciones Médicas Adicionales
+                            </label>
+                            <textarea id="notes" name="notes" rows="3" placeholder="Reposo relativo en cama, hidratación oral abundante y no realizar esfuerzos físicos..."
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30"></textarea>
+                        </div>
+
+                        <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100">
+                            <button type="submit" class="py-3 px-6 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-lg shadow-amber-600/30 transition-all flex items-center space-x-2">
+                                <i class="fas fa-file-pdf"></i>
+                                <span>Emitir Certificado y Descargar PDF</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+function calculateEndDate() {
+    const startVal = document.getElementById('start_date').value;
+    const days = parseInt(document.getElementById('days_rest').value) || 1;
+    if (!startVal) return;
+    const sDate = new Date(startVal);
+    sDate.setDate(sDate.getDate() + (days - 1));
+    document.getElementById('end_date').value = sDate.toISOString().split('T')[0];
+}
+</script>
+{% endblock %}

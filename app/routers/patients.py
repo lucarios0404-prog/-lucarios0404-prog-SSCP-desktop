@@ -12,6 +12,7 @@ from app.models.payment import Payment
 from app.models.appointment import Appointment
 from app.models.consultation import Consultation
 from app.core.deps import require_current_user
+from app.services.qr_service import generate_patient_qr_base64
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -78,6 +79,7 @@ def create_patient(
     email: str = Form(None),
     address: str = Form(None),
     blood_type: str = Form(None),
+    allergies: str = Form(None),
     emergency_contact_name: str = Form(None),
     emergency_contact_phone: str = Form(None),
     db: Session = Depends(get_db),
@@ -100,6 +102,7 @@ def create_patient(
         email=email,
         address=address,
         blood_type=blood_type,
+        allergies=allergies,
         emergency_contact_name=emergency_contact_name,
         emergency_contact_phone=emergency_contact_phone
     )
@@ -123,8 +126,12 @@ def view_patient(
     consultations = db.query(Consultation).filter(Consultation.patient_id == patient_id).order_by(Consultation.created_at.desc()).all()
     payments = db.query(Payment).filter(Payment.patient_id == patient_id).order_by(Payment.created_at.desc()).all()
 
-    # F8: Saldo pendiente
-    balance_due = sum(p.total for p in payments if p.status == "pending")
+    # F8: Cálculo de deuda pendiente
+    pending_payments = [p for p in payments if p.status == "pending"]
+    balance_due = sum(p.total for p in pending_payments)
+
+    # F17: Código QR del Paciente
+    qr_code_base64 = generate_patient_qr_base64(patient)
 
     return templates.TemplateResponse(
         request=request,
@@ -136,6 +143,7 @@ def view_patient(
             "consultations": consultations,
             "payments": payments,
             "balance_due": balance_due,
+            "qr_code_base64": qr_code_base64,
         }
     )
 
@@ -172,6 +180,7 @@ def edit_patient(
     email: str = Form(None),
     address: str = Form(None),
     blood_type: str = Form(None),
+    allergies: str = Form(None),
     emergency_contact_name: str = Form(None),
     emergency_contact_phone: str = Form(None),
     db: Session = Depends(get_db),
@@ -197,6 +206,7 @@ def edit_patient(
     patient.email = email
     patient.address = address
     patient.blood_type = blood_type
+    patient.allergies = allergies
     patient.emergency_contact_name = emergency_contact_name
     patient.emergency_contact_phone = emergency_contact_phone
     patient.updated_at = datetime.utcnow()

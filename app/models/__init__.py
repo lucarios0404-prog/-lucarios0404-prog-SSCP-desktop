@@ -9,9 +9,14 @@ from app.models.lab_result import LabResult
 from app.models.vaccine import VaccineRecord
 from app.models.message import InternalMessage
 from app.models.inventory import InventoryItem, InventoryMovement
+from app.models.template import ClinicalTemplate
+from app.models.medical_license import MedicalLicense
+from app.models.medical_reference import MedicalReference
+from app.models.sync_log import SyncLog
 
 __all__ = [
     "User", "Patient", "Appointment", "Payment", "Consultation",
     "Setting", "VitalSign", "LabResult", "VaccineRecord", "InternalMessage",
-    "InventoryItem", "InventoryMovement"
+    "InventoryItem", "InventoryMovement", "ClinicalTemplate",
+    "MedicalLicense", "MedicalReference", "SyncLog"
 ]
