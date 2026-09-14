@@ -1,0 +1,132 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Sincronización de Datos — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'sync' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Centro de Sincronización" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-5xl mx-auto space-y-6">
+                <!-- Encabezado -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Sincronización Offline / Online</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Gestión de conectividad con la nube, respaldo portátil y sincronización entre consultorios.</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold {% if connection.online %}bg-emerald-100 text-emerald-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+                            <span class="w-2 h-2 rounded-full mr-2 {% if connection.online %}bg-emerald-500 animate-pulse{% else %}bg-amber-500{% endif %}"></span>
+                            {% if connection.online %}En Línea con el Servidor{% else %}Modo Offline Activo{% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Mensaje de Feedback si existe -->
+                {% if message %}
+                <div class="rounded-xl p-4 flex items-center space-x-3 text-xs font-semibold {% if msg_type == 'success' %}bg-emerald-50 border border-emerald-200 text-emerald-800{% elif msg_type == 'warning' %}bg-amber-50 border border-amber-200 text-amber-800{% else %}bg-blue-50 border border-blue-200 text-blue-800{% endif %}">
+                    <i class="fas {% if msg_type == 'success' %}fa-check-circle text-emerald-600{% elif msg_type == 'warning' %}fa-exclamation-triangle text-amber-600{% else %}fa-info-circle text-blue-600{% endif %} text-base"></i>
+                    <span>{{ message }}</span>
+                </div>
+                {% endif %}
+
+                <!-- Métricas Rápidas de Registros Locales -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase">Pacientes</span>
+                        <p class="text-2xl font-black text-slate-800 mt-1">{{ stats.total_patients }}</p>
+                    </div>
+                    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase">Consultas</span>
+                        <p class="text-2xl font-black text-slate-800 mt-1">{{ stats.total_consultations }}</p>
+                    </div>
+                    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase">Signos Vitales</span>
+                        <p class="text-2xl font-black text-slate-800 mt-1">{{ stats.total_vital_signs }}</p>
+                    </div>
+                    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase">Pagos Registrados</span>
+                        <p class="text-2xl font-black text-slate-800 mt-1">{{ stats.total_payments }}</p>
+                    </div>
+                </div>
+
+                <!-- Opciones de Sincronización -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Tarjeta 1: Sincronización en la Nube -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between space-y-5">
+                        <div>
+                            <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center mb-4">
+                                <i class="fas fa-cloud-arrow-up text-lg"></i>
+                            </div>
+                            <h2 class="text-base font-bold text-slate-900">Sincronización en la Nube</h2>
+                            <p class="text-xs text-slate-500 mt-1">Conecta con el servidor central SSCP para subir consultas realizadas offline y descargar actualizaciones.</p>
+                            
+                            <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1.5">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Servidor Remoto:</span>
+                                    <span class="font-mono text-slate-700 font-semibold truncate max-w-[200px]">{{ remote_url }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Sede Actual:</span>
+                                    <span class="text-slate-700 font-bold">{{ stats.sede_name }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Última Comprobación:</span>
+                                    <span class="text-slate-700">{{ stats.last_synced_at }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <form method="post" action="/sync/trigger">
+                            <input type="hidden" name="remote_url" value="{{ remote_url }}">
+                            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center space-x-2">
+                                <i class="fas fa-rotate"></i>
+                                <span>Probar Conexión y Sincronizar Ahora</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Tarjeta 2: Respaldo y Migración Portátil (Pendrive / USB) -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between space-y-5">
+                        <div>
+                            <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center mb-4">
+                                <i class="fas fa-hard-drive text-lg"></i>
+                            </div>
+                            <h2 class="text-base font-bold text-slate-900">Respaldo Portátil y USB</h2>
+                            <p class="text-xs text-slate-500 mt-1">Exporta un paquete cifrado con todos los expedientes y consultas para transferirlos a otra computadora o restaurar en caso de fallo.</p>
+
+                            <div class="mt-4 space-y-3">
+                                <!-- Botón Descargar Paquete -->
+                                <a href="/sync/export" class="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center space-x-2">
+                                    <i class="fas fa-download"></i>
+                                    <span>Descargar Paquete de Sincronización (.json)</span>
+                                </a>
+
+                                <!-- Formulario Importar Paquete -->
+                                <form method="post" action="/sync/import" enctype="multipart/form-data" class="pt-2 border-t border-slate-100">
+                                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1.5">Importar Paquete desde Archivo</label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="file" name="file" accept=".json" required class="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 w-full border border-slate-200 rounded-lg p-1">
+                                        <button type="submit" class="py-2 px-3 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shrink-0">
+                                            <i class="fas fa-upload mr-1"></i> Cargar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="text-[11px] text-slate-400 text-center">
+                            Los datos exportados respetan la privacidad de los pacientes y la integridad de los historiales.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

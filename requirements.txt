@@ -11,3 +11,4 @@ pydantic-settings
 requests
 httpx
 pyinstaller
+reportlab

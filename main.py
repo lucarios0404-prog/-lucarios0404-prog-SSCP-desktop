@@ -23,12 +23,15 @@ from app.routers import (
     vaccines,
     messages,
     inventory,
+    sync,
 )
 from app.core.deps import get_current_user
+import sys
 
 app = FastAPI(title="SSCP Desktop")
 
-BASE_DIR = Path(__file__).resolve().parent
+# Soporte para PyInstaller (empaquetado .exe) y desarrollo local
+BASE_DIR = Path(sys._MEIPASS).resolve() if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
@@ -45,6 +48,7 @@ app.include_router(lab_results.router)
 app.include_router(vaccines.router)
 app.include_router(messages.router)
 app.include_router(inventory.router)
+app.include_router(sync.router)
 
 @app.get("/")
 async def root(request: Request, current_user = Depends(get_current_user)):

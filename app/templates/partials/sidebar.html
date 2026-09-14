@@ -67,6 +67,10 @@
                     <i class="fas fa-cog mr-3 text-base {% if active_menu == 'settings' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Configuración
                 </a>
+                <a href="/sync" class="{% if active_menu == 'sync' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
+                    <i class="fas fa-cloud-arrow-up mr-3 text-base {% if active_menu == 'sync' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
+                    Sincronización
+                </a>
             </nav>
         </div>
     </div>

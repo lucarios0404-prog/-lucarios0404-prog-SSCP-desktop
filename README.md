@@ -14,7 +14,9 @@ Aplicación de escritorio moderna y ligera desarrollada para la gestión médica
 - **Control de Vacunación**: Esquema y registro de dosis aplicadas a pacientes.
 - **Inventario Médico**: Catálogo de insumos/medicamentos, stock y registro de movimientos de entrada/salida.
 - **Pagos y Facturación**: Registro de pagos, control de adeudos y balance.
-- **Mensajería Interna**: Comunicación local entre personal médico y administrativo.
+- **Recetas e Informes en PDF**: Generación e impresión directa de recetas médicas oficiales con firma y membrete, e informes clínicos detallados en formato PDF.
+- **Sincronización Offline / Online**: Conectividad bidireccional con el servidor central SSCP y exportación/importación de paquetes de datos portátiles (.json) para traslados vía USB.
+- **Empaquetado Portable (.exe)**: Ejecutable nativo para Windows compilable con un solo clic (`build.bat`) sin requerir consola ni Python preinstalado.
 - **Ajustes y Personalización**: Configuración del consultorio o clínica.
 
 ---
@@ -81,6 +83,18 @@ El script activará el entorno, levantará el servidor en el puerto 8080 y abrir
    ```bash
    uvicorn main:app --host 0.0.0.0 --port 8080 --reload
    ```
+
+### 4. Compilar Ejecutable Portable (.exe) para Windows
+
+Para generar la versión portable lista para distribuir sin requerir Python:
+```bat
+build.bat
+```
+o mediante script:
+```bash
+python build_exe.py
+```
+El archivo ejecutable listo para usar se generará en: `dist/SSCP-Desktop/SSCP-Desktop.exe`.
 
 ---
 

@@ -30,7 +30,7 @@ wheels/
 .installed.cfg
 *.egg
 *.manifest
-*.spec
+!sscp_desktop.spec
 
 # Pytest / Coverage
 .pytest_cache/

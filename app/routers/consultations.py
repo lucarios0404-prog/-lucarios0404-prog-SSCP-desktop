@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from pathlib import Path
@@ -10,7 +10,10 @@ from app.database import get_db
 from app.models.consultation import Consultation
 from app.models.patient import Patient
 from app.models.appointment import Appointment
+from app.models.setting import Setting
+from app.models.vital_sign import VitalSign
 from app.core.deps import require_current_user
+from app.services.pdf_service import generate_prescription_pdf, generate_consultation_report_pdf
 
 router = APIRouter(prefix="/consultations", tags=["consultations"])
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -217,3 +220,47 @@ def update_consultation(
 
     db.commit()
     return RedirectResponse(url=f"/consultations/{consultation_id}", status_code=303)
+
+@router.get("/{consultation_id}/prescription/pdf")
+def download_prescription_pdf(
+    consultation_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    consultation = db.query(Consultation).filter(Consultation.id == consultation_id).first()
+    if not consultation:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+    
+    setting = db.query(Setting).first()
+    pdf_buffer = generate_prescription_pdf(consultation, setting)
+    
+    filename = f"Receta_Consulta_{consultation.id}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
+
+@router.get("/{consultation_id}/report/pdf")
+def download_consultation_report_pdf(
+    consultation_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    consultation = db.query(Consultation).filter(Consultation.id == consultation_id).first()
+    if not consultation:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+    
+    setting = db.query(Setting).first()
+    vitals = None
+    if consultation.patient_id:
+        vitals = db.query(VitalSign).filter(VitalSign.patient_id == consultation.patient_id).order_by(VitalSign.recorded_at.desc()).first()
+        
+    pdf_buffer = generate_consultation_report_pdf(consultation, setting, vitals)
+    
+    filename = f"Informe_Consulta_{consultation.id}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )

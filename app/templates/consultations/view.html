@@ -25,13 +25,21 @@
                         </div>
                     </div>
 
-                    <div class="flex items-center space-x-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <!-- F3: Botón de Edición Post-Guardado -->
-                        <a href="/consultations/{{ consultation.id }}/edit" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-sm transition-all">
-                            <i class="fas fa-edit mr-1.5"></i> Editar Consulta (F3)
+                        <a href="/consultations/{{ consultation.id }}/edit" class="inline-flex items-center px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-sm transition-all">
+                            <i class="fas fa-edit mr-1.5"></i> Editar (F3)
                         </a>
-                        <button onclick="window.print()" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold shadow-sm transition-all">
-                            <i class="fas fa-print mr-1.5"></i> Imprimir Nota / Receta
+                        <!-- Botón Receta PDF -->
+                        <a href="/consultations/{{ consultation.id }}/prescription/pdf" target="_blank" class="inline-flex items-center px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm transition-all">
+                            <i class="fas fa-prescription mr-1.5"></i> Receta Médica (PDF)
+                        </a>
+                        <!-- Botón Informe Clínico PDF -->
+                        <a href="/consultations/{{ consultation.id }}/report/pdf" target="_blank" class="inline-flex items-center px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-all">
+                            <i class="fas fa-file-pdf mr-1.5"></i> Informe Clínico (PDF)
+                        </a>
+                        <button onclick="window.print()" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold shadow-sm transition-all">
+                            <i class="fas fa-print mr-1.5"></i> Vista Rápida
                         </button>
                     </div>
                 </div>
