@@ -1,6 +1,6 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}Receta Rápida (F2) — SSCP Desktop{% endblock %}
+{% block title %}Receta Rápida — SSCP Desktop{% endblock %}
 
 {% block body %}
 <div class="flex h-screen bg-slate-50 overflow-hidden">
@@ -15,7 +15,7 @@
             <div class="max-w-3xl mx-auto space-y-6">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h1 class="text-2xl font-bold text-slate-900">Emisión de Receta Rápida (F2)</h1>
+                        <h1 class="text-2xl font-bold text-slate-900">Emisión de Receta Rápida</h1>
                         <p class="text-xs text-slate-500 mt-0.5">Emite e imprime una receta médica oficial de inmediato sin requerir crear una consulta completa.</p>
                     </div>
                     <a href="/consultations" class="text-slate-500 hover:text-slate-800 text-xs font-semibold py-2 px-3 rounded-lg border border-slate-200 hover:bg-slate-100">
@@ -23,11 +23,11 @@
                     </a>
                 </div>
 
-                <!-- Banner Alerta de Alergias Dinámico (F6) -->
+                <!-- Banner Alerta de Alergias Dinámico -->
                 <div id="allergy-alert-banner" class="hidden rounded-xl p-4 bg-red-50 border-2 border-red-400 text-red-900 flex items-start space-x-3 shadow-md animate-bounce">
                     <i class="fas fa-triangle-exclamation text-red-600 text-xl mt-0.5"></i>
                     <div>
-                        <h3 class="text-xs font-black uppercase tracking-wider text-red-700">¡Alerta de Seguridad por Alergias Cruzadas (F6)!</h3>
+                        <h3 class="text-xs font-black uppercase tracking-wider text-red-700">¡Alerta de Seguridad por Alergias Cruzadas!</h3>
                         <p id="allergy-alert-text" class="text-xs font-semibold mt-0.5"></p>
                     </div>
                 </div>
@@ -51,11 +51,11 @@
                             <div id="patient-allergies-badge" class="mt-2 text-xs text-slate-600 font-medium"></div>
                         </div>
 
-                        <!-- Selector de Plantillas Clínicas (F4) -->
+                        <!-- Selector de Plantillas Clínicas -->
                         {% if templates %}
                         <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                             <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                                <i class="fas fa-file-prescription text-teal-600 mr-1"></i> Cargar desde Plantilla de Receta (F4)
+                                <i class="fas fa-file-prescription text-teal-600 mr-1"></i> Cargar desde Plantilla de Receta
                             </label>
                             <select onchange="applyTemplate(this.value)" class="w-full text-xs py-1.5 px-2.5 border border-slate-200 rounded-lg bg-white">
                                 <option value="">-- Seleccione una plantilla predefinida --</option>

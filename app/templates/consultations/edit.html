@@ -8,7 +8,7 @@
     {% include "partials/sidebar.html" %}
 
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {% set page_title = "Editar Historia Médica (F3)" %}
+        {% set page_title = "Editar Historia Médica" %}
         {% include "partials/header.html" %}
 
         <main class="flex-1 overflow-y-auto p-6 md:p-8">
@@ -16,7 +16,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <h1 class="text-2xl font-bold text-slate-900">Editar Consulta #{{ consultation.id }}</h1>
-                        <p class="text-xs text-slate-500 mt-0.5">Modificación autorizada de historia clínica (F3: Queda constancia en registro de auditoría).</p>
+                        <p class="text-xs text-slate-500 mt-0.5">Modificación autorizada de historia clínica (Queda constancia en registro de auditoría).</p>
                     </div>
                     <a href="/consultations/{{ consultation.id }}" class="text-xs text-slate-500 hover:text-slate-800 font-medium">
                         &larr; Volver al detalle
@@ -42,7 +42,7 @@
                             <span class="text-xs text-slate-500 font-mono">DNI: {{ consultation.patient.document_id or 'N/D' }}</span>
                         </div>
 
-                        <!-- Motivo de la modificación (F3) -->
+                        <!-- Motivo de la modificación -->
                         <div class="bg-amber-50/50 p-4 rounded-xl border border-amber-200">
                             <label class="block text-xs font-bold text-amber-950 uppercase tracking-wider mb-1.5">
                                 Motivo de la Modificación (Requerido para Auditoría) <span class="text-red-500">*</span>
@@ -132,7 +132,7 @@
                         <div class="border-t border-slate-100 pt-5 flex items-center justify-end space-x-3">
                             <a href="/consultations/{{ consultation.id }}" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">Cancelar</a>
                             <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-amber-500/20 transition-all">
-                                <i class="fas fa-check mr-1.5"></i> Guardar Cambios y Registrar Auditoría (F3)
+                                <i class="fas fa-check mr-1.5"></i> Guardar Cambios y Registrar Auditoría
                             </button>
                         </div>
                     </form>

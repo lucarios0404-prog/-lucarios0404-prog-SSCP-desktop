@@ -17,7 +17,7 @@
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h1 class="text-2xl font-bold text-slate-900">Facturación & Pagos</h1>
-                        <p class="text-xs text-slate-500 mt-0.5">Control de ingresos, cobro de consultas y cuentas por cobrar (F13).</p>
+                        <p class="text-xs text-slate-500 mt-0.5">Control de ingresos, cobro de consultas y cuentas por cobrar.</p>
                     </div>
                     <a href="/payments/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-md shadow-emerald-500/20 transition-all">
                         <i class="fas fa-plus-circle mr-2"></i> Registrar Nuevo Pago / Cobro
@@ -38,7 +38,7 @@
 
                     <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
                         <div>
-                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cuentas por Cobrar (F13)</p>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cuentas por Cobrar</p>
                             <h3 class="text-2xl font-bold text-amber-600 mt-1">RD$ {{ "%.2f"|format(total_pendiente) }}</h3>
                         </div>
                         <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
@@ -69,13 +69,13 @@
                         <i class="fas fa-clock mr-1.5"></i> Pendientes de Pago
                     </a>
                     <a href="/payments?status=receivables" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'receivables' %}border-red-600 text-red-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
-                        <i class="fas fa-exclamation-triangle mr-1.5"></i> Cuentas por Cobrar (F13)
+                        <i class="fas fa-exclamation-triangle mr-1.5"></i> Cuentas por Cobrar
                     </a>
                 </div>
 
                 <!-- Table Content -->
                 {% if status_filter == 'receivables' %}
-                <!-- Debtor Patients List (F13) -->
+                <!-- Debtor Patients List -->
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div class="px-5 py-3.5 bg-red-50/50 border-b border-red-100 flex items-center justify-between">
                         <span class="text-xs font-bold text-red-900 uppercase tracking-wider">

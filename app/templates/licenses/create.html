@@ -1,6 +1,6 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}Nueva Licencia Médica (F5) — SSCP Desktop{% endblock %}
+{% block title %}Nueva Licencia Médica — SSCP Desktop{% endblock %}
 
 {% block body %}
 <div class="flex h-screen bg-slate-50 overflow-hidden">
@@ -15,7 +15,7 @@
             <div class="max-w-3xl mx-auto space-y-6">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h1 class="text-2xl font-bold text-slate-900">Emisión de Licencia / Reposo Médico (F5)</h1>
+                        <h1 class="text-2xl font-bold text-slate-900">Emisión de Licencia / Reposo Médico</h1>
                         <p class="text-xs text-slate-500 mt-0.5">Genera un certificado médico oficial con días de reposo y validez legal.</p>
                     </div>
                     <a href="/licenses" class="text-slate-500 hover:text-slate-800 text-xs font-semibold py-2 px-3 rounded-lg border border-slate-200 hover:bg-slate-100">
@@ -44,7 +44,7 @@
                         {% if templates %}
                         <div class="p-3 bg-amber-50/50 border border-amber-200 rounded-xl">
                             <label class="block text-[11px] font-bold text-amber-900 uppercase tracking-wider mb-1">
-                                <i class="fas fa-file-lines mr-1 text-amber-600"></i> Cargar desde Plantilla de Reposo (F4)
+                                <i class="fas fa-file-lines mr-1 text-amber-600"></i> Cargar desde Plantilla de Reposo
                             </label>
                             <select onchange="document.getElementById('notes').value = this.value" class="w-full text-xs py-1.5 px-2.5 border border-slate-200 rounded-lg bg-white">
                                 <option value="">-- Seleccione una plantilla --</option>

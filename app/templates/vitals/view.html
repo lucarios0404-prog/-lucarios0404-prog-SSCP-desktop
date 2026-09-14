@@ -13,7 +13,7 @@
     {% include "partials/sidebar.html" %}
 
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {% set page_title = "Evolución de Signos Vitales (F11)" %}
+        {% set page_title = "Evolución de Signos Vitales" %}
         {% include "partials/header.html" %}
 
         <main class="flex-1 overflow-y-auto p-6 md:p-8">
@@ -26,7 +26,7 @@
                         </a>
                         <div>
                             <h1 class="text-2xl font-bold text-slate-900">Curva de Signos Vitales — {{ patient.first_name }} {{ patient.last_name }}</h1>
-                            <p class="text-xs text-slate-500">Monitoreo hemodinámico continuo, curvas de tensión arterial, peso y glucosa (F11).</p>
+                            <p class="text-xs text-slate-500">Monitoreo hemodinámico continuo, curvas de tensión arterial, peso y glucosa.</p>
                         </div>
                     </div>
 
@@ -41,7 +41,7 @@
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                         <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
                             <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center">
-                                <i class="fas fa-heartbeat text-rose-500 mr-2 text-base"></i> Presión Arterial & Pulso (F11)
+                                <i class="fas fa-heartbeat text-rose-500 mr-2 text-base"></i> Presión Arterial & Pulso
                             </h3>
                             <span class="text-[11px] text-slate-400 font-medium">mmHg / bpm</span>
                         </div>
@@ -54,7 +54,7 @@
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                         <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
                             <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center">
-                                <i class="fas fa-weight text-blue-600 mr-2 text-base"></i> Evolución de Peso & Glucosa (F11)
+                                <i class="fas fa-weight text-blue-600 mr-2 text-base"></i> Evolución de Peso & Glucosa
                             </h3>
                             <span class="text-[11px] text-slate-400 font-medium">kg / mg/dL</span>
                         </div>

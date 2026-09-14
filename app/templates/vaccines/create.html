@@ -1,6 +1,6 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}Registrar Vacuna (F12) — SSCP Desktop{% endblock %}
+{% block title %}Registrar Vacuna — SSCP Desktop{% endblock %}
 
 {% block body %}
 <div class="flex h-screen bg-slate-50 overflow-hidden">
@@ -8,7 +8,7 @@
     {% include "partials/sidebar.html" %}
 
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {% set page_title = "Registrar Vacuna (F12)" %}
+        {% set page_title = "Registrar Vacuna" %}
         {% include "partials/header.html" %}
 
         <main class="flex-1 overflow-y-auto p-6 md:p-8">
@@ -16,7 +16,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <h1 class="text-2xl font-bold text-slate-900">Registrar Dosis de Vacuna</h1>
-                        <p class="text-xs text-slate-500 mt-0.5">Control de esquema de inmunización por paciente (F12).</p>
+                        <p class="text-xs text-slate-500 mt-0.5">Control de esquema de inmunización por paciente.</p>
                     </div>
                     <a href="/vaccines" class="text-xs text-slate-500 hover:text-slate-800 font-medium">
                         &larr; Volver al listado

@@ -1,6 +1,6 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}Registro de Vacunas (F12) — SSCP Desktop{% endblock %}
+{% block title %}Registro de Vacunas — SSCP Desktop{% endblock %}
 
 {% block body %}
 <div class="flex h-screen bg-slate-50 overflow-hidden">
@@ -8,14 +8,14 @@
     {% include "partials/sidebar.html" %}
 
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {% set page_title = "Control de Inmunizaciones (F12)" %}
+        {% set page_title = "Control de Inmunizaciones" %}
         {% include "partials/header.html" %}
 
         <main class="flex-1 overflow-y-auto p-6 md:p-8">
             <div class="max-w-7xl mx-auto space-y-6">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 class="text-2xl font-bold text-slate-900">Carnet y Esquema de Vacunación (F12)</h1>
+                        <h1 class="text-2xl font-bold text-slate-900">Carnet y Esquema de Vacunación</h1>
                         <p class="text-xs text-slate-500 mt-0.5">Control de vacunas aplicadas, lotes de biológicos y fechas de próximos refuerzos.</p>
                     </div>
                     <a href="/vaccines/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold shadow-md shadow-cyan-500/20 transition-all">

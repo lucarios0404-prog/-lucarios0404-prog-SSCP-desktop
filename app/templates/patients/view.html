@@ -43,7 +43,7 @@
                                 </div>
                                 {% if patient.allergies %}
                                 <div class="mt-2.5 inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-300">
-                                    <i class="fas fa-circle-exclamation mr-1.5 text-red-600"></i> Alergias del Paciente (F6): {{ patient.allergies }}
+                                    <i class="fas fa-circle-exclamation mr-1.5 text-red-600"></i> Alergias del Paciente: {{ patient.allergies }}
                                 </div>
                                 {% endif %}
                             </div>
@@ -61,15 +61,15 @@
                         <div class="flex flex-wrap gap-2 md:self-center">
                             <!-- F2: Receta Rápida -->
                             <a href="/prescriptions/quick?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm transition-all">
-                                <i class="fas fa-prescription mr-1.5"></i> Receta Rápida (F2)
+                                <i class="fas fa-prescription mr-1.5"></i> Receta Rápida
                             </a>
                             <!-- F5: Licencia Médica -->
                             <a href="/licenses/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-sm transition-all">
-                                <i class="fas fa-file-signature mr-1.5"></i> Licencia (F5)
+                                <i class="fas fa-file-signature mr-1.5"></i> Licencia
                             </a>
                             <!-- F10: Carta de Referencia -->
                             <a href="/references/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-all">
-                                <i class="fas fa-share-nodes mr-1.5"></i> Referencia (F10)
+                                <i class="fas fa-share-nodes mr-1.5"></i> Referencia
                             </a>
                             <a href="/appointments/create?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all">
                                 <i class="fas fa-calendar-plus mr-1.5"></i> Cita
@@ -193,7 +193,7 @@
                         <div>
                             <h3 class="text-base font-bold text-slate-900 flex items-center">
                                 <i class="fas fa-heart-pulse text-rose-500 mr-2"></i>
-                                Evolución Clínica y Tendencias de Signos Vitales (F8)
+                                Evolución Clínica y Tendencias de Signos Vitales
                             </h3>
                             <p class="text-xs text-slate-500 mt-0.5">Monitoreo temporal de presión arterial, glucemia, peso y saturación de oxígeno.</p>
                         </div>
@@ -318,7 +318,7 @@
                         <div>
                             <h3 class="text-base font-bold text-slate-900 flex items-center">
                                 <i class="fas fa-fingerprint text-indigo-600 mr-2"></i>
-                                Bitácora de Auditoría y Modificaciones Clínicas (F13)
+                                Bitácora de Auditoría y Modificaciones Clínicas
                             </h3>
                             <p class="text-xs text-slate-500">Registro cronológico e inmutable de cambios sobre la historia clínica del paciente.</p>
                         </div>
