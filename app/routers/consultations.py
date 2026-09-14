@@ -14,7 +14,7 @@ from app.models.appointment import Appointment
 from app.models.setting import Setting
 from app.models.vital_sign import VitalSign
 from app.models.template import ClinicalTemplate
-from app.core.deps import require_current_user
+from app.core.deps import require_current_user, require_permission
 from app.services.pdf_service import generate_prescription_pdf, generate_consultation_report_pdf
 from app.services.audit_service import AuditService
 
@@ -43,7 +43,7 @@ def list_consultations(
     page: int = Query(1, ge=1),
     per_page: int = Query(15, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('consultations'))
 ):
     query = db.query(Consultation).join(Patient, Consultation.patient_id == Patient.id, isouter=True)
     if patient_id:
@@ -96,7 +96,7 @@ def create_consultation_form(
     patient_id: int = Query(None),
     appointment_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('consultations'))
 ):
     patients = db.query(Patient).order_by(Patient.last_name).all()
     selected_patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
@@ -130,7 +130,7 @@ def create_consultation(
     prescription: str = Form(None),
     notes: str = Form(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('consultations'))
 ):
     new_consultation = Consultation(
         patient_id=patient_id,
@@ -179,7 +179,7 @@ def view_consultation(
     request: Request,
     consultation_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('consultations'))
 ):
     consultation = db.query(Consultation).filter(Consultation.id == consultation_id).first()
     if not consultation:
@@ -207,7 +207,7 @@ def edit_consultation_form(
     request: Request,
     consultation_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('consultations'))
 ):
     consultation = db.query(Consultation).filter(Consultation.id == consultation_id).first()
     if not consultation:
@@ -241,7 +241,7 @@ def update_consultation(
     notes: str = Form(None),
     edit_reason: str = Form("Modificación de notas médicas"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('consultations'))
 ):
     consultation = db.query(Consultation).filter(Consultation.id == consultation_id).first()
     if not consultation:

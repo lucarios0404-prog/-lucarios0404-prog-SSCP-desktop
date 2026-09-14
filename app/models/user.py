@@ -19,6 +19,9 @@ class User(Base):
         """Verifica si el usuario tiene un permiso específico por rol o personalización."""
         if self.role == "admin":
             return True
+        # El rol secretaria nunca puede realizar actos médicos estrictos (consultas, recetas, licencias, referencias)
+        if self.role == "secretaria" and perm_key in ["consultations", "prescriptions", "licenses", "references"]:
+            return False
         if self.permissions:
             try:
                 import json

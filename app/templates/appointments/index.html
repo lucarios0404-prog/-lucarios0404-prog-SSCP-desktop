@@ -117,9 +117,11 @@
                                                 Confirmar
                                             </button>
                                         </form>
+                                        {% if user.has_permission('consultations') %}
                                         <a href="/consultations/create?patient_id={{ a.patient_id }}&appointment_id={{ a.id }}" class="px-2 py-1 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded text-xs font-medium" title="Atender Consulta">
                                             Atender
                                         </a>
+                                        {% endif %}
                                         <a href="/payments/create?patient_id={{ a.patient_id }}&appointment_id={{ a.id }}" class="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded text-xs font-medium" title="Cobrar Cita">
                                             Cobrar
                                         </a>

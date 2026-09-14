@@ -122,9 +122,11 @@
                                         <a href="/appointments/create?patient_id={{ p.id }}" class="inline-flex items-center px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 rounded-lg text-xs font-medium transition-colors" title="Agendar Cita">
                                             <i class="fas fa-calendar-plus mr-1"></i> Cita
                                         </a>
+                                        {% if user.has_permission('consultations') %}
                                         <a href="/consultations/create?patient_id={{ p.id }}" class="inline-flex items-center px-2.5 py-1.5 bg-slate-100 hover:bg-violet-50 text-slate-700 hover:text-violet-600 rounded-lg text-xs font-medium transition-colors" title="Nueva Consulta">
                                             <i class="fas fa-notes-medical mr-1"></i> Consulta
                                         </a>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% else %}

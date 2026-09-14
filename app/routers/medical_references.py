@@ -9,7 +9,7 @@ from app.models.patient import Patient
 from app.models.medical_reference import MedicalReference
 from app.models.setting import Setting
 from app.models.template import ClinicalTemplate
-from app.core.deps import require_current_user
+from app.core.deps import require_current_user, require_permission
 from app.services.pdf_service import generate_medical_reference_pdf
 
 router = APIRouter(prefix="/references", tags=["references"])
@@ -21,7 +21,7 @@ def list_references(
     request: Request,
     patient_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('references'))
 ):
     query = db.query(MedicalReference).order_by(MedicalReference.created_at.desc())
     if patient_id:
@@ -42,7 +42,7 @@ def create_reference_form(
     request: Request,
     patient_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('references'))
 ):
     patients = db.query(Patient).order_by(Patient.first_name).all()
     selected_patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
@@ -68,7 +68,7 @@ def submit_reference(
     clinical_summary: str = Form(None),
     notes: str = Form(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('references'))
 ):
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:

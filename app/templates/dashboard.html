@@ -30,9 +30,11 @@
                             <a href="/appointments/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-blue-600/60 hover:bg-blue-600 text-white font-semibold text-sm border border-white/30 backdrop-blur-sm transition-all">
                                 <i class="fas fa-calendar-plus mr-2"></i> Agendar Cita
                             </a>
+                            {% if user.has_permission('consultations') %}
                             <a href="/consultations/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-indigo-600/60 hover:bg-indigo-600 text-white font-semibold text-sm border border-white/30 backdrop-blur-sm transition-all">
                                 <i class="fas fa-stethoscope mr-2"></i> Nueva Consulta
                             </a>
+                            {% endif %}
                             <a href="/payments/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-emerald-600/60 hover:bg-emerald-600 text-white font-semibold text-sm border border-white/30 backdrop-blur-sm transition-all">
                                 <i class="fas fa-receipt mr-2"></i> Registrar Pago
                             </a>

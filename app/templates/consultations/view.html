@@ -27,9 +27,11 @@
 
                     <div class="flex flex-wrap items-center gap-2">
                         <!-- F3: Botón de Edición Post-Guardado -->
+                        {% if user.has_permission('consultations') %}
                         <a href="/consultations/{{ consultation.id }}/edit" class="inline-flex items-center px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-sm transition-all">
                             <i class="fas fa-edit mr-1.5"></i> Editar
                         </a>
+                        {% endif %}
                         <!-- Botón Receta PDF -->
                         <a href="/consultations/{{ consultation.id }}/prescription/pdf" target="_blank" class="inline-flex items-center px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm transition-all">
                             <i class="fas fa-prescription mr-1.5"></i> Receta Médica (PDF)
