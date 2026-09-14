@@ -40,14 +40,45 @@
             </div>
 
             <div>
-                <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                <button type="submit" class="group relative w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-md shadow-blue-500/20 transition-all">
                     <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-                        <i class="fas fa-sign-in-alt text-blue-500 group-hover:text-blue-400"></i>
+                        <i class="fas fa-sign-in-alt text-blue-300 group-hover:text-white"></i>
                     </span>
                     Iniciar Sesión
                 </button>
             </div>
         </form>
+
+        <!-- Acceso Rápido Demostración -->
+        <div class="mt-6 pt-6 border-t border-gray-100">
+            <p class="text-xs text-center font-bold text-gray-500 uppercase tracking-wider mb-3">
+                Seleccionar Perfil para Demostración:
+            </p>
+            <div class="grid grid-cols-3 gap-2">
+                <button type="button" onclick="setCredentials('admin@sscp.com', 'password123')" class="flex flex-col items-center p-2.5 rounded-lg border border-blue-200 bg-blue-50/50 hover:bg-blue-100/70 text-blue-700 transition-all text-xs group">
+                    <i class="fas fa-shield-alt text-base mb-1 text-blue-600 group-hover:scale-110 transition-transform"></i>
+                    <span class="font-bold">Admin</span>
+                    <span class="text-[10px] text-gray-500">General</span>
+                </button>
+                <button type="button" onclick="setCredentials('doctor@sscp.com', 'password123')" class="flex flex-col items-center p-2.5 rounded-lg border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/70 text-emerald-700 transition-all text-xs group">
+                    <i class="fas fa-user-md text-base mb-1 text-emerald-600 group-hover:scale-110 transition-transform"></i>
+                    <span class="font-bold">Médico</span>
+                    <span class="text-[10px] text-gray-500">Clínica</span>
+                </button>
+                <button type="button" onclick="setCredentials('secretaria@sscp.com', 'password123')" class="flex flex-col items-center p-2.5 rounded-lg border border-amber-200 bg-amber-50/50 hover:bg-amber-100/70 text-amber-700 transition-all text-xs group">
+                    <i class="fas fa-headset text-base mb-1 text-amber-600 group-hover:scale-110 transition-transform"></i>
+                    <span class="font-bold">Secretaria</span>
+                    <span class="text-[10px] text-gray-500">Recepción</span>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+function setCredentials(email, pass) {
+    document.getElementById('username').value = email;
+    document.getElementById('password').value = pass;
+}
+</script>
 {% endblock %}
