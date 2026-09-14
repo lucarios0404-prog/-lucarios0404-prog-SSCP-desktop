@@ -78,19 +78,34 @@
                     </div>
 
                     <!-- Síntomas y Examen -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 {% if consultation.physical_exam %}md:grid-cols-2{% endif %} gap-6">
                         <div>
-                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Anamnesis / Síntomas</h3>
-                            <div class="mt-1.5 text-sm text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-100 min-h-[90px] whitespace-pre-line">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                    {% if consultation.sede_origen == 'import_consulta_practica' %}
+                                    Evolución Clínica / Anamnesis
+                                    {% else %}
+                                    Anamnesis / Síntomas
+                                    {% endif %}
+                                </h3>
+                                {% if consultation.sede_origen == 'import_consulta_practica' %}
+                                <span class="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                                    <i class="fas fa-history mr-1"></i> Consulta Práctica
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="mt-1.5 text-sm text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100 min-h-[90px] whitespace-pre-line leading-relaxed">
                                 {{ consultation.symptoms or 'Sin detalles adicionales registrados.' }}
                             </div>
                         </div>
+                        {% if consultation.physical_exam %}
                         <div>
                             <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Examen Físico</h3>
-                            <div class="mt-1.5 text-sm text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-100 min-h-[90px] whitespace-pre-line">
-                                {{ consultation.physical_exam or 'Sin hallazgos particulares registrados.' }}
+                            <div class="mt-1.5 text-sm text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100 min-h-[90px] whitespace-pre-line leading-relaxed">
+                                {{ consultation.physical_exam }}
                             </div>
                         </div>
+                        {% endif %}
                     </div>
 
                     <!-- Diagnóstico CIE-10 -->
@@ -123,11 +138,11 @@
                         </div>
                     </div>
 
-                    <!-- Notas Confidenciales -->
-                    {% if consultation.notes %}
+                    <!-- Notas Adicionales -->
+                    {% if consultation.notes and consultation.notes.strip() != consultation.symptoms.strip() %}
                     <div>
-                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Notas Confidenciales</h3>
-                        <div class="mt-1.5 text-xs text-slate-500 italic bg-slate-50 p-3 rounded-lg">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Notas Adicionales</h3>
+                        <div class="mt-1.5 text-xs text-slate-500 italic bg-slate-50 p-3 rounded-lg whitespace-pre-line">
                             {{ consultation.notes }}
                         </div>
                     </div>

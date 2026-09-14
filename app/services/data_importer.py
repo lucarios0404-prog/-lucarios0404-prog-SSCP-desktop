@@ -186,9 +186,13 @@ class DataImporterService:
                 
                 consult_dt = parse_datetime(fecha, hora)
                 
+                reason_str = f"Consulta: {diag}" if diag and diag.lower() not in ["sin diagnóstico especificado", "en estudio"] else "Consulta Médica / Chequeo Clínico"
+                symptoms_str = hist_text if hist_text and hist_text.lower() not in ["no recabada", "none", ""] else "Consulta histórica sin descripción de síntomas registrada."
+
                 patients_dict[id_pac]["consultations"].append({
                     "date": consult_dt.isoformat(),
-                    "reason": "Consulta Histórica importada de Consulta Práctica",
+                    "reason": reason_str,
+                    "symptoms": symptoms_str,
                     "diagnosis": diag if diag else "Sin diagnóstico especificado",
                     "treatment": trat if trat else None,
                     "notes": hist_text if hist_text else None,
@@ -520,14 +524,22 @@ class DataImporterService:
                     c_dt_str = c.get("date")
                     c_dt = datetime.fromisoformat(c_dt_str) if c_dt_str else datetime.utcnow()
                     
+                    hist_notes = clean_utf8(c.get("notes")) or None
+                    symptoms_val = clean_utf8(c.get("symptoms"))
+                    if not symptoms_val or symptoms_val == "Importado de historia clínica anterior":
+                        if hist_notes and hist_notes.lower() not in ["no recabada", "none", ""]:
+                            symptoms_val = hist_notes
+                        else:
+                            symptoms_val = "Consulta histórica sin descripción de síntomas registrada en el sistema anterior."
+
                     consult = Consultation(
                         patient_id=patient.id,
                         doctor_id=doctor_id,
-                        reason=clean_utf8(c.get("reason")) or "Consulta Histórica importada de Consulta Práctica",
-                        symptoms="Importado de historia clínica anterior",
+                        reason=clean_utf8(c.get("reason")) or "Consulta Médica / Chequeo Clínico",
+                        symptoms=symptoms_val,
                         diagnosis=clean_utf8(c.get("diagnosis")) or "Sin diagnóstico especificado",
                         treatment=clean_utf8(c.get("treatment")) or None,
-                        notes=clean_utf8(c.get("notes")) or None,
+                        notes=hist_notes,
                         sede_origen="import_consulta_practica",
                         created_at=c_dt
                     )
