@@ -11,12 +11,39 @@ from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.appointment import Appointment
 from app.models.consultation import Consultation
+from app.models.vital_sign import VitalSign
 from app.core.deps import require_current_user
 from app.services.qr_service import generate_patient_qr_base64
+from app.services.patient_service import PatientService
+from app.services.audit_service import AuditService
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+
+@router.post("/check-duplicate")
+async def check_duplicate_patient(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    """
+    Detector Inteligente de Pacientes Duplicados (F9).
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    matches = PatientService.find_potential_duplicates(
+        db=db,
+        first_name=data.get("first_name", ""),
+        last_name=data.get("last_name", ""),
+        document_id=data.get("document_id"),
+        phone=data.get("phone"),
+        exclude_id=data.get("exclude_id")
+    )
+    return {"has_duplicates": len(matches) > 0, "matches": matches}
 
 @router.get("/")
 def list_patients(
@@ -109,6 +136,19 @@ def create_patient(
     db.add(new_patient)
     db.commit()
     db.refresh(new_patient)
+
+    # Registrar en bitácora de auditoría médica (F13)
+    AuditService.log_change(
+        db=db,
+        entity_type="patient",
+        entity_id=new_patient.id,
+        action="create",
+        summary=f"Expediente clínico creado para {new_patient.first_name} {new_patient.last_name}",
+        patient_id=new_patient.id,
+        user_id=current_user.id if current_user else 1,
+        new_data={"document_id": document_id, "phone": phone, "allergies": allergies}
+    )
+
     return RedirectResponse(url=f"/patients/{new_patient.id}", status_code=303)
 
 @router.get("/{patient_id}")
@@ -125,6 +165,19 @@ def view_patient(
     appointments = db.query(Appointment).filter(Appointment.patient_id == patient_id).order_by(Appointment.date.desc()).all()
     consultations = db.query(Consultation).filter(Consultation.patient_id == patient_id).order_by(Consultation.created_at.desc()).all()
     payments = db.query(Payment).filter(Payment.patient_id == patient_id).order_by(Payment.created_at.desc()).all()
+    vitals = db.query(VitalSign).filter(VitalSign.patient_id == patient_id).order_by(VitalSign.recorded_at.asc()).all()
+    audit_logs = AuditService.get_logs_for_patient(db, patient_id, limit=25)
+
+    # F8: Series de evolución de signos vitales para gráficas
+    vitals_evolution = {
+        "dates": [v.recorded_at.strftime("%d/%m") for v in vitals],
+        "systolic": [v.systolic_bp for v in vitals if v.systolic_bp is not None],
+        "diastolic": [v.diastolic_bp for v in vitals if v.diastolic_bp is not None],
+        "glucose": [v.glucose_mg_dl for v in vitals if v.glucose_mg_dl is not None],
+        "weight": [v.weight_kg for v in vitals if v.weight_kg is not None],
+        "bmi": [v.bmi for v in vitals if v.bmi is not None],
+        "heart_rate": [v.heart_rate for v in vitals if v.heart_rate is not None],
+    }
 
     # F8: Cálculo de deuda pendiente
     pending_payments = [p for p in payments if p.status == "pending"]
@@ -142,6 +195,9 @@ def view_patient(
             "appointments": appointments,
             "consultations": consultations,
             "payments": payments,
+            "vitals": list(reversed(vitals)),
+            "vitals_evolution": vitals_evolution,
+            "audit_logs": audit_logs,
             "balance_due": balance_due,
             "qr_code_base64": qr_code_base64,
         }
@@ -197,6 +253,13 @@ def edit_patient(
         except ValueError:
             dob = None
 
+    old_data = {
+        "name": f"{patient.first_name} {patient.last_name}",
+        "phone": patient.phone,
+        "allergies": patient.allergies,
+        "address": patient.address
+    }
+
     patient.first_name = first_name
     patient.last_name = last_name
     patient.document_id = document_id
@@ -212,4 +275,18 @@ def edit_patient(
     patient.updated_at = datetime.utcnow()
 
     db.commit()
+
+    # Registrar en bitácora de auditoría médica (F13)
+    AuditService.log_change(
+        db=db,
+        entity_type="patient",
+        entity_id=patient.id,
+        action="update",
+        summary=f"Actualización de datos demográficos y de contacto de {patient.first_name} {patient.last_name}",
+        patient_id=patient.id,
+        user_id=current_user.id if current_user else 1,
+        old_data=old_data,
+        new_data={"name": f"{first_name} {last_name}", "phone": phone, "allergies": allergies, "address": address}
+    )
+
     return RedirectResponse(url=f"/patients/{patient_id}", status_code=303)

@@ -14,6 +14,7 @@ from app.models.setting import Setting
 from app.models.vital_sign import VitalSign
 from app.core.deps import require_current_user
 from app.services.pdf_service import generate_prescription_pdf, generate_consultation_report_pdf
+from app.services.audit_service import AuditService
 
 router = APIRouter(prefix="/consultations", tags=["consultations"])
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -122,6 +123,19 @@ def create_consultation(
             
     db.commit()
     db.refresh(new_consultation)
+
+    # Registrar en auditoría médica (F13)
+    AuditService.log_change(
+        db=db,
+        entity_type="consultation",
+        entity_id=new_consultation.id,
+        action="create",
+        summary=f"Consulta médica creada: {new_consultation.reason}",
+        patient_id=new_consultation.patient_id,
+        user_id=current_user.id if current_user else 1,
+        new_data={"reason": new_consultation.reason, "diagnosis": diagnosis}
+    )
+
     return RedirectResponse(url=f"/consultations/{new_consultation.id}", status_code=303)
 
 @router.get("/{consultation_id}")
@@ -207,6 +221,13 @@ def update_consultation(
         "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     })
 
+    old_data = {
+        "reason": consultation.reason,
+        "diagnosis": consultation.diagnosis,
+        "treatment": consultation.treatment,
+        "prescription": consultation.prescription
+    }
+
     consultation.reason = reason
     consultation.symptoms = symptoms
     consultation.physical_exam = physical_exam
@@ -219,6 +240,20 @@ def update_consultation(
     consultation.edit_history = json.dumps(history)
 
     db.commit()
+
+    # Registrar en auditoría médica (F13)
+    AuditService.log_change(
+        db=db,
+        entity_type="consultation",
+        entity_id=consultation.id,
+        action="update",
+        summary=f"Consulta #{consultation.id} editada: {edit_reason}",
+        patient_id=consultation.patient_id,
+        user_id=current_user.id if current_user else 1,
+        old_data=old_data,
+        new_data={"reason": reason, "diagnosis": diagnosis, "treatment": treatment, "prescription": prescription}
+    )
+
     return RedirectResponse(url=f"/consultations/{consultation_id}", status_code=303)
 
 @router.get("/{consultation_id}/prescription/pdf")

@@ -1,0 +1,203 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Reportes Clínicos y Estadísticas — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'reports' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Reportes y Analítica Clínica" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+                <!-- Encabezado con Botones de Exportación Directa -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Inteligencia Clínica & Estadísticas (F14)</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Métricas epidemiológicas, demografía de pacientes y exportación de bases de datos a formato Excel/CSV.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a href="/reports/export/patients" class="inline-flex items-center px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all">
+                            <i class="fas fa-file-excel mr-2"></i> Pacientes (.csv)
+                        </a>
+                        <a href="/reports/export/consultations" class="inline-flex items-center px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all">
+                            <i class="fas fa-file-csv mr-2"></i> Consultas (.csv)
+                        </a>
+                        <a href="/reports/export/financial" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all">
+                            <i class="fas fa-file-invoice-dollar mr-2"></i> Facturación (.csv)
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Métricas Principales (KPIs) -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Pacientes</span>
+                            <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-bold">
+                                <i class="fas fa-users"></i>
+                            </div>
+                        </div>
+                        <p class="text-3xl font-black text-slate-900 mt-2">{{ total_patients }}</p>
+                        <span class="text-[10px] text-emerald-600 font-semibold flex items-center mt-1">
+                            <i class="fas fa-id-card mr-1"></i> Expedientes activos
+                        </span>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Consultas Realizadas</span>
+                            <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">
+                                <i class="fas fa-stethoscope"></i>
+                            </div>
+                        </div>
+                        <p class="text-3xl font-black text-slate-900 mt-2">{{ total_consultations }}</p>
+                        <span class="text-[10px] text-blue-600 font-semibold flex items-center mt-1">
+                            <i class="fas fa-clock-rotate-left mr-1"></i> Atenciones clínicas
+                        </span>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Signos Vitales</span>
+                            <div class="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center text-sm font-bold">
+                                <i class="fas fa-heart-pulse"></i>
+                            </div>
+                        </div>
+                        <p class="text-3xl font-black text-slate-900 mt-2">{{ total_vitals }}</p>
+                        <span class="text-[10px] text-teal-600 font-semibold flex items-center mt-1">
+                            <i class="fas fa-chart-line mr-1"></i> Mediciones de control
+                        </span>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Recaudación Cobrada</span>
+                            <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold">
+                                <i class="fas fa-receipt"></i>
+                            </div>
+                        </div>
+                        <p class="text-3xl font-black text-emerald-700 mt-2">DOP ${{ "{:,.0f}".format(total_collected) }}</p>
+                        <span class="text-[10px] text-amber-600 font-semibold flex items-center mt-1">
+                            Pendiente: DOP ${{ "{:,.0f}".format(total_pending) }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Grilla Analítica: Morbilidad + Demografía -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Tarjeta 1: Top Diagnósticos Médicos (Morbilidad Frecuente) -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h2 class="text-base font-bold text-slate-900 flex items-center">
+                                        <i class="fas fa-virus mr-2 text-rose-500"></i>
+                                        Top Diagnósticos Clínicos Más Frecuentes
+                                    </h2>
+                                    <p class="text-xs text-slate-500">Perfil epidemiológico de patologías tratadas en la consulta.</p>
+                                </div>
+                                <span class="text-[10px] font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 uppercase">CIE-10 / Diagnósticos</span>
+                            </div>
+
+                            {% if top_diagnoses %}
+                            <div class="space-y-4 mt-6">
+                                {% for diag in top_diagnoses %}
+                                <div>
+                                    <div class="flex justify-between text-xs font-semibold mb-1">
+                                        <span class="text-slate-800 truncate max-w-xs">{{ diag.name }}</span>
+                                        <span class="text-slate-500 font-mono">{{ diag.count }} casos ({{ diag.percent }}%)</span>
+                                    </div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                                        <div class="bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full" style="width: {{ [diag.percent, 100]|min }}%"></div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-center py-12 text-slate-400 text-xs">
+                                <i class="fas fa-clipboard-question text-3xl mb-2 block text-slate-300"></i>
+                                No hay suficientes diagnósticos registrados para generar estadísticas.
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                            <span>Total consultas analizadas: <strong>{{ total_consultations }}</strong></span>
+                            <a href="/consultations" class="text-blue-600 font-bold hover:underline">Ver todas las consultas &rarr;</a>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 2: Demografía y Distribución Etaria -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h2 class="text-base font-bold text-slate-900 flex items-center">
+                                        <i class="fas fa-chart-pie mr-2 text-indigo-500"></i>
+                                        Distribución Demográfica de Pacientes
+                                    </h2>
+                                    <p class="text-xs text-slate-500">Segmentación por género y grupos etarios.</p>
+                                </div>
+                            </div>
+
+                            <!-- Género -->
+                            <div class="mt-4">
+                                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Por Género</span>
+                                <div class="grid grid-cols-3 gap-3 text-center">
+                                    <div class="p-3 bg-blue-50/70 border border-blue-100 rounded-xl">
+                                        <i class="fas fa-mars text-blue-600 text-lg mb-1 block"></i>
+                                        <span class="text-xs font-bold text-slate-700">Masculino</span>
+                                        <p class="text-lg font-black text-blue-700 mt-0.5">{{ gender_counts.male }}</p>
+                                    </div>
+                                    <div class="p-3 bg-pink-50/70 border border-pink-100 rounded-xl">
+                                        <i class="fas fa-venus text-pink-600 text-lg mb-1 block"></i>
+                                        <span class="text-xs font-bold text-slate-700">Femenino</span>
+                                        <p class="text-lg font-black text-pink-700 mt-0.5">{{ gender_counts.female }}</p>
+                                    </div>
+                                    <div class="p-3 bg-slate-50 border border-slate-200/70 rounded-xl">
+                                        <i class="fas fa-genderless text-slate-500 text-lg mb-1 block"></i>
+                                        <span class="text-xs font-bold text-slate-700">Otro / No esp.</span>
+                                        <p class="text-lg font-black text-slate-700 mt-0.5">{{ gender_counts.other }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Grupos de Edad -->
+                            <div class="mt-6">
+                                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Por Grupo Etario</span>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                                    <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                                        <span class="text-slate-500 text-[10px] block">Pediátricos (&lt;18)</span>
+                                        <span class="font-bold text-slate-800 text-base mt-0.5 block">{{ age_groups.pediatric }}</span>
+                                    </div>
+                                    <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                                        <span class="text-slate-500 text-[10px] block">Jóvenes (18-35)</span>
+                                        <span class="font-bold text-slate-800 text-base mt-0.5 block">{{ age_groups.young_adult }}</span>
+                                    </div>
+                                    <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                                        <span class="text-slate-500 text-[10px] block">Adultos (36-60)</span>
+                                        <span class="font-bold text-slate-800 text-base mt-0.5 block">{{ age_groups.middle_adult }}</span>
+                                    </div>
+                                    <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                                        <span class="text-slate-500 text-[10px] block">Mayores (&gt;60)</span>
+                                        <span class="font-bold text-slate-800 text-base mt-0.5 block">{{ age_groups.senior }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                            <span>Población total registrada: <strong>{{ total_patients }}</strong></span>
+                            <a href="/patients" class="text-blue-600 font-bold hover:underline">Ver directorio completo &rarr;</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

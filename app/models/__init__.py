@@ -13,10 +13,11 @@ from app.models.template import ClinicalTemplate
 from app.models.medical_license import MedicalLicense
 from app.models.medical_reference import MedicalReference
 from app.models.sync_log import SyncLog
+from app.models.audit_log import ClinicalAuditLog
 
 __all__ = [
     "User", "Patient", "Appointment", "Payment", "Consultation",
     "Setting", "VitalSign", "LabResult", "VaccineRecord", "InternalMessage",
     "InventoryItem", "InventoryMovement", "ClinicalTemplate",
-    "MedicalLicense", "MedicalReference", "SyncLog"
+    "MedicalLicense", "MedicalReference", "SyncLog", "ClinicalAuditLog"
 ]

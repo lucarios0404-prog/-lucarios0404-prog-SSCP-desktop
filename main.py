@@ -32,6 +32,7 @@ from app.routers import (
     templates as clinical_templates,
     medical_licenses,
     medical_references,
+    reports,
 )
 from app.core.deps import get_current_user
 
@@ -87,6 +88,7 @@ app.include_router(quick_prescriptions.router)
 app.include_router(clinical_templates.router)
 app.include_router(medical_licenses.router)
 app.include_router(medical_references.router)
+app.include_router(reports.router)
 
 @app.get("/")
 async def root(request: Request, current_user = Depends(get_current_user)):

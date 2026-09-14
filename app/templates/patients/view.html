@@ -187,6 +187,181 @@
                             {% endfor %}
                         </div>
                     </div>
+                <!-- Sección F8: Evolución Clínica de Signos Vitales -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                                <i class="fas fa-heart-pulse text-rose-500 mr-2"></i>
+                                Evolución Clínica y Tendencias de Signos Vitales (F8)
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Monitoreo temporal de presión arterial, glucemia, peso y saturación de oxígeno.</p>
+                        </div>
+                        <a href="/vitals/patient/{{ patient.id }}" class="inline-flex items-center px-3 py-1.5 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-xs font-bold transition-all">
+                            <i class="fas fa-plus mr-1.5"></i> Registrar Medición
+                        </a>
+                    </div>
+
+                    {% if vitals %}
+                    <!-- Última Medición Destacada -->
+                    {% set latest = vitals[0] %}
+                    <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-6">
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase block">Presión Arterial</span>
+                            <p class="text-base font-black {% if latest.systolic_bp and latest.systolic_bp >= 140 %}text-rose-600{% else %}text-slate-800{% endif %} mt-0.5">
+                                {{ latest.systolic_bp or '—' }} / {{ latest.diastolic_bp or '—' }} <span class="text-[10px] font-normal text-slate-400">mmHg</span>
+                            </p>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase block">Frecuencia Cardíaca</span>
+                            <p class="text-base font-black text-slate-800 mt-0.5">
+                                {{ latest.heart_rate or '—' }} <span class="text-[10px] font-normal text-slate-400">lpm</span>
+                            </p>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase block">Glucosa en Ayunas</span>
+                            <p class="text-base font-black {% if latest.glucose_mg_dl and latest.glucose_mg_dl >= 126 %}text-amber-600{% else %}text-slate-800{% endif %} mt-0.5">
+                                {{ latest.glucose_mg_dl or '—' }} <span class="text-[10px] font-normal text-slate-400">mg/dL</span>
+                            </p>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase block">Peso / Altura</span>
+                            <p class="text-base font-black text-slate-800 mt-0.5">
+                                {{ latest.weight_kg or '—' }} <span class="text-[10px] font-normal text-slate-400">kg</span>
+                            </p>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase block">Índice Masa Corp.</span>
+                            <p class="text-base font-black text-slate-800 mt-0.5">
+                                {{ latest.bmi or '—' }} <span class="text-[10px] font-normal text-slate-400">IMC</span>
+                            </p>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase block">Sat. Oxígeno (SpO2)</span>
+                            <p class="text-base font-black text-slate-800 mt-0.5">
+                                {{ latest.oxygen_saturation or '—' }} <span class="text-[10px] font-normal text-slate-400">%</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Gráfica de Tendencia Visual (SVG Responsive & Offline-Ready) -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Panel Gráfico 1: Presión Arterial -->
+                        <div class="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-bold text-slate-700 flex items-center">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500 mr-2"></span> Presión Sistólica vs Diastólica (mmHg)
+                                </span>
+                                <span class="text-[10px] text-slate-400 font-mono">Límite: 120/80 mmHg</span>
+                            </div>
+                            <div class="h-32 flex items-end space-x-3 pt-6 pb-2 px-3 bg-white rounded-xl border border-slate-100">
+                                {% for v in vitals %}
+                                <div class="flex-1 flex flex-col items-center gap-1 group relative">
+                                    <div class="w-full flex justify-center items-end space-x-1 h-20">
+                                        <!-- Barra Sistólica -->
+                                        {% set sys_height = [((v.systolic_bp or 100) - 50) * 100 / 120, 100]|min %}
+                                        <div class="w-3 bg-rose-500 rounded-t transition-all hover:bg-rose-600" style="height: {{ [sys_height, 10]|max }}%" title="Sistólica: {{ v.systolic_bp }} mmHg"></div>
+                                        <!-- Barra Diastólica -->
+                                        {% set dia_height = [((v.diastolic_bp or 60) - 30) * 100 / 100, 100]|min %}
+                                        <div class="w-3 bg-blue-500 rounded-t transition-all hover:bg-blue-600" style="height: {{ [dia_height, 10]|max }}%" title="Diastólica: {{ v.diastolic_bp }} mmHg"></div>
+                                    </div>
+                                    <span class="text-[9px] font-mono text-slate-400 mt-1">{{ v.recorded_at.strftime("%d/%m") }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="flex items-center justify-center space-x-4 mt-2 text-[10px] text-slate-500">
+                                <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-rose-500 mr-1"></span> Sistólica</span>
+                                <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-blue-500 mr-1"></span> Diastólica</span>
+                            </div>
+                        </div>
+
+                        <!-- Panel Gráfico 2: Glucosa y Peso -->
+                        <div class="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-bold text-slate-700 flex items-center">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500 mr-2"></span> Glucosa (mg/dL) & Peso (kg)
+                                </span>
+                                <span class="text-[10px] text-slate-400 font-mono">Evolución</span>
+                            </div>
+                            <div class="h-32 flex items-end space-x-3 pt-6 pb-2 px-3 bg-white rounded-xl border border-slate-100">
+                                {% for v in vitals %}
+                                <div class="flex-1 flex flex-col items-center gap-1 group relative">
+                                    <div class="w-full flex justify-center items-end space-x-1 h-20">
+                                        <!-- Barra Glucosa -->
+                                        {% set glu_height = [((v.glucose_mg_dl or 80) * 100 / 200), 100]|min %}
+                                        <div class="w-3 bg-amber-500 rounded-t transition-all hover:bg-amber-600" style="height: {{ [glu_height, 10]|max }}%" title="Glucosa: {{ v.glucose_mg_dl }} mg/dL"></div>
+                                        <!-- Barra Peso -->
+                                        {% set wei_height = [((v.weight_kg or 60) * 100 / 140), 100]|min %}
+                                        <div class="w-3 bg-emerald-500 rounded-t transition-all hover:bg-emerald-600" style="height: {{ [wei_height, 10]|max }}%" title="Peso: {{ v.weight_kg }} kg"></div>
+                                    </div>
+                                    <span class="text-[9px] font-mono text-slate-400 mt-1">{{ v.recorded_at.strftime("%d/%m") }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="flex items-center justify-center space-x-4 mt-2 text-[10px] text-slate-500">
+                                <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-amber-500 mr-1"></span> Glucosa</span>
+                                <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-emerald-500 mr-1"></span> Peso</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-8 text-slate-400 text-xs">
+                        <i class="fas fa-heart-crack text-2xl text-slate-300 mb-2 block"></i>
+                        Aún no se han registrado signos vitales para este paciente.
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Sección F13: Bitácora de Auditoría y Trazabilidad Médica -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                                <i class="fas fa-fingerprint text-indigo-600 mr-2"></i>
+                                Bitácora de Auditoría y Modificaciones Clínicas (F13)
+                            </h3>
+                            <p class="text-xs text-slate-500">Registro cronológico e inmutable de cambios sobre la historia clínica del paciente.</p>
+                        </div>
+                        <span class="text-xs text-slate-400"><i class="fas fa-shield-alt mr-1"></i> Auditoría legal</span>
+                    </div>
+
+                    {% if audit_logs %}
+                    <div class="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                        {% for log in audit_logs %}
+                        <div class="p-3 bg-slate-50/80 border border-slate-100 rounded-xl flex items-start justify-between text-xs">
+                            <div class="flex items-start space-x-3">
+                                <div class="mt-0.5">
+                                    {% if log.action == 'create' %}
+                                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    {% elif log.action == 'update' %}
+                                    <span class="inline-block w-2 h-2 rounded-full bg-blue-500"></span>
+                                    {% else %}
+                                    <span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <p class="font-bold text-slate-800">{{ log.summary }}</p>
+                                    <span class="text-[11px] text-slate-500">Entidad: <strong class="capitalize">{{ log.entity_type }}</strong> #{{ log.entity_id }}</span>
+                                    {% if log.changes_json %}
+                                    <details class="mt-1">
+                                        <summary class="text-[10px] text-blue-600 cursor-pointer hover:underline font-semibold">Ver diferencias registradas</summary>
+                                        <pre class="text-[10px] bg-slate-900 text-slate-200 p-2 rounded-lg mt-1 font-mono overflow-x-auto">{{ log.changes_json }}</pre>
+                                    </details>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <span class="font-mono text-[10px] text-slate-400 shrink-0">
+                                {{ log.created_at.strftime("%d/%m/%Y %H:%M") if log.created_at else "—" }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-6 text-slate-400 text-xs">
+                        <i class="fas fa-clipboard-check text-2xl text-slate-300 mb-2 block"></i>
+                        No hay registros de modificaciones para este expediente.
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </main>
