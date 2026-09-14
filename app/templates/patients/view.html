@@ -49,14 +49,6 @@
                             </div>
                         </div>
 
-                        <!-- F17: Código QR del Paciente -->
-                        {% if qr_code_base64 %}
-                        <div class="flex flex-col items-center justify-center p-2 bg-slate-50 rounded-2xl border border-slate-200 shrink-0">
-                            <img src="{{ qr_code_base64 }}" alt="QR Paciente" class="w-20 h-20 rounded-xl shadow-xs">
-                            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1"><i class="fas fa-qrcode mr-0.5"></i> QR Paciente</span>
-                        </div>
-                        {% endif %}
-
                         <!-- Direct Action Buttons -->
                         <div class="flex flex-wrap gap-2 md:self-center">
                             <!-- F2: Receta Rápida -->

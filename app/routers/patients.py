@@ -13,7 +13,6 @@ from app.models.appointment import Appointment
 from app.models.consultation import Consultation
 from app.models.vital_sign import VitalSign
 from app.core.deps import require_current_user
-from app.services.qr_service import generate_patient_qr_base64
 from app.services.patient_service import PatientService
 from app.services.audit_service import AuditService
 
@@ -199,10 +198,6 @@ def view_patient(
     # F8: Cálculo de deuda pendiente
     pending_payments = [p for p in payments if p.status == "pending"]
     balance_due = sum(p.total for p in pending_payments)
-
-    # F17: Código QR del Paciente
-    qr_code_base64 = generate_patient_qr_base64(patient)
-
     return templates.TemplateResponse(
         request=request,
         name="patients/view.html",
@@ -216,7 +211,6 @@ def view_patient(
             "vitals_evolution": vitals_evolution,
             "audit_logs": audit_logs,
             "balance_due": balance_due,
-            "qr_code_base64": qr_code_base64,
         }
     )
 
