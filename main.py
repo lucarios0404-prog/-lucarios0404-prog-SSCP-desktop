@@ -117,6 +117,13 @@ async def dashboard(request: Request, db: Session = Depends(get_db), current_use
     recent_appointments = db.query(Appointment).order_by(Appointment.date.desc()).limit(5).all()
     recent_consultations = db.query(Consultation).order_by(Consultation.created_at.desc()).limit(5).all()
 
+    # Pacientes en sala de espera hoy (notificados por secretaría para atención inmediata)
+    today = date.today()
+    waiting_patients = db.query(Appointment).filter(
+        Appointment.date == today,
+        Appointment.status == "En Espera"
+    ).order_by(Appointment.start_time.asc()).all()
+
     return templates.TemplateResponse(
         request=request, name="dashboard.html", context={
             "title": "Panel Principal - SSCP Desktop",
@@ -127,5 +134,6 @@ async def dashboard(request: Request, db: Session = Depends(get_db), current_use
             "total_pending_debt": total_pending_debt,
             "recent_appointments": recent_appointments,
             "recent_consultations": recent_consultations,
+            "waiting_patients": waiting_patients,
         }
     )

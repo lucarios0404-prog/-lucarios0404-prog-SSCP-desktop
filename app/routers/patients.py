@@ -198,6 +198,15 @@ def view_patient(
     # F8: Cálculo de deuda pendiente
     pending_payments = [p for p in payments if p.status == "pending"]
     balance_due = sum(p.total for p in pending_payments)
+
+    # Paciente en sala de espera hoy
+    today = date.today()
+    active_waiting_appointment = db.query(Appointment).filter(
+        Appointment.patient_id == patient_id,
+        Appointment.date == today,
+        Appointment.status == "En Espera"
+    ).first()
+
     return templates.TemplateResponse(
         request=request,
         name="patients/view.html",
@@ -211,6 +220,8 @@ def view_patient(
             "vitals_evolution": vitals_evolution,
             "audit_logs": audit_logs,
             "balance_due": balance_due,
+            "active_waiting_appointment": active_waiting_appointment,
+            "waiting_success": request.query_params.get("waiting_success"),
         }
     )
 

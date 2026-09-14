@@ -8,7 +8,8 @@ from datetime import datetime, date, time, timedelta
 from app.database import get_db
 from app.models.appointment import Appointment
 from app.models.patient import Patient
-from app.core.deps import require_current_user
+from app.models.user import User
+from app.core.deps import require_current_user, require_permission
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -51,6 +52,11 @@ def list_appointments(
         })
 
     today_str = date.today().strftime("%Y-%m-%d")
+    all_patients = db.query(Patient).order_by(Patient.last_name).all()
+    waiting_count = db.query(Appointment).filter(
+        Appointment.date == date.today(),
+        Appointment.status == "En Espera"
+    ).count()
 
     return templates.TemplateResponse(
         request=request,
@@ -58,6 +64,9 @@ def list_appointments(
         context={
             "user": current_user,
             "appointments": appointments,
+            "all_patients": all_patients,
+            "waiting_count": waiting_count,
+            "waiting_success": request.query_params.get("waiting_success"),
             "view_mode": view,
             "calendar_events": calendar_events,
             "today_str": today_str,
@@ -154,3 +163,96 @@ def update_appointment_status(
         appt.updated_at = datetime.utcnow()
         db.commit()
     return RedirectResponse(url="/appointments", status_code=303)
+
+@router.post("/check-in-walkin")
+def check_in_walkin(
+    request: Request,
+    patient_id: int = Form(...),
+    notes: str = Form(None),
+    redirect_to: str = Form(None),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('appointments'))
+):
+    today = date.today()
+    now_time = datetime.now().time()
+    
+    # Verificar si el paciente ya tiene cita hoy en estado Pendiente, Confirmada o En Espera
+    existing = db.query(Appointment).filter(
+        Appointment.patient_id == patient_id,
+        Appointment.date == today,
+        Appointment.status.in_(["Pendiente", "Confirmada", "En Espera"])
+    ).first()
+    
+    if existing:
+        existing.status = "En Espera"
+        if notes:
+            existing.notes = f"{existing.notes} | {notes}" if existing.notes else notes
+        existing.updated_at = datetime.utcnow()
+        db.commit()
+        appt = existing
+    else:
+        # Crear cita espontánea / walk-in directa para hoy
+        end_time_val = (datetime.now() + timedelta(minutes=30)).time()
+        appt = Appointment(
+            patient_id=patient_id,
+            doctor_id=current_user.id if current_user.role == "doctor" else 1,
+            date=today,
+            start_time=now_time,
+            end_time=end_time_val,
+            reason="Llegada espontánea (Sin cita previa) - En Espera",
+            notes=notes or "Paciente en sala de espera indicado por recepción",
+            status="En Espera"
+        )
+        db.add(appt)
+        db.commit()
+        db.refresh(appt)
+
+    if redirect_to == "patient":
+        return RedirectResponse(url=f"/patients/{patient_id}?waiting_success=1", status_code=303)
+    elif redirect_to == "dashboard":
+        return RedirectResponse(url="/dashboard?waiting_success=1", status_code=303)
+    return RedirectResponse(url="/appointments?status=En+Espera&waiting_success=1", status_code=303)
+
+@router.post("/attend-now")
+def attend_now(
+    request: Request,
+    patient_id: int = Form(...),
+    notes: str = Form(None),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('consultations'))
+):
+    # Solo médicos pueden ingresar directamente a consulta
+    today = date.today()
+    now_time = datetime.now().time()
+    
+    # Si ya existe una cita hoy, asociarla para completarla luego
+    existing = db.query(Appointment).filter(
+        Appointment.patient_id == patient_id,
+        Appointment.date == today,
+        Appointment.status.in_(["En Espera", "Pendiente", "Confirmada"])
+    ).first()
+    
+    if existing:
+        existing.status = "En Espera"
+        existing.updated_at = datetime.utcnow()
+        db.commit()
+        appt_id = existing.id
+    else:
+        end_time_val = (datetime.now() + timedelta(minutes=30)).time()
+        appt = Appointment(
+            patient_id=patient_id,
+            doctor_id=current_user.id,
+            date=today,
+            start_time=now_time,
+            end_time=end_time_val,
+            reason="Atención Inmediata (Sin cita previa)",
+            notes=notes or "Paciente entra de inmediato a consulta médica",
+            status="En Espera"
+        )
+        db.add(appt)
+        db.commit()
+        db.refresh(appt)
+        appt_id = appt.id
+
+    return RedirectResponse(url=f"/consultations/create?patient_id={patient_id}&appointment_id={appt_id}&walk_in=1", status_code=303)
+

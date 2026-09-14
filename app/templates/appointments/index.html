@@ -13,15 +13,36 @@
 
         <main class="flex-1 overflow-y-auto p-6 md:p-8">
             <div class="max-w-7xl mx-auto space-y-6">
+                <!-- Waiting Success Banner -->
+                {% if waiting_success %}
+                <div class="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex items-center justify-between text-amber-900 shadow-sm animate-fade-in">
+                    <div class="flex items-center space-x-3">
+                        <span class="w-10 h-10 rounded-xl bg-amber-200 text-amber-800 flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
+                            <i class="fas fa-couch"></i>
+                        </span>
+                        <div>
+                            <p class="text-sm font-bold">¡Paciente ingresado a Sala de Espera!</p>
+                            <p class="text-xs text-amber-800">El paciente ha sido registrado en recepción y el doctor verá la notificación en su Panel Principal para atenderlo de inmediato.</p>
+                        </div>
+                    </div>
+                    <button onclick="this.parentElement.remove()" class="text-amber-700 hover:text-amber-950 text-base font-bold px-2">&times;</button>
+                </div>
+                {% endif %}
+
                 <!-- Header Actions -->
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h1 class="text-2xl font-bold text-slate-900">Agenda de Citas Médicas</h1>
-                        <p class="text-xs text-slate-500 mt-0.5">Control de horarios, confirmación de asistencia y citas recurrentes.</p>
+                        <p class="text-xs text-slate-500 mt-0.5">Control de horarios, confirmación de asistencia, sala de espera y atención inmediata.</p>
                     </div>
-                    <a href="/appointments/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md shadow-blue-500/20 transition-all">
-                        <i class="fas fa-calendar-plus mr-2"></i> Agendar Nueva Cita
-                    </a>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="document.getElementById('walkinModal').classList.remove('hidden')" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold shadow-md shadow-amber-500/20 transition-all">
+                            <i class="fas fa-user-clock mr-2"></i> Llegada sin Cita (Poner en Espera)
+                        </button>
+                        <a href="/appointments/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md shadow-blue-500/20 transition-all">
+                            <i class="fas fa-calendar-plus mr-2"></i> Agendar Nueva Cita
+                        </a>
+                    </div>
                 </div>
 
                 <!-- Filters Bar -->
@@ -30,7 +51,10 @@
                         <a href="/appointments" class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if status_filter == 'all' and not filter_date %}bg-slate-900 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
                             Todas
                         </a>
-                        <a href="/appointments?filter_date={{ today_str }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if filter_date == today_str %}bg-blue-600 text-white{% else %}bg-blue-50 text-blue-700 hover:bg-blue-100{% endif %}">
+                        <a href="/appointments?status=En Espera" class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if status_filter == 'En Espera' %}bg-amber-600 text-white{% else %}bg-amber-50 text-amber-800 hover:bg-amber-100{% endif %}">
+                            <i class="fas fa-couch mr-1"></i> En Espera {% if waiting_count > 0 %}<span class="ml-1 px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 text-[10px] font-bold">{{ waiting_count }}</span>{% endif %}
+                        </a>
+                        <a href="/appointments?filter_date={{ today_str }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if filter_date == today_str and status_filter != 'En Espera' %}bg-blue-600 text-white{% else %}bg-blue-50 text-blue-700 hover:bg-blue-100{% endif %}">
                             <i class="fas fa-calendar-day mr-1"></i> Citas de Hoy
                         </a>
                         <a href="/appointments?status=Pendiente" class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if status_filter == 'Pendiente' %}bg-amber-500 text-white{% else %}bg-amber-50 text-amber-700 hover:bg-amber-100{% endif %}">
@@ -58,14 +82,14 @@
                                 <tr>
                                     <th class="py-3.5 px-5">Fecha y Hora</th>
                                     <th class="py-3.5 px-5">Paciente</th>
-                                    <th class="py-3.5 px-5">Motivo de Consulta</th>
+                                    <th class="py-3.5 px-5">Motivo / Tipo</th>
                                     <th class="py-3.5 px-5">Estado</th>
                                     <th class="py-3.5 px-5 text-right">Acciones Rápidas</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
                                 {% for a in appointments %}
-                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                <tr class="hover:bg-slate-50/80 transition-colors {% if a.status == 'En Espera' %}bg-amber-50/30{% endif %}">
                                     <td class="py-4 px-5 whitespace-nowrap">
                                         <div class="font-semibold text-slate-900">{{ a.date.strftime("%d/%m/%Y") }}</div>
                                         <div class="text-xs text-blue-600 font-mono font-medium mt-0.5">
@@ -91,6 +115,11 @@
                                     </td>
                                     <td class="py-4 px-5">
                                         <div class="text-slate-900 font-medium">{{ a.reason }}</div>
+                                        {% if 'Sin cita' in a.reason or 'espontánea' in a.reason %}
+                                        <span class="inline-flex items-center text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-bold mt-1 border border-amber-200">
+                                            <i class="fas fa-walking mr-1"></i> Sin Cita Previa
+                                        </span>
+                                        {% endif %}
                                         {% if a.is_recurring %}
                                         <span class="inline-flex items-center text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded font-semibold mt-1">
                                             <i class="fas fa-redo-alt mr-1"></i> Recurrente
@@ -102,32 +131,54 @@
                                     </td>
                                     <td class="py-4 px-5 whitespace-nowrap">
                                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold
-                                            {% if a.status == 'Confirmada' %}bg-blue-100 text-blue-800 border border-blue-200
+                                            {% if a.status == 'En Espera' %}bg-amber-100 text-amber-900 border-2 border-amber-300
+                                            {% elif a.status == 'Confirmada' %}bg-blue-100 text-blue-800 border border-blue-200
                                             {% elif a.status == 'Completada' %}bg-emerald-100 text-emerald-800 border border-emerald-200
                                             {% elif a.status == 'Cancelada' %}bg-red-100 text-red-800 border border-red-200
-                                            {% else %}bg-amber-100 text-amber-800 border border-amber-200{% endif %}">
+                                            {% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
+                                            {% if a.status == 'En Espera' %}
+                                            <span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5 animate-ping"></span>
+                                            <i class="fas fa-couch mr-1 text-amber-600"></i> En Espera
+                                            {% else %}
                                             {{ a.status }}
+                                            {% endif %}
                                         </span>
                                     </td>
                                     <td class="py-4 px-5 text-right whitespace-nowrap space-x-1.5">
-                                        {% if a.status != 'Completada' and a.status != 'Cancelada' %}
-                                        <form method="post" action="/appointments/{{ a.id }}/status" class="inline">
-                                            <input type="hidden" name="new_status" value="Confirmada">
-                                            <button type="submit" class="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-xs font-medium" title="Confirmar">
-                                                Confirmar
-                                            </button>
-                                        </form>
-                                        {% if user.has_permission('consultations') %}
-                                        <a href="/consultations/create?patient_id={{ a.patient_id }}&appointment_id={{ a.id }}" class="px-2 py-1 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded text-xs font-medium" title="Atender Consulta">
-                                            Atender
-                                        </a>
+                                        {% if a.status == 'En Espera' %}
+                                            {% if user.has_permission('consultations') %}
+                                            <a href="/consultations/create?patient_id={{ a.patient_id }}&appointment_id={{ a.id }}&walk_in=1" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow transition-all" title="Atender ahora a este paciente">
+                                                <i class="fas fa-bolt mr-1.5"></i> Atender Ahora
+                                            </a>
+                                            {% else %}
+                                            <span class="text-xs text-amber-800 bg-amber-100 px-2.5 py-1 rounded-lg font-semibold inline-flex items-center">
+                                                <i class="fas fa-clock mr-1"></i> Esperando al Dr.
+                                            </span>
+                                            {% endif %}
+                                        {% elif a.status != 'Completada' and a.status != 'Cancelada' %}
+                                            <form method="post" action="/appointments/{{ a.id }}/status" class="inline">
+                                                <input type="hidden" name="new_status" value="En Espera">
+                                                <button type="submit" class="px-2 py-1 bg-amber-100 text-amber-800 hover:bg-amber-200 rounded text-xs font-semibold" title="Marcar que el paciente llegó a recepción y ponerlo en espera">
+                                                    <i class="fas fa-user-clock mr-1"></i> Llegó (Espera)
+                                                </button>
+                                            </form>
+                                            <form method="post" action="/appointments/{{ a.id }}/status" class="inline">
+                                                <input type="hidden" name="new_status" value="Confirmada">
+                                                <button type="submit" class="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-xs font-medium" title="Confirmar">
+                                                    Confirmar
+                                                </button>
+                                            </form>
+                                            {% if user.has_permission('consultations') %}
+                                            <a href="/consultations/create?patient_id={{ a.patient_id }}&appointment_id={{ a.id }}" class="px-2 py-1 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded text-xs font-medium" title="Atender Consulta">
+                                                Atender
+                                            </a>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-xs text-slate-400">Completada</span>
                                         {% endif %}
                                         <a href="/payments/create?patient_id={{ a.patient_id }}&appointment_id={{ a.id }}" class="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded text-xs font-medium" title="Cobrar Cita">
                                             Cobrar
                                         </a>
-                                        {% else %}
-                                        <span class="text-xs text-slate-400">Completada</span>
-                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% else %}
@@ -143,6 +194,67 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Modal: Marcar Llegada de Paciente sin Cita Previa -->
+            <div id="walkinModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-lg">
+                                <i class="fas fa-couch"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900">Llegada sin Cita (Poner en Espera)</h3>
+                                <p class="text-xs text-slate-500">Notificar al doctor que el paciente llegó hoy y está en sala de espera.</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="document.getElementById('walkinModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                    </div>
+
+                    <form method="post" action="/appointments/check-in-walkin" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Seleccionar Paciente <span class="text-red-500">*</span>
+                            </label>
+                            <select name="patient_id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white">
+                                <option value="">Seleccione el paciente que acaba de llegar...</option>
+                                {% for p in all_patients %}
+                                <option value="{{ p.id }}">
+                                    {{ p.last_name }}, {{ p.first_name }} (DNI: {{ p.document_id or 'N/D' }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Motivo / Observación de Recepción (Opcional)
+                            </label>
+                            <input type="text" name="notes" placeholder="Ej. Llega con dolor de cabeza / Control de presión / Sin cita previa" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        </div>
+
+                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                            <i class="fas fa-info-circle mr-1"></i> Al confirmar, el paciente aparecerá inmediatamente en el Panel del Doctor con el botón <strong>"Atender Ahora"</strong>.
+                        </div>
+
+                        <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
+                            <button type="button" onclick="document.getElementById('walkinModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
+                                Cancelar
+                            </button>
+                            <button type="submit" class="px-5 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow transition-all">
+                                <i class="fas fa-check mr-1.5"></i> Poner en Sala de Espera
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <script>
+                // Abrir automáticamente si la URL contiene action=walkin
+                if (new URLSearchParams(window.location.search).get('action') === 'walkin') {
+                    document.getElementById('walkinModal')?.classList.remove('hidden');
+                }
+            </script>
         </main>
     </div>
 </div>

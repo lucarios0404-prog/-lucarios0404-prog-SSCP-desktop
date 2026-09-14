@@ -24,6 +24,20 @@
                 </div>
 
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    {% if request.query_params.get('walk_in') %}
+                    <div class="mb-6 p-4 bg-emerald-50 border-2 border-emerald-300 rounded-xl flex items-center justify-between text-emerald-900 shadow-sm">
+                        <div class="flex items-center space-x-3">
+                            <span class="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
+                                <i class="fas fa-bolt"></i>
+                            </span>
+                            <div>
+                                <p class="text-xs font-extrabold uppercase tracking-wide text-emerald-900">⚡ Atención Inmediata (Llegada sin cita previa / Sala de Espera)</p>
+                                <p class="text-xs text-emerald-700">El paciente ingresó directamente a consulta. Al guardar la consulta, el estado de la cita se marcará como completada automáticamente.</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <form method="post" action="/consultations/create" class="space-y-6">
                         {% if selected_appointment_id %}
                         <input type="hidden" name="appointment_id" value="{{ selected_appointment_id }}">

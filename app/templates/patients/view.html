@@ -13,6 +13,57 @@
 
         <main class="flex-1 overflow-y-auto p-6 md:p-8">
             <div class="max-w-7xl mx-auto space-y-6">
+                <!-- Waiting Success Alert -->
+                {% if waiting_success %}
+                <div class="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl flex items-center justify-between text-amber-900 shadow-sm animate-fade-in">
+                    <div class="flex items-center space-x-3">
+                        <span class="w-10 h-10 rounded-xl bg-amber-200 text-amber-800 flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
+                            <i class="fas fa-couch"></i>
+                        </span>
+                        <div>
+                            <p class="text-sm font-bold">¡Paciente ingresado en Sala de Espera!</p>
+                            <p class="text-xs text-amber-800">El paciente se encuentra registrado en recepción y el doctor puede ver la notificación para atenderlo en cualquier momento.</p>
+                        </div>
+                    </div>
+                    <button onclick="this.parentElement.remove()" class="text-amber-700 hover:text-amber-950 text-base font-bold px-2">&times;</button>
+                </div>
+                {% endif %}
+
+                <!-- Active Waiting Room Banner -->
+                {% if active_waiting_appointment %}
+                <div class="p-4 bg-gradient-to-r from-amber-500/10 via-amber-50 to-emerald-500/10 border-2 border-amber-400 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-amber-950 shadow-sm">
+                    <div class="flex items-center space-x-3">
+                        <span class="relative flex h-4 w-4 shrink-0">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-4 w-4 bg-amber-500"></span>
+                        </span>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm font-extrabold text-amber-900">
+                                    <i class="fas fa-couch mr-1"></i> Paciente en Sala de Espera
+                                </span>
+                                <span class="text-[11px] px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold">
+                                    Llegó hoy a las {{ active_waiting_appointment.start_time.strftime("%I:%M %p") }}
+                                </span>
+                            </div>
+                            <p class="text-xs text-amber-800 mt-0.5">
+                                {{ active_waiting_appointment.notes or active_waiting_appointment.reason }}
+                            </p>
+                        </div>
+                    </div>
+                    {% if user.has_permission('consultations') %}
+                    <a href="/consultations/create?patient_id={{ patient.id }}&appointment_id={{ active_waiting_appointment.id }}&walk_in=1" 
+                       class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all shrink-0">
+                        <i class="fas fa-bolt mr-1.5"></i> Atender Ahora
+                    </a>
+                    {% else %}
+                    <span class="text-xs font-bold text-amber-800 bg-amber-100 px-3 py-1.5 rounded-xl inline-flex items-center shrink-0">
+                        <i class="fas fa-clock mr-1.5"></i> Esperando al Doctor
+                    </span>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <!-- Patient Profile Card -->
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -51,6 +102,27 @@
 
                         <!-- Direct Action Buttons -->
                         <div class="flex flex-wrap gap-2 md:self-center">
+                            <!-- Botón Atender Ahora (Doctor: sin cita previa, directo a consulta) -->
+                            {% if user.has_permission('consultations') %}
+                            <form method="post" action="/appointments/attend-now" class="inline">
+                                <input type="hidden" name="patient_id" value="{{ patient.id }}">
+                                <button type="submit" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all" title="Paciente llegó ahora y entra directo a consulta sin cita previa">
+                                    <i class="fas fa-bolt mr-1.5"></i> Atender Ahora
+                                </button>
+                            </form>
+                            {% endif %}
+
+                            <!-- Botón Llegó sin Cita / Poner en Espera (Secretaria o Recepción) -->
+                            {% if not active_waiting_appointment %}
+                            <form method="post" action="/appointments/check-in-walkin" class="inline">
+                                <input type="hidden" name="patient_id" value="{{ patient.id }}">
+                                <input type="hidden" name="redirect_to" value="patient">
+                                <button type="submit" class="inline-flex items-center px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-sm transition-all" title="Indicar que el paciente llegó hoy sin cita previa y ponerlo en sala de espera">
+                                    <i class="fas fa-user-clock mr-1.5"></i> Llegó (En Espera)
+                                </button>
+                            </form>
+                            {% endif %}
+
                             <!-- F2: Receta Rápida -->
                             {% if user.has_permission('prescriptions') %}
                             <a href="/prescriptions/quick?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm transition-all">
