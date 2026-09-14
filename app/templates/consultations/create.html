@@ -53,13 +53,37 @@
                                 class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">
                         </div>
 
+                        <!-- Selector de Plantilla de Consulta -->
+                        <div class="p-3.5 bg-violet-50/80 border border-violet-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-7 h-7 rounded-lg bg-violet-200 text-violet-700 flex items-center justify-center text-xs shrink-0">
+                                    <i class="fas fa-magic"></i>
+                                </span>
+                                <div>
+                                    <span class="text-xs font-bold text-violet-950 uppercase tracking-wide block">Plantilla de Consulta</span>
+                                    <span class="text-[11px] text-violet-700">Autocompleta Anamnesis / Síntomas con un solo clic</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <select id="consultation-template-select" onchange="applyConsultationTemplate(this)" class="text-xs py-1.5 px-3 border border-violet-300 rounded-lg bg-white text-slate-800 focus:ring-2 focus:ring-violet-500 font-medium">
+                                    <option value="">-- Seleccionar Plantilla de Consulta --</option>
+                                    {% for t in consultation_templates %}
+                                    <option value="{{ t.id }}" data-content="{{ t.content }}">{{ t.title }}</option>
+                                    {% endfor %}
+                                </select>
+                                <a href="/templates?category=consultation" target="_blank" class="p-1.5 text-violet-600 hover:text-violet-800 hover:bg-violet-100 rounded-lg text-xs" title="Crear o gestionar plantillas">
+                                    <i class="fas fa-cog"></i>
+                                </a>
+                            </div>
+                        </div>
+
                         <!-- Síntomas y Examen Físico -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                     Anamnesis / Síntomas Subjetivos
                                 </label>
-                                <textarea name="symptoms" rows="4" placeholder="Descripción detallada de síntomas relatados por el paciente..." 
+                                <textarea id="symptoms_textarea" name="symptoms" rows="4" placeholder="Descripción detallada de síntomas relatados por el paciente..." 
                                     class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500"></textarea>
                             </div>
 
@@ -105,11 +129,23 @@
                         </div>
 
                         <!-- Prescripción / Receta -->
-                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                            <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                                <i class="fas fa-pills text-blue-600 mr-1"></i> Indicaciones Farmacológicas / Receta Médica
-                            </label>
-                            <textarea name="prescription" rows="3" placeholder="Medicamento, Dosis, Vía, Frecuencia y Duración (ej. Amoxicilina 500mg VO cada 8 horas por 7 días)..." 
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                    <i class="fas fa-pills text-blue-600 mr-1"></i> Indicaciones Farmacológicas / Receta Médica
+                                </label>
+                                {% if prescription_templates %}
+                                <div class="flex items-center gap-2">
+                                    <select onchange="applyPrescriptionTemplate(this)" class="text-xs py-1 px-2.5 border border-slate-300 rounded-lg bg-white text-slate-700 focus:ring-2 focus:ring-blue-500 font-medium">
+                                        <option value="">-- Cargar Plantilla de Receta --</option>
+                                        {% for t in prescription_templates %}
+                                        <option value="{{ t.id }}" data-content="{{ t.content }}">{{ t.title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <textarea id="prescription_textarea" name="prescription" rows="3" placeholder="Medicamento, Dosis, Vía, Frecuencia y Duración (ej. Amoxicilina 500mg VO cada 8 horas por 7 días)..." 
                                 class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                         </div>
 
@@ -144,6 +180,36 @@ function setDiagnosis(text) {
         input.value = input.value + '; ' + text;
     } else {
         input.value = text;
+    }
+}
+
+function applyConsultationTemplate(selectEl) {
+    const selected = selectEl.options[selectEl.selectedIndex];
+    const content = selected.getAttribute('data-content');
+    if (!content) return;
+    const symptomsEl = document.getElementById('symptoms_textarea');
+    if (symptomsEl) {
+        if (symptomsEl.value.trim() && !confirm('¿Desea reemplazar el texto actual en Anamnesis / Síntomas con el contenido de la plantilla? (Cancelar para anexar al final)')) {
+            symptomsEl.value += '\n\n' + content;
+        } else {
+            symptomsEl.value = content;
+        }
+        symptomsEl.focus();
+    }
+}
+
+function applyPrescriptionTemplate(selectEl) {
+    const selected = selectEl.options[selectEl.selectedIndex];
+    const content = selected.getAttribute('data-content');
+    if (!content) return;
+    const rxEl = document.getElementById('prescription_textarea');
+    if (rxEl) {
+        if (rxEl.value.trim() && !confirm('¿Desea reemplazar la receta actual con el contenido de la plantilla? (Cancelar para anexar al final)')) {
+            rxEl.value += '\n' + content;
+        } else {
+            rxEl.value = content;
+        }
+        rxEl.focus();
     }
 }
 </script>

@@ -25,6 +25,16 @@
             <span class="w-2 h-2 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
             Offline Activo
         </div>
+
+        <!-- Selector Modo Claro / Oscuro -->
+        <button id="theme-toggle-btn" type="button" onclick="toggleDarkMode()" 
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-sm transition-all bg-white hover:bg-slate-50 border-slate-200 text-slate-700" 
+            title="Alternar Modo Claro / Modo Oscuro">
+            <i id="theme-icon-sun" class="fas fa-sun text-amber-500 text-xs"></i>
+            <i id="theme-icon-moon" class="fas fa-moon text-indigo-400 text-xs hidden"></i>
+            <span id="theme-label" class="text-xs font-medium">Claro</span>
+        </button>
+
         <a href="/logout" class="text-xs text-gray-500 hover:text-red-600 font-medium flex items-center px-3 py-1.5 rounded-md hover:bg-red-50 border border-gray-200 transition-colors">
             <i class="fas fa-sign-out-alt mr-1.5"></i> Salir
         </a>

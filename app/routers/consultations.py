@@ -13,6 +13,7 @@ from app.models.patient import Patient
 from app.models.appointment import Appointment
 from app.models.setting import Setting
 from app.models.vital_sign import VitalSign
+from app.models.template import ClinicalTemplate
 from app.core.deps import require_current_user
 from app.services.pdf_service import generate_prescription_pdf, generate_consultation_report_pdf
 from app.services.audit_service import AuditService
@@ -23,16 +24,15 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
 # Diagnósticos CIE-10 comunes para autocompletar / sugerencias rápidas
 CIE10_COMMON = [
-    {"code": "J00", "description": "Rinofaringitis aguda [resfriado común]"},
-    {"code": "J02.9", "description": "Faringitis aguda, no especificada"},
+    {"code": "J00", "description": "Rinofaringitis aguda (resfriado común)"},
     {"code": "I10", "description": "Hipertensión esencial (primaria)"},
-    {"code": "E11.9", "description": "Diabetes mellitus tipo 2 sin mención de complicación"},
+    {"code": "E11", "description": "Diabetes mellitus tipo 2"},
+    {"code": "J02.9", "description": "Faringitis aguda, no especificada"},
     {"code": "K29.7", "description": "Gastritis, no especificada"},
     {"code": "M54.5", "description": "Lumbago no especificado"},
     {"code": "A09", "description": "Gastroenteritis y colitis de origen no especificado"},
     {"code": "R51", "description": "Cefalea"},
     {"code": "J20.9", "description": "Bronquitis aguda, no especificada"},
-    {"code": "N39.0", "description": "Infección de vías urinarias, sitio no especificado"},
 ]
 
 @router.get("/")
@@ -100,6 +100,8 @@ def create_consultation_form(
 ):
     patients = db.query(Patient).order_by(Patient.last_name).all()
     selected_patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
+    consultation_templates = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "consultation").order_by(ClinicalTemplate.title).all()
+    prescription_templates = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "prescription").order_by(ClinicalTemplate.title).all()
     
     return templates.TemplateResponse(
         request=request,
@@ -110,6 +112,8 @@ def create_consultation_form(
             "selected_patient": selected_patient,
             "selected_appointment_id": appointment_id,
             "cie10_common": CIE10_COMMON,
+            "consultation_templates": consultation_templates,
+            "prescription_templates": prescription_templates,
         }
     )
 
@@ -209,6 +213,9 @@ def edit_consultation_form(
     if not consultation:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
 
+    consultation_templates = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "consultation").order_by(ClinicalTemplate.title).all()
+    prescription_templates = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "prescription").order_by(ClinicalTemplate.title).all()
+
     return templates.TemplateResponse(
         request=request,
         name="consultations/edit.html",
@@ -216,6 +223,8 @@ def edit_consultation_form(
             "user": current_user,
             "consultation": consultation,
             "cie10_common": CIE10_COMMON,
+            "consultation_templates": consultation_templates,
+            "prescription_templates": prescription_templates,
         }
     )
 
