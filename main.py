@@ -34,6 +34,7 @@ from app.routers import (
     medical_references,
     reports,
     users,
+    data_import,
 )
 from app.core.deps import get_current_user
 
@@ -74,6 +75,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
 # Incluir todos los módulos Core, Clínicos y de Productividad (Fase 4 y Fase 6)
 app.include_router(auth.router)
+app.include_router(data_import.router)
 app.include_router(patients.router)
 app.include_router(appointments.router)
 app.include_router(payments.router)

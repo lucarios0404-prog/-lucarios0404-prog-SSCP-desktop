@@ -19,9 +19,14 @@
                         <h1 class="text-2xl font-bold text-slate-900">Listado de Pacientes</h1>
                         <p class="text-xs text-slate-500 mt-0.5">Gestión de historias clínicas, citas y estado financiero.</p>
                     </div>
-                    <a href="/patients/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md shadow-blue-500/20 transition-all">
-                        <i class="fas fa-user-plus mr-2"></i> Nuevo Paciente
-                    </a>
+                    <div class="flex items-center gap-2">
+                        <a href="/patients/import" class="inline-flex items-center justify-center px-3.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-sm font-semibold shadow-sm transition-all" title="Migrar pacientes e historias desde Consulta Práctica (.mdb), CSV o Excel">
+                            <i class="fas fa-file-import mr-2 text-emerald-600"></i> Importar Consulta Práctica
+                        </a>
+                        <a href="/patients/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md shadow-blue-500/20 transition-all">
+                            <i class="fas fa-user-plus mr-2"></i> Nuevo Paciente
+                        </a>
+                    </div>
                 </div>
 
                 <!-- Search Bar -->

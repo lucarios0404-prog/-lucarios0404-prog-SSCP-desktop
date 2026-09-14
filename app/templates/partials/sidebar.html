@@ -28,6 +28,10 @@
                     <i class="fas fa-user-injured mr-3 text-base {% if active_menu == 'patients' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
                     Pacientes
                 </a>
+                <a href="/patients/import" class="{% if active_menu == 'import' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
+                    <i class="fas fa-file-import mr-3 text-base {% if active_menu == 'import' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
+                    Importar Consulta Práctica
+                </a>
                 {% endif %}
 
                 {% if user.has_permission('appointments') %}

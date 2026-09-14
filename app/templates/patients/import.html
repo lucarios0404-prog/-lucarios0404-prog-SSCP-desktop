@@ -1,0 +1,369 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Importar desde Consulta Práctica — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'patients' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Importación de Datos" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-5xl mx-auto space-y-6">
+
+                <!-- Header de la Página -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+                                Asistente de Migración
+                            </span>
+                            <span class="text-xs text-slate-500">MDB / CSV / Excel</span>
+                        </div>
+                        <h1 class="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+                            Importar Datos desde Consulta Práctica
+                        </h1>
+                        <p class="text-sm text-slate-500 mt-0.5">
+                            Transfiere fácilmente pacientes e historiales clínicos previos directamente a tu base local.
+                        </p>
+                    </div>
+                    <div>
+                        <a href="/patients" class="inline-flex items-center px-4 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 font-semibold text-sm hover:bg-slate-50 shadow-sm transition-all">
+                            <i class="fas fa-arrow-left mr-2"></i> Volver a Pacientes
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Info Card: Consulta Práctica -->
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-5 text-slate-700 flex items-start gap-4 shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+                        <i class="fas fa-database text-lg"></i>
+                    </div>
+                    <div class="text-sm space-y-1">
+                        <h3 class="font-bold text-blue-950">¿Cómo migrar desde el sistema Consulta Práctica?</h3>
+                        <p class="text-slate-600 leading-relaxed">
+                            Puedes subir directamente el archivo <strong>.MDB</strong> de tu instalación anterior de <em>Consulta Práctica</em> (usualmente localizado en la carpeta del programa o en tus respaldos). El sistema leerá automáticamente los expedientes de pacientes y vinculará todas sus consultas médicas históricas previas. También se aceptan exportaciones en formato <strong>CSV</strong> y <strong>Excel (.xlsx)</strong>.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Paso 1: Selección de Archivo -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5" id="stepUpload">
+                    <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
+                        <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">1</div>
+                        <h2 class="text-base font-bold text-slate-800">Seleccionar Archivo de Origen</h2>
+                    </div>
+
+                    <form id="uploadForm" class="space-y-4">
+                        <div id="dropArea" class="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-8 text-center transition-all cursor-pointer bg-slate-50/50 hover:bg-blue-50/20">
+                            <input type="file" id="fileInput" name="file" accept=".mdb,.csv,.txt,.xlsx" class="hidden" required>
+                            <div class="space-y-2">
+                                <div class="w-14 h-14 mx-auto rounded-full bg-blue-100/70 text-blue-600 flex items-center justify-center text-2xl">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                </div>
+                                <div class="text-sm font-semibold text-slate-700" id="fileLabel">
+                                    Haz clic aquí o arrastra tu archivo <span class="text-blue-600">.MDB, .CSV o .XLSX</span>
+                                </div>
+                                <p class="text-xs text-slate-400">
+                                    Formatos soportados: Microsoft Access MDB (Consulta Práctica), Valores separados por comas (CSV) o Excel (.xlsx)
+                                </p>
+                            </div>
+                        </div>
+
+                        <div id="fileDetails" class="hidden p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-file-alt text-blue-600 text-lg"></i>
+                                <div>
+                                    <p class="text-xs font-bold text-slate-800" id="fileNameText"></p>
+                                    <p class="text-[11px] text-slate-500" id="fileSizeText"></p>
+                                </div>
+                            </div>
+                            <button type="button" id="removeFileBtn" class="text-xs text-red-600 hover:underline font-semibold">
+                                Cambiar archivo
+                            </button>
+                        </div>
+
+                        <div class="flex justify-end pt-2">
+                            <button type="submit" id="btnPreview" class="inline-flex items-center px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md shadow-blue-500/20 transition-all disabled:opacity-50">
+                                <i class="fas fa-search mr-2"></i> Analizar y Previsualizar Datos
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Spinner de Carga -->
+                <div id="loadingIndicator" class="hidden bg-white rounded-2xl border border-slate-200 p-10 text-center shadow-sm">
+                    <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent mb-3"></div>
+                    <h3 class="text-base font-bold text-slate-800">Analizando base de datos...</h3>
+                    <p class="text-xs text-slate-500 mt-1">Extrayendo tablas de pacientes e historias clínicas.</p>
+                </div>
+
+                <!-- Paso 2: Previsualización y Estadísticas -->
+                <div id="previewContainer" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">2</div>
+                            <h2 class="text-base font-bold text-slate-800">Resumen del Análisis de Datos</h2>
+                        </div>
+                        <span id="sourceTypeBadge" class="text-xs font-bold px-2.5 py-1 rounded-md bg-slate-100 text-slate-700"></span>
+                    </div>
+
+                    <!-- Métricas -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                            <span class="text-xs text-slate-500 font-semibold uppercase">Total Pacientes</span>
+                            <div class="text-2xl font-black text-slate-900 mt-1" id="statTotalPatients">0</div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                            <span class="text-xs text-emerald-700 font-semibold uppercase">Nuevos Pacientes</span>
+                            <div class="text-2xl font-black text-emerald-700 mt-1" id="statNewPatients">0</div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-amber-50 border border-amber-200">
+                            <span class="text-xs text-amber-700 font-semibold uppercase">A Actualizar</span>
+                            <div class="text-2xl font-black text-amber-700 mt-1" id="statExistingPatients">0</div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-200">
+                            <span class="text-xs text-indigo-700 font-semibold uppercase">Historias Clínicas</span>
+                            <div class="text-2xl font-black text-indigo-700 mt-1" id="statTotalConsultations">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Previsualización -->
+                    <div class="space-y-2">
+                        <h3 class="text-xs font-bold uppercase text-slate-400 tracking-wider">Muestra de Registros (Primeros 15)</h3>
+                        <div class="overflow-x-auto rounded-xl border border-slate-200">
+                            <table class="min-w-full divide-y divide-slate-200 text-xs">
+                                <thead class="bg-slate-50 text-slate-600 font-bold">
+                                    <tr>
+                                        <th class="py-2.5 px-3 text-left">Paciente</th>
+                                        <th class="py-2.5 px-3 text-left">Cédula / DNI</th>
+                                        <th class="py-2.5 px-3 text-left">Teléfono</th>
+                                        <th class="py-2.5 px-3 text-left">Género</th>
+                                        <th class="py-2.5 px-3 text-center">Historias</th>
+                                        <th class="py-2.5 px-3 text-center">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="previewTableBody" class="divide-y divide-slate-100 text-slate-700">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Botón de Confirmación -->
+                    <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+                        <button type="button" onclick="resetImport()" class="text-xs font-semibold text-slate-500 hover:text-slate-800">
+                            <i class="fas fa-times mr-1"></i> Cancelar y Elegir Otro Archivo
+                        </button>
+                        <button type="button" id="btnConfirmImport" onclick="confirmImport()" class="inline-flex items-center px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 transition-all">
+                            <i class="fas fa-check-circle mr-2"></i> Confirmar e Importar al Sistema
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Paso 3: Éxito Final -->
+                <div id="successCard" class="hidden bg-emerald-50 border border-emerald-300 rounded-2xl p-8 text-center shadow-md space-y-4">
+                    <div class="w-16 h-16 rounded-full bg-emerald-500 text-white mx-auto flex items-center justify-center text-3xl shadow-lg shadow-emerald-500/30">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-emerald-950">¡Migración Completada Exitosamente!</h2>
+                    <p class="text-sm text-emerald-800 max-w-xl mx-auto" id="successMessageText">
+                        Los datos han sido incorporados a la base de datos de SSCP Desktop.
+                    </p>
+                    <div class="pt-2 flex justify-center gap-3">
+                        <a href="/patients" class="inline-flex items-center px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow transition-all">
+                            <i class="fas fa-users mr-2"></i> Ver Lista de Pacientes
+                        </a>
+                        <button type="button" onclick="location.reload()" class="inline-flex items-center px-4 py-2.5 rounded-xl bg-white border border-emerald-300 text-emerald-800 font-semibold text-sm hover:bg-emerald-100 transition-all">
+                            Importar Otro Archivo
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('fileInput');
+    const fileDetails = document.getElementById('fileDetails');
+    const fileNameText = document.getElementById('fileNameText');
+    const fileSizeText = document.getElementById('fileSizeText');
+    const removeFileBtn = document.getElementById('removeFileBtn');
+    const uploadForm = document.getElementById('uploadForm');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const previewContainer = document.getElementById('previewContainer');
+    const successCard = document.getElementById('successCard');
+
+    let currentCacheToken = null;
+
+    dropArea.addEventListener('click', () => fileInput.click());
+
+    dropArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropArea.classList.add('border-blue-500', 'bg-blue-50/40');
+    });
+
+    dropArea.addEventListener('dragleave', () => {
+        dropArea.classList.remove('border-blue-500', 'bg-blue-50/40');
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropArea.classList.remove('border-blue-500', 'bg-blue-50/40');
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            handleFileSelect();
+        }
+    });
+
+    fileInput.addEventListener('change', handleFileSelect);
+
+    function handleFileSelect() {
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            fileNameText.textContent = file.name;
+            fileSizeText.textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+            fileDetails.classList.remove('hidden');
+            dropArea.classList.add('hidden');
+        }
+    }
+
+    removeFileBtn.addEventListener('click', () => {
+        fileInput.value = '';
+        fileDetails.classList.add('hidden');
+        dropArea.classList.remove('hidden');
+    });
+
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!fileInput.files.length) {
+            alert('Por favor seleccione un archivo .mdb, .csv o .xlsx');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        uploadForm.classList.add('hidden');
+        loadingIndicator.classList.remove('hidden');
+
+        try {
+            const response = await fetch('/patients/import/preview', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            loadingIndicator.classList.add('hidden');
+
+            if (!response.ok) {
+                alert('Error al analizar archivo: ' + (data.detail || 'Ocurrió un error inesperado.'));
+                uploadForm.classList.remove('hidden');
+                return;
+            }
+
+            // Populate stats
+            currentCacheToken = data.cache_token;
+            document.getElementById('statTotalPatients').textContent = data.total_patients;
+            document.getElementById('statNewPatients').textContent = data.new_patients;
+            document.getElementById('statExistingPatients').textContent = data.existing_patients;
+            document.getElementById('statTotalConsultations').textContent = data.total_consultations;
+            document.getElementById('sourceTypeBadge').textContent = data.source_type;
+
+            // Populate preview table
+            const tbody = document.getElementById('previewTableBody');
+            tbody.innerHTML = '';
+
+            data.preview_sample.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition-colors';
+                
+                const badgeClass = p.is_duplicate 
+                    ? 'bg-amber-100 text-amber-800 border-amber-200' 
+                    : 'bg-emerald-100 text-emerald-800 border-emerald-200';
+
+                tr.innerHTML = `
+                    <td class="py-2.5 px-3 font-semibold text-slate-800">${p.first_name} ${p.last_name}</td>
+                    <td class="py-2.5 px-3 text-slate-600 font-mono">${p.document_id || '<span class="text-slate-400 italic">S/D</span>'}</td>
+                    <td class="py-2.5 px-3 text-slate-600">${p.phone || '<span class="text-slate-400 italic">-</span>'}</td>
+                    <td class="py-2.5 px-3 text-slate-600">${p.gender || 'Otro'}</td>
+                    <td class="py-2.5 px-3 text-center">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${p.consultations && p.consultations.length > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}">
+                            ${p.consultations ? p.consultations.length : 0}
+                        </span>
+                    </td>
+                    <td class="py-2.5 px-3 text-center">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${badgeClass}">
+                            ${p.status_label}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            previewContainer.classList.remove('hidden');
+
+        } catch (err) {
+            loadingIndicator.classList.add('hidden');
+            uploadForm.classList.remove('hidden');
+            alert('Error en la comunicación con el servidor: ' + err.message);
+        }
+    });
+
+    async function confirmImport() {
+        if (!currentCacheToken) {
+            alert('Sesión de importación no válida. Vuelva a cargar el archivo.');
+            return;
+        }
+
+        const btn = document.getElementById('btnConfirmImport');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Importando datos...';
+
+        const formData = new FormData();
+        formData.append('cache_token', currentCacheToken);
+
+        try {
+            const response = await fetch('/patients/import/confirm', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (!response.ok) {
+                alert('Error al procesar la importación: ' + (data.detail || 'Error desconocido'));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check-circle mr-2"></i> Confirmar e Importar al Sistema';
+                return;
+            }
+
+            previewContainer.classList.add('hidden');
+            document.getElementById('stepUpload').classList.add('hidden');
+            document.getElementById('successMessageText').textContent = data.message;
+            successCard.classList.remove('hidden');
+
+        } catch (err) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check-circle mr-2"></i> Confirmar e Importar al Sistema';
+            alert('Error al confirmar importación: ' + err.message);
+        }
+    }
+
+    function resetImport() {
+        previewContainer.classList.add('hidden');
+        uploadForm.classList.remove('hidden');
+        fileInput.value = '';
+        fileDetails.classList.add('hidden');
+        dropArea.classList.remove('hidden');
+        currentCacheToken = null;
+    }
+</script>
+{% endblock %}
