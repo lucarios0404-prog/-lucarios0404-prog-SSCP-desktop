@@ -42,16 +42,31 @@
 
                         <!-- Cargar plantilla si hay -->
                         {% if templates %}
-                        <div class="p-3 bg-indigo-50/50 border border-indigo-200 rounded-xl">
-                            <label class="block text-[11px] font-bold text-indigo-900 uppercase tracking-wider mb-1">
-                                <i class="fas fa-file-waveform mr-1 text-indigo-600"></i> Cargar desde Plantilla de Referencia
-                            </label>
-                            <select onchange="document.getElementById('clinical_summary').value = this.value" class="w-full text-xs py-1.5 px-2.5 border border-slate-200 rounded-lg bg-white">
-                                <option value="">-- Seleccione una plantilla --</option>
-                                {% for t in templates %}
-                                <option value="{{ t.content }}">{{ t.title }}</option>
-                                {% endfor %}
-                            </select>
+                        <div class="p-4 bg-indigo-50/80 border border-indigo-200 rounded-xl space-y-2.5">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div class="flex items-center space-x-2">
+                                    <span class="w-7 h-7 rounded-lg bg-indigo-200 text-indigo-800 flex items-center justify-center text-xs shrink-0">
+                                        <i class="fas fa-magic"></i>
+                                    </span>
+                                    <div>
+                                        <label class="block text-xs font-bold text-indigo-950 uppercase tracking-wider">
+                                            Plantilla de Carta de Referencia / Interconsulta
+                                        </label>
+                                        <span class="text-[11px] text-indigo-800">Autocompleta médico/servicio destino, motivo y resumen clínico</span>
+                                    </div>
+                                </div>
+                                <a href="/templates?category=reference" target="_blank" class="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 flex items-center self-start sm:self-auto">
+                                    <i class="fas fa-cog mr-1"></i> Gestionar Plantillas
+                                </a>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <select id="reference_template_select" onchange="applyReferenceTemplate(this)" class="w-full text-xs py-2 px-3 border border-indigo-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500">
+                                    <option value="">-- Seleccionar Plantilla de Referencia --</option>
+                                    {% for t in templates %}
+                                    <option value="{{ t.id }}" data-title="{{ t.title }}" data-content="{{ t.content }}">{{ t.title }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
                         </div>
                         {% endif %}
 
@@ -60,14 +75,14 @@
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                     Médico o Especialidad Destino <span class="text-red-500">*</span>
                                 </label>
-                                <input type="text" name="referred_to_doctor_or_specialty" required placeholder="Ej. Dr. Ramírez / Cardiología, Traumatología..."
+                                <input type="text" id="referred_input" name="referred_to_doctor_or_specialty" required placeholder="Ej. Dr. Ramírez / Cardiología, Traumatología..."
                                     class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                     Institución / Clínica Destino
                                 </label>
-                                <input type="text" name="institution" placeholder="Ej. Centro Médico UCE, Hospital Plaza de la Salud..."
+                                <input type="text" id="institution_input" name="institution" placeholder="Ej. Centro Médico UCE, Hospital Plaza de la Salud..."
                                     class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
                             </div>
                         </div>
@@ -76,7 +91,7 @@
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                 Motivo Principal de la Referencia <span class="text-red-500">*</span>
                             </label>
-                            <input type="text" name="reason_for_referral" required placeholder="Ej. Evaluación de soplo cardíaco en foco aórtico, valoración quirúrgica..."
+                            <input type="text" id="reason_input" name="reason_for_referral" required placeholder="Ej. Evaluación de soplo cardíaco en foco aórtico, valoración quirúrgica..."
                                 class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
                         </div>
 
@@ -92,7 +107,7 @@
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                 Notas Adicionales / Exámenes y Estudios Adjuntos
                             </label>
-                            <textarea name="notes" rows="2" placeholder="Se anexan resultados de perfil lipídico y ecocardiograma previo..."
+                            <textarea id="notes_input" name="notes" rows="2" placeholder="Se anexan resultados de perfil lipídico y ecocardiograma previo..."
                                 class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30"></textarea>
                         </div>
 
@@ -108,4 +123,87 @@
         </main>
     </div>
 </div>
+
+<script>
+function applyReferenceTemplate(selectEl) {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    if (!opt || !opt.value) return;
+
+    let content = opt.getAttribute('data-content') || '';
+    const title = opt.getAttribute('data-title') || opt.text;
+
+    // Obtener nombre del paciente seleccionado para reemplazar variables dinámicas
+    const patientSelect = document.querySelector('select[name="patient_id"]');
+    let patientName = '';
+    if (patientSelect && patientSelect.selectedIndex > 0) {
+        patientName = patientSelect.options[patientSelect.selectedIndex].text.split('(')[0].trim();
+    }
+    if (patientName) {
+        content = content.replace(/\[(nombre(\s+del\s+paciente)?|paciente)\]/gi, patientName);
+    }
+
+    let parsedReferred = '';
+    let parsedInstitution = '';
+    let parsedReason = '';
+    let summaryBuffer = [];
+    let notesBuffer = [];
+
+    const lines = content.split('\n');
+    let currentMode = 'summary';
+
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (/^(especialidad|m[eé]dico(\s*o\s*especialidad)?)\s*:\s*/i.test(line)) {
+            parsedReferred = line.replace(/^(especialidad|m[eé]dico(\s*o\s*especialidad)?)\s*:\s*/i, '').trim();
+            currentMode = null;
+        } else if (/^instituci[oó]n(\s*destino)?\s*:\s*/i.test(line)) {
+            parsedInstitution = line.replace(/^instituci[oó]n(\s*destino)?\s*:\s*/i, '').trim();
+            currentMode = null;
+        } else if (/^motivo(\s*principal)?(\s*de\s*la\s*referencia)?\s*:\s*/i.test(line)) {
+            parsedReason = line.replace(/^motivo(\s*principal)?(\s*de\s*la\s*referencia)?\s*:\s*/i, '').trim();
+            currentMode = null;
+        } else if (/^resumen(\s*cl[ií]nico)?\s*:\s*/i.test(line)) {
+            currentMode = 'summary';
+            const rest = line.replace(/^resumen(\s*cl[ií]nico)?\s*:\s*/i, '').trim();
+            if (rest) summaryBuffer.push(rest);
+        } else if (/^notas?(\s*adicionales)?\s*:\s*/i.test(line)) {
+            currentMode = 'notes';
+            const rest = line.replace(/^notas?(\s*adicionales)?\s*:\s*/i, '').trim();
+            if (rest) notesBuffer.push(rest);
+        } else if (currentMode === 'summary') {
+            if (line) summaryBuffer.push(rawLine);
+        } else if (currentMode === 'notes') {
+            if (line) notesBuffer.push(rawLine);
+        } else if (line) {
+            summaryBuffer.push(rawLine);
+        }
+    }
+
+    // Poblar Especialidad / Médico
+    if (parsedReferred && document.getElementById('referred_input')) {
+        document.getElementById('referred_input').value = parsedReferred;
+    }
+
+    // Poblar Institución
+    if (parsedInstitution && document.getElementById('institution_input')) {
+        document.getElementById('institution_input').value = parsedInstitution;
+    }
+
+    // Poblar Motivo
+    if (parsedReason && document.getElementById('reason_input')) {
+        document.getElementById('reason_input').value = parsedReason;
+    } else if (!document.getElementById('reason_input').value) {
+        document.getElementById('reason_input').value = title;
+    }
+
+    // Poblar Resumen Clínico
+    const finalSummary = summaryBuffer.join('\n').trim() || content;
+    document.getElementById('clinical_summary').value = finalSummary;
+
+    // Poblar Notas Adicionales
+    if (notesBuffer.length > 0 && document.getElementById('notes_input')) {
+        document.getElementById('notes_input').value = notesBuffer.join('\n').trim();
+    }
+}
+</script>
 {% endblock %}

@@ -42,16 +42,31 @@
 
                         <!-- Cargar plantilla si hay -->
                         {% if templates %}
-                        <div class="p-3 bg-amber-50/50 border border-amber-200 rounded-xl">
-                            <label class="block text-[11px] font-bold text-amber-900 uppercase tracking-wider mb-1">
-                                <i class="fas fa-file-lines mr-1 text-amber-600"></i> Cargar desde Plantilla de Reposo
-                            </label>
-                            <select onchange="document.getElementById('notes').value = this.value" class="w-full text-xs py-1.5 px-2.5 border border-slate-200 rounded-lg bg-white">
-                                <option value="">-- Seleccione una plantilla --</option>
-                                {% for t in templates %}
-                                <option value="{{ t.content }}">{{ t.title }}</option>
-                                {% endfor %}
-                            </select>
+                        <div class="p-4 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2.5">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div class="flex items-center space-x-2">
+                                    <span class="w-7 h-7 rounded-lg bg-amber-200 text-amber-800 flex items-center justify-center text-xs shrink-0">
+                                        <i class="fas fa-magic"></i>
+                                    </span>
+                                    <div>
+                                        <label class="block text-xs font-bold text-amber-950 uppercase tracking-wider">
+                                            Plantilla de Licencia / Reposo Médico
+                                        </label>
+                                        <span class="text-[11px] text-amber-800">Autocompleta diagnóstico, días de reposo, destinatario e indicaciones</span>
+                                    </div>
+                                </div>
+                                <a href="/templates?category=license" target="_blank" class="text-[11px] font-semibold text-amber-700 hover:text-amber-900 flex items-center self-start sm:self-auto">
+                                    <i class="fas fa-cog mr-1"></i> Gestionar Plantillas
+                                </a>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <select id="license_template_select" onchange="applyLicenseTemplate(this)" class="w-full text-xs py-2 px-3 border border-amber-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-2 focus:ring-amber-500">
+                                    <option value="">-- Seleccionar Plantilla de Licencia / Reposo --</option>
+                                    {% for t in templates %}
+                                    <option value="{{ t.id }}" data-title="{{ t.title }}" data-content="{{ t.content }}">{{ t.title }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
                         </div>
                         {% endif %}
 
@@ -60,7 +75,7 @@
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                 Diagnóstico Médico Justificativo <span class="text-red-500">*</span>
                             </label>
-                            <input type="text" name="diagnosis" required placeholder="Ej. Síndrome gripal severo con compromiso respiratorio alto, Lumbago agudo..."
+                            <input type="text" id="diagnosis_input" name="diagnosis" required placeholder="Ej. Síndrome gripal severo con compromiso respiratorio alto, Lumbago agudo..."
                                 class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30">
                         </div>
 
@@ -94,7 +109,7 @@
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                 Dirigido a (Empresa, Escuela o Institución)
                             </label>
-                            <input type="text" name="workplace_or_school" placeholder="Ej. A quien pueda interesar, Banco Reservas, MINERD..."
+                            <input type="text" id="workplace_input" name="workplace_or_school" placeholder="Ej. A quien pueda interesar, Banco Reservas, MINERD..."
                                 class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30">
                         </div>
 
@@ -128,6 +143,77 @@ function calculateEndDate() {
     const sDate = new Date(startVal);
     sDate.setDate(sDate.getDate() + (days - 1));
     document.getElementById('end_date').value = sDate.toISOString().split('T')[0];
+}
+
+function applyLicenseTemplate(selectEl) {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    if (!opt || !opt.value) return;
+
+    let content = opt.getAttribute('data-content') || '';
+    const title = opt.getAttribute('data-title') || opt.text;
+
+    // Obtener nombre del paciente seleccionado para reemplazar variables dinámicas
+    const patientSelect = document.querySelector('select[name="patient_id"]');
+    let patientName = '';
+    if (patientSelect && patientSelect.selectedIndex > 0) {
+        patientName = patientSelect.options[patientSelect.selectedIndex].text.split('(')[0].trim();
+    }
+    if (patientName) {
+        content = content.replace(/\[(nombre(\s+del\s+paciente)?|paciente)\]/gi, patientName);
+    }
+
+    let parsedDiagnosis = '';
+    let parsedDays = '';
+    let parsedWorkplace = '';
+    let notesBuffer = [];
+
+    const lines = content.split('\n');
+    let inNotes = false;
+
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (/^diagn[oó]stico\s*:\s*/i.test(line)) {
+            parsedDiagnosis = line.replace(/^diagn[oó]stico\s*:\s*/i, '').trim();
+            inNotes = false;
+        } else if (/^d[ií]as(\s*de\s*reposo)?\s*:\s*/i.test(line)) {
+            const m = line.match(/\d+/);
+            if (m) parsedDays = m[0];
+            inNotes = false;
+        } else if (/^dirigido\s*a\s*:\s*/i.test(line)) {
+            parsedWorkplace = line.replace(/^dirigido\s*a\s*:\s*/i, '').trim();
+            inNotes = false;
+        } else if (/^(indicaciones|observaciones)\s*:\s*/i.test(line)) {
+            inNotes = true;
+            const rest = line.replace(/^(indicaciones|observaciones)\s*:\s*/i, '').trim();
+            if (rest) notesBuffer.push(rest);
+        } else if (inNotes) {
+            notesBuffer.push(rawLine);
+        } else if (line) {
+            notesBuffer.push(rawLine);
+        }
+    }
+
+    // Poblar Diagnóstico
+    if (parsedDiagnosis) {
+        document.getElementById('diagnosis_input').value = parsedDiagnosis;
+    } else if (!document.getElementById('diagnosis_input').value) {
+        document.getElementById('diagnosis_input').value = title;
+    }
+
+    // Poblar Días de Reposo
+    if (parsedDays) {
+        document.getElementById('days_rest').value = parsedDays;
+        calculateEndDate();
+    }
+
+    // Poblar Destinatario
+    if (parsedWorkplace && document.getElementById('workplace_input')) {
+        document.getElementById('workplace_input').value = parsedWorkplace;
+    }
+
+    // Poblar Indicaciones / Notas
+    const finalNotes = notesBuffer.join('\n').trim() || content;
+    document.getElementById('notes').value = finalNotes;
 }
 </script>
 {% endblock %}

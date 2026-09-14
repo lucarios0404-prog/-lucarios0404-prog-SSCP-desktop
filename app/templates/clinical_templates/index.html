@@ -69,6 +69,21 @@
                                 Guardar Plantilla
                             </button>
                         </form>
+
+                        <!-- Guía de Variables y Autocompletado -->
+                        <div class="mt-4 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
+                            <span class="font-bold text-slate-800 flex items-center">
+                                <i class="fas fa-lightbulb text-amber-500 mr-1.5"></i> Autocompletado Inteligente
+                            </span>
+                            <p class="text-[11px] text-slate-600 leading-relaxed">
+                                Puedes incluir estas etiquetas en el contenido para que el formulario se rellene solo:
+                            </p>
+                            <div class="space-y-1.5 text-[10px] font-mono text-slate-700">
+                                <div class="bg-white p-1.5 rounded border border-slate-200"><strong class="text-amber-700">Licencias:</strong> Diagnóstico:, Días:, Dirigido a:, Indicaciones:</div>
+                                <div class="bg-white p-1.5 rounded border border-slate-200"><strong class="text-indigo-700">Referencias:</strong> Especialidad:, Institución:, Motivo:, Resumen Clínico:, Notas:</div>
+                                <div class="bg-white p-1.5 rounded border border-slate-200"><strong class="text-teal-700">Variables:</strong> [Nombre del Paciente]</div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Listado de Plantillas -->
@@ -91,7 +106,10 @@
                                             {% elif t.category == 'consultation' %}bg-blue-100 text-blue-800
                                             {% elif t.category == 'license' %}bg-amber-100 text-amber-800
                                             {% else %}bg-indigo-100 text-indigo-800{% endif %}">
-                                            {{ t.category }}
+                                            {% if t.category == 'prescription' %}<i class="fas fa-prescription mr-1"></i> Receta
+                                            {% elif t.category == 'consultation' %}<i class="fas fa-notes-medical mr-1"></i> Consulta
+                                            {% elif t.category == 'license' %}<i class="fas fa-file-signature mr-1"></i> Licencia
+                                            {% else %}<i class="fas fa-share-nodes mr-1"></i> Referencia{% endif %}
                                         </span>
                                         <form method="post" action="/templates/{{ t.id }}/delete" onsubmit="return confirm('¿Eliminar esta plantilla?');">
                                             <button type="submit" class="text-slate-400 hover:text-red-600 text-xs">
