@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from pathlib import Path
 from datetime import datetime
 import json
@@ -37,15 +38,39 @@ CIE10_COMMON = [
 @router.get("/")
 def list_consultations(
     request: Request,
+    q: str = Query(None),
     patient_id: int = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(15, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
-    query = db.query(Consultation).order_by(Consultation.created_at.desc())
+    query = db.query(Consultation).join(Patient, Consultation.patient_id == Patient.id, isouter=True)
     if patient_id:
         query = query.filter(Consultation.patient_id == patient_id)
     
-    consultations = query.all()
+    clean_q = q.strip() if q else ""
+    if clean_q:
+        search_pattern = f"%{clean_q}%"
+        query = query.filter(
+            or_(
+                Patient.first_name.ilike(search_pattern),
+                Patient.last_name.ilike(search_pattern),
+                Patient.document_id.ilike(search_pattern),
+                Consultation.diagnosis.ilike(search_pattern),
+                Consultation.reason.ilike(search_pattern),
+                Consultation.treatment.ilike(search_pattern),
+                Consultation.notes.ilike(search_pattern),
+            )
+        )
+    
+    total_count = query.count()
+    total_pages = max(1, (total_count + per_page - 1) // per_page)
+    if page > total_pages:
+        page = total_pages
+        
+    offset = (page - 1) * per_page
+    consultations = query.order_by(Consultation.created_at.desc()).offset(offset).limit(per_page).all()
     patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
 
     return templates.TemplateResponse(
@@ -55,6 +80,13 @@ def list_consultations(
             "user": current_user,
             "consultations": consultations,
             "selected_patient": patient,
+            "q": clean_q,
+            "page": page,
+            "per_page": per_page,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "start_item": offset + 1 if total_count > 0 else 0,
+            "end_item": min(offset + per_page, total_count),
         }
     )
 
