@@ -57,6 +57,18 @@ async def run_periodic_sync():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Asegurar creación de tablas e inicialización de catálogo oficial CIE-10
+    try:
+        from app.database import Base, engine, SessionLocal
+        import app.models # Registrar todos los modelos
+        Base.metadata.create_all(bind=engine)
+        
+        from app.data.cie10_catalog import seed_cie10_catalog
+        with SessionLocal() as db:
+            seed_cie10_catalog(db)
+    except Exception as e:
+        print(f"[Startup Database] Aviso: {e}")
+
     sync_task = asyncio.create_task(run_periodic_sync())
     yield
     sync_task.cancel()

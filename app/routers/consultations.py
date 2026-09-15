@@ -14,6 +14,8 @@ from app.models.appointment import Appointment
 from app.models.setting import Setting
 from app.models.vital_sign import VitalSign
 from app.models.template import ClinicalTemplate
+from app.models.cie10 import Cie10Code
+from app.data.cie10_catalog import OFFICIAL_CIE10_CATALOG, seed_cie10_catalog
 from app.core.deps import require_current_user, require_permission
 from app.services.pdf_service import generate_prescription_pdf, generate_consultation_report_pdf
 from app.services.audit_service import AuditService
@@ -22,18 +24,94 @@ router = APIRouter(prefix="/consultations", tags=["consultations"])
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
-# Diagnósticos CIE-10 comunes para autocompletar / sugerencias rápidas
+# Diagnósticos CIE-10 comunes para sugerencias rápidas iniciales
 CIE10_COMMON = [
-    {"code": "J00", "description": "Rinofaringitis aguda (resfriado común)"},
     {"code": "I10", "description": "Hipertensión esencial (primaria)"},
-    {"code": "E11", "description": "Diabetes mellitus tipo 2"},
+    {"code": "E11.9", "description": "Diabetes mellitus tipo 2 sin mención de complicación"},
+    {"code": "J00", "description": "Rinofaringitis aguda (resfriado común)"},
     {"code": "J02.9", "description": "Faringitis aguda, no especificada"},
     {"code": "K29.7", "description": "Gastritis, no especificada"},
-    {"code": "M54.5", "description": "Lumbago no especificado"},
-    {"code": "A09", "description": "Gastroenteritis y colitis de origen no especificado"},
-    {"code": "R51", "description": "Cefalea"},
+    {"code": "M54.5", "description": "Lumbago no especificado (lumbalgia)"},
+    {"code": "A09", "description": "Diarrea y gastroenteritis de presunto origen infeccioso"},
+    {"code": "R51", "description": "Cefalea (dolor de cabeza)"},
     {"code": "J20.9", "description": "Bronquitis aguda, no especificada"},
+    {"code": "J45.9", "description": "Asma, no especificada"},
+    {"code": "N39.0", "description": "Infección de vías urinarias (IVU)"},
+    {"code": "E78.5", "description": "Dislipidemia / Hiperlipidemia"},
 ]
+
+@router.get("/cie10/search")
+def search_cie10_codes(
+    q: str = Query("", description="Término o código a buscar"),
+    limit: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('consultations'))
+):
+    clean_q = q.strip() if q else ""
+    query = db.query(Cie10Code)
+    
+    if clean_q:
+        search_pattern = f"%{clean_q}%"
+        query = query.filter(
+            or_(
+                Cie10Code.code.ilike(search_pattern),
+                Cie10Code.description.ilike(search_pattern),
+                Cie10Code.chapter.ilike(search_pattern)
+            )
+        )
+        # Ordenar: primero coincidencias exactas o que inicien con el código, luego custom, luego alfabético
+        query = query.order_by(
+            Cie10Code.code.ilike(f"{clean_q}%").desc(),
+            Cie10Code.is_custom.desc(),
+            Cie10Code.code.asc()
+        )
+    else:
+        # Top oficiales más utilizados
+        query = query.order_by(Cie10Code.is_custom.desc(), Cie10Code.id.asc())
+
+    results = query.limit(limit).all()
+    
+    # Si la BD no estaba sembrada aún, autosembrar al vuelo
+    if not results and not clean_q:
+        seed_cie10_catalog(db)
+        results = db.query(Cie10Code).limit(limit).all()
+
+    return [r.to_dict() for r in results]
+
+
+@router.post("/cie10/custom")
+def add_custom_cie10_code(
+    code: str = Form(None),
+    description: str = Form(...),
+    chapter: str = Form(None),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('consultations'))
+):
+    clean_desc = description.strip()
+    if not clean_desc:
+        raise HTTPException(status_code=400, detail="La descripción del diagnóstico es obligatoria.")
+    
+    clean_code = (code.strip().upper() if code else "").strip()
+    if not clean_code:
+        custom_count = db.query(Cie10Code).filter(Cie10Code.is_custom == True).count()
+        clean_code = f"PERS-{custom_count + 1:02d}"
+
+    existing = db.query(Cie10Code).filter(Cie10Code.code == clean_code, Cie10Code.description == clean_desc).first()
+    if existing:
+        return {"success": True, "item": existing.to_dict(), "message": "Código ya existente"}
+
+    new_code = Cie10Code(
+        code=clean_code,
+        description=clean_desc,
+        chapter=chapter.strip() if chapter else "Diagnóstico Clínico Personalizado",
+        is_custom=True,
+        doctor_id=current_user.id
+    )
+    db.add(new_code)
+    db.commit()
+    db.refresh(new_code)
+
+    return {"success": True, "item": new_code.to_dict(), "message": "Diagnóstico personalizado agregado exitosamente"}
 
 @router.get("/")
 def list_consultations(
@@ -103,6 +181,10 @@ def create_consultation_form(
     consultation_templates = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "consultation").order_by(ClinicalTemplate.title).all()
     prescription_templates = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "prescription").order_by(ClinicalTemplate.title).all()
     
+    # Obtener sugerencias comunes oficiales de la BD
+    common_db = db.query(Cie10Code).filter(Cie10Code.is_custom == False).limit(14).all()
+    dynamic_cie10 = [{"code": c.code, "description": c.description} for c in common_db] if common_db else CIE10_COMMON
+
     return templates.TemplateResponse(
         request=request,
         name="consultations/create.html",
@@ -111,7 +193,7 @@ def create_consultation_form(
             "patients": patients,
             "selected_patient": selected_patient,
             "selected_appointment_id": appointment_id,
-            "cie10_common": CIE10_COMMON,
+            "cie10_common": dynamic_cie10,
             "consultation_templates": consultation_templates,
             "prescription_templates": prescription_templates,
         }
@@ -216,13 +298,17 @@ def edit_consultation_form(
     consultation_templates = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "consultation").order_by(ClinicalTemplate.title).all()
     prescription_templates = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "prescription").order_by(ClinicalTemplate.title).all()
 
+    # Obtener sugerencias comunes oficiales de la BD
+    common_db = db.query(Cie10Code).filter(Cie10Code.is_custom == False).limit(14).all()
+    dynamic_cie10 = [{"code": c.code, "description": c.description} for c in common_db] if common_db else CIE10_COMMON
+
     return templates.TemplateResponse(
         request=request,
         name="consultations/edit.html",
         context={
             "user": current_user,
             "consultation": consultation,
-            "cie10_common": CIE10_COMMON,
+            "cie10_common": dynamic_cie10,
             "consultation_templates": consultation_templates,
             "prescription_templates": prescription_templates,
         }

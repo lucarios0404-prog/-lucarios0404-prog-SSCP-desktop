@@ -103,22 +103,60 @@
                             </div>
                         </div>
 
-                        <!-- Diagnóstico -->
-                        <div class="bg-violet-50/50 p-4 rounded-xl border border-violet-100 space-y-3">
-                            <div>
-                                <label class="block text-xs font-bold text-violet-950 uppercase tracking-wider mb-1.5">
-                                    <i class="fas fa-stethoscope mr-1"></i> Diagnóstico y Código CIE-10
+                        <!-- Diagnóstico Clínico y Catálogo Oficial CIE-10 -->
+                        <div class="bg-violet-50/50 p-4 sm:p-5 rounded-2xl border border-violet-200/80 space-y-3.5 relative">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <label class="block text-xs font-bold text-violet-950 uppercase tracking-wider">
+                                    <i class="fas fa-stethoscope mr-1 text-violet-600"></i> Diagnóstico Clínico y Código CIE-10 Oficial
                                 </label>
-                                <input type="text" id="diagnosis_input" name="diagnosis" value="{{ consultation.diagnosis or '' }}" 
-                                    class="w-full px-3.5 py-2 text-sm border border-violet-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-violet-500">
+                                <button type="button" onclick="openCustomCie10Modal()" 
+                                    class="inline-flex items-center px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-sm transition-all self-start sm:self-auto">
+                                    <i class="fas fa-plus-circle mr-1.5"></i> Agregar Diagnóstico / Código Personalizado
+                                </button>
                             </div>
 
+                            <!-- Campo con Autocompletado / Buscador Inteligente -->
+                            <div class="relative">
+                                <div class="relative flex items-center">
+                                    <span class="absolute left-3.5 text-slate-400 pointer-events-none">
+                                        <i class="fas fa-search text-xs"></i>
+                                    </span>
+                                    <input type="text" id="diagnosis_input" name="diagnosis" value="{{ consultation.diagnosis or '' }}" autocomplete="off"
+                                        placeholder="Escribe para buscar código oficial (ej. I10, J00, E11) o diagnóstico (ej. hipertensión, gripe, cefalea)..." 
+                                        class="w-full pl-9 pr-24 py-2.5 text-sm border border-violet-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-slate-800 placeholder-slate-400 shadow-2xs">
+                                    <div class="absolute right-2 flex items-center space-x-1">
+                                        <button type="button" id="cie10_clear_btn" onclick="clearDiagnosis()" class="{% if not consultation.diagnosis %}hidden{% endif %} text-slate-400 hover:text-slate-600 px-2 py-1 text-xs">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                        <span class="text-[10px] bg-violet-100 text-violet-800 font-bold px-2 py-0.5 rounded-full border border-violet-200">
+                                            CIE-10
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Dropdown de Resultados de Búsqueda CIE-10 -->
+                                <div id="cie10_results_dropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
+                                    <div id="cie10_results_list" class="p-1.5 space-y-1">
+                                        <!-- Resultados inyectados por AJAX -->
+                                    </div>
+                                    <div class="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                                        <span>¿No encuentras el código oficial?</span>
+                                        <button type="button" onclick="openCustomCie10ModalFromSearch()" class="text-violet-700 hover:text-violet-900 font-bold hover:underline">
+                                            <i class="fas fa-plus mr-1"></i> Crear diagnóstico personalizado
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Diagnósticos Frecuentes Oficiales (Pills) -->
                             <div>
-                                <p class="text-[11px] font-semibold text-violet-900 mb-1.5">Sugerencias CIE-10:</p>
+                                <p class="text-[11px] font-semibold text-violet-900 mb-1.5 flex items-center">
+                                    <i class="fas fa-star text-amber-500 text-[10px] mr-1.5"></i> Diagnósticos Frecuentes Oficiales:
+                                </p>
                                 <div class="flex flex-wrap gap-1.5">
                                     {% for item in cie10_common %}
                                     <button type="button" onclick="setDiagnosis('{{ item.code }} - {{ item.description }}')" 
-                                        class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white text-violet-700 border border-violet-200 hover:bg-violet-600 hover:text-white transition-colors">
+                                        class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white text-violet-700 border border-violet-200 hover:bg-violet-600 hover:text-white transition-all shadow-2xs">
                                         <strong>{{ item.code }}</strong> {{ item.description }}
                                     </button>
                                     {% endfor %}
@@ -174,6 +212,67 @@
                     </form>
                 </div>
             </div>
+
+            <!-- Modal: Agregar Diagnóstico / Código Personalizado -->
+            <div id="customCie10Modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-9 h-9 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center font-bold text-lg">
+                                <i class="fas fa-notes-medical"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900">Agregar Diagnóstico / Código Personalizado</h3>
+                                <p class="text-xs text-slate-500">Registra un diagnóstico clínico propio para usarlo en tus consultas.</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="closeCustomCie10Modal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                    </div>
+
+                    <form id="customCie10Form" onsubmit="saveCustomCie10(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Descripción / Nombre del Diagnóstico <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="custom_desc_input" required placeholder="Ej. Síndrome post-COVID con fatiga crónica / Secuela de fractura en tibia" 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500">
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Código Identificador (Opcional)
+                                </label>
+                                <input type="text" id="custom_code_input" placeholder="Ej. PERS-01 o tu código propio" 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 uppercase">
+                                <span class="text-[10px] text-slate-400">Si se deja vacío, el sistema lo genera automáticamente.</span>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Capítulo / Especialidad (Opcional)
+                                </label>
+                                <input type="text" id="custom_chapter_input" placeholder="Ej. Medicina Interna / Traumatología" 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500">
+                            </div>
+                        </div>
+
+                        <div class="p-3 bg-violet-50 border border-violet-200 rounded-xl text-xs text-violet-800 flex items-start space-x-2">
+                            <i class="fas fa-info-circle text-violet-600 mt-0.5 shrink-0"></i>
+                            <span>Este diagnóstico quedará guardado en tu catálogo y aparecerá en las búsquedas para futuras consultas médicas.</span>
+                        </div>
+
+                        <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
+                            <button type="button" onclick="closeCustomCie10Modal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
+                                Cancelar
+                            </button>
+                            <button type="submit" id="saveCustomCie10Btn" class="px-5 py-2 text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-xl shadow transition-all flex items-center">
+                                <i class="fas fa-check mr-1.5"></i> Guardar y Usar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </main>
     </div>
 </div>
@@ -181,15 +280,180 @@
 
 {% block scripts %}
 <script>
-function setDiagnosis(text) {
-    const input = document.getElementById('diagnosis_input');
-    if (input.value) {
-        input.value = input.value + '; ' + text;
-    } else {
-        input.value = text;
+// --- BUSCADOR Y AUTOCOMPLETADO CIE-10 ---
+let cie10SearchTimer = null;
+const diagInput = document.getElementById('diagnosis_input');
+const resultsDropdown = document.getElementById('cie10_results_dropdown');
+const resultsList = document.getElementById('cie10_results_list');
+const clearBtn = document.getElementById('cie10_clear_btn');
+
+if (diagInput) {
+    diagInput.addEventListener('input', function() {
+        const val = this.value.trim();
+        if (clearBtn) clearBtn.classList.toggle('hidden', !val);
+        
+        clearTimeout(cie10SearchTimer);
+        if (val.length >= 1) {
+            cie10SearchTimer = setTimeout(() => fetchCie10Results(val), 180);
+        } else {
+            resultsDropdown.classList.add('hidden');
+        }
+    });
+
+    diagInput.addEventListener('focus', function() {
+        if (this.value.trim().length >= 1) {
+            fetchCie10Results(this.value.trim());
+        }
+    });
+
+    // Cerrar dropdown al hacer click fuera
+    document.addEventListener('click', function(e) {
+        if (!diagInput.contains(e.target) && !resultsDropdown.contains(e.target)) {
+            resultsDropdown.classList.add('hidden');
+        }
+    });
+}
+
+function clearDiagnosis() {
+    diagInput.value = '';
+    clearBtn.classList.add('hidden');
+    resultsDropdown.classList.add('hidden');
+    diagInput.focus();
+}
+
+async function fetchCie10Results(query) {
+    try {
+        const response = await fetch(`/consultations/cie10/search?q=${encodeURIComponent(query)}&limit=15`);
+        if (!response.ok) return;
+        const items = await response.json();
+        renderCie10Results(items, query);
+    } catch (e) {
+        console.error("Error buscando CIE-10:", e);
     }
 }
 
+function renderCie10Results(items, query) {
+    resultsList.innerHTML = '';
+    if (items.length === 0) {
+        resultsList.innerHTML = `
+            <div class="p-3 text-center text-xs text-slate-500">
+                <p>No se encontraron códigos oficiales para "<strong>${escapeHtml(query)}</strong>"</p>
+                <button type="button" onclick="openCustomCie10ModalFromSearch('${escapeHtml(query)}')" class="mt-2 px-3 py-1.5 bg-violet-100 hover:bg-violet-200 text-violet-800 rounded-lg font-bold text-xs inline-flex items-center">
+                    <i class="fas fa-plus mr-1.5"></i> Agregar "${escapeHtml(query)}" como diagnóstico personalizado
+                </button>
+            </div>
+        `;
+    } else {
+        items.forEach(item => {
+            const row = document.createElement('div');
+            row.className = "px-3 py-2 hover:bg-violet-50 cursor-pointer rounded-lg transition-colors flex items-center justify-between group";
+            const customBadge = item.is_custom 
+                ? `<span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full border border-amber-300 shrink-0">Personalizado</span>`
+                : `<span class="text-[10px] bg-blue-100 text-blue-800 font-mono font-bold px-2 py-0.5 rounded-full shrink-0">${escapeHtml(item.code)}</span>`;
+            
+            row.innerHTML = `
+                <div class="flex-1 pr-2">
+                    <div class="flex items-center space-x-2">
+                        ${customBadge}
+                        <span class="text-xs font-bold text-slate-900 group-hover:text-violet-900">${escapeHtml(item.description)}</span>
+                    </div>
+                    ${item.chapter ? `<span class="text-[10px] text-slate-400 block mt-0.5">${escapeHtml(item.chapter)}</span>` : ''}
+                </div>
+                <button type="button" class="text-xs text-violet-600 opacity-0 group-hover:opacity-100 font-semibold px-2 py-1 rounded bg-white shadow-xs shrink-0">
+                    Seleccionar &rarr;
+                </button>
+            `;
+            row.onclick = () => {
+                selectCie10Item(item);
+                resultsDropdown.classList.add('hidden');
+            };
+            resultsList.appendChild(row);
+        });
+    }
+    resultsDropdown.classList.remove('hidden');
+}
+
+function selectCie10Item(item) {
+    const formatted = `${item.code} - ${item.description}`;
+    setDiagnosis(formatted);
+}
+
+function setDiagnosis(text) {
+    const input = document.getElementById('diagnosis_input');
+    if (!input) return;
+    if (input.value && input.value.trim() !== '') {
+        if (!input.value.includes(text)) {
+            input.value = input.value + '; ' + text;
+        }
+    } else {
+        input.value = text;
+    }
+    if (clearBtn) clearBtn.classList.remove('hidden');
+    input.focus();
+}
+
+// --- MODAL DE DIAGNÓSTICO PERSONALIZADO ---
+function openCustomCie10Modal() {
+    document.getElementById('custom_desc_input').value = '';
+    document.getElementById('custom_code_input').value = '';
+    document.getElementById('custom_chapter_input').value = '';
+    document.getElementById('customCie10Modal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('custom_desc_input').focus(), 50);
+}
+
+function openCustomCie10ModalFromSearch(prefillDesc) {
+    openCustomCie10Modal();
+    if (prefillDesc) {
+        document.getElementById('custom_desc_input').value = prefillDesc;
+    }
+}
+
+function closeCustomCie10Modal() {
+    document.getElementById('customCie10Modal').classList.add('hidden');
+}
+
+async function saveCustomCie10(e) {
+    e.preventDefault();
+    const desc = document.getElementById('custom_desc_input').value.trim();
+    const code = document.getElementById('custom_code_input').value.trim();
+    const chapter = document.getElementById('custom_chapter_input').value.trim();
+    if (!desc) return;
+
+    const btn = document.getElementById('saveCustomCie10Btn');
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1.5"></i> Guardando...`;
+
+    try {
+        const formData = new FormData();
+        formData.append('description', desc);
+        if (code) formData.append('code', code);
+        if (chapter) formData.append('chapter', chapter);
+
+        const res = await fetch('/consultations/cie10/custom', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (data.success && data.item) {
+            selectCie10Item(data.item);
+            closeCustomCie10Modal();
+        } else {
+            alert(data.detail || data.message || "Error al guardar el diagnóstico");
+        }
+    } catch (err) {
+        alert("Error de conexión al guardar el código personalizado");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fas fa-check mr-1.5"></i> Guardar y Usar`;
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// --- PLANTILLAS CLÍNICAS ---
 function applyConsultationTemplate(selectEl) {
     const selected = selectEl.options[selectEl.selectedIndex];
     const content = selected.getAttribute('data-content');
