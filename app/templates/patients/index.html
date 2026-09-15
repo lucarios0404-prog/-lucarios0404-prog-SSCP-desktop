@@ -29,9 +29,26 @@
                     </div>
                 </div>
 
+                <!-- Status Tabs (Solo Administrador) -->
+                {% if is_admin %}
+                <div class="flex items-center space-x-2 border-b border-slate-200 pb-2">
+                    <a href="/patients?status=active{% if search_query %}&q={{ search_query }}{% endif %}" class="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center {% if status_filter == 'active' %}bg-blue-600 text-white shadow-md shadow-blue-500/20{% else %}bg-white text-slate-600 hover:bg-slate-100 border border-slate-200{% endif %}">
+                        <i class="fas fa-user-check mr-2"></i> Pacientes Activos
+                        <span class="ml-2 px-2 py-0.5 rounded-full text-[11px] {% if status_filter == 'active' %}bg-white/20 text-white{% else %}bg-slate-100 text-slate-700{% endif %}">{{ active_count }}</span>
+                    </a>
+                    <a href="/patients?status=archived{% if search_query %}&q={{ search_query }}{% endif %}" class="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center {% if status_filter == 'archived' %}bg-amber-600 text-white shadow-md shadow-amber-500/20{% else %}bg-white text-slate-600 hover:bg-slate-100 border border-slate-200{% endif %}">
+                        <i class="fas fa-box-archive mr-2"></i> Archivados / Papelera
+                        <span class="ml-2 px-2 py-0.5 rounded-full text-[11px] {% if status_filter == 'archived' %}bg-white/20 text-white{% else %}bg-amber-100 text-amber-800{% endif %}">{{ archived_count }}</span>
+                    </a>
+                </div>
+                {% endif %}
+
                 <!-- Search & Filters Bar -->
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <form method="get" action="/patients" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        {% if is_admin and status_filter == 'archived' %}
+                        <input type="hidden" name="status" value="archived">
+                        {% endif %}
                         <div class="relative flex-1">
                             <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                                 <i class="fas fa-search"></i>
@@ -44,7 +61,7 @@
                                 <i class="fas fa-search mr-1.5"></i> Buscar
                             </button>
                             {% if search_query %}
-                            <a href="/patients" class="px-3.5 py-2.5 text-sm text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors">
+                            <a href="/patients{% if status_filter == 'archived' %}?status=archived{% endif %}" class="px-3.5 py-2.5 text-sm text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors">
                                 <i class="fas fa-times mr-1"></i> Limpiar
                             </a>
                             {% endif %}
@@ -55,6 +72,11 @@
                     <div class="flex flex-wrap items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100 gap-2">
                         <div class="flex items-center gap-2">
                             <span>Mostrando registros <strong>{{ start_item|default(0) }}</strong> - <strong>{{ end_item|default(0) }}</strong> de <strong>{{ total_count|default(0) }}</strong> pacientes</span>
+                            {% if status_filter == 'archived' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                <i class="fas fa-box-archive mr-1"></i> Vista de Archivados
+                            </span>
+                            {% endif %}
                             {% if search_query %}
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-800">
                                 Filtro: "{{ search_query }}"
@@ -76,24 +98,35 @@
                                     <th class="py-3.5 px-5">Paciente</th>
                                     <th class="py-3.5 px-5">Identificación / Cédula</th>
                                     <th class="py-3.5 px-5">Teléfono / Email</th>
-                                    <th class="py-3.5 px-5">Saldo Pendiente</th>
+                                    <th class="py-3.5 px-5">Estado / Saldo</th>
                                     <th class="py-3.5 px-5 text-right">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
                                 {% for card in patient_cards %}
                                 {% set p = card.patient %}
-                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                <tr class="hover:bg-slate-50/80 transition-colors {% if p.is_active == False %}bg-amber-50/30{% endif %}">
                                     <td class="py-4 px-5">
                                         <div class="flex items-center space-x-3">
-                                            <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm shrink-0">
+                                            <div class="w-9 h-9 rounded-full {% if p.is_active == False %}bg-amber-100 text-amber-800{% else %}bg-blue-100 text-blue-700{% endif %} flex items-center justify-center font-bold text-sm shrink-0">
                                                 {{ p.first_name[0] if p.first_name else 'P' }}{{ p.last_name[0] if p.last_name else '' }}
                                             </div>
                                             <div>
-                                                <a href="/patients/{{ p.id }}" class="font-semibold text-slate-900 hover:text-blue-600 transition-colors">
-                                                    {{ p.first_name }} {{ p.last_name }}
-                                                </a>
+                                                <div class="flex items-center space-x-2">
+                                                    <a href="/patients/{{ p.id }}" class="font-semibold text-slate-900 hover:text-blue-600 transition-colors">
+                                                        {{ p.first_name }} {{ p.last_name }}
+                                                    </a>
+                                                    {% if p.is_active == False %}
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                                        Archivado
+                                                    </span>
+                                                    {% endif %}
+                                                </div>
+                                                {% if p.is_active == False and p.archived_reason %}
+                                                <span class="block text-[11px] text-amber-800"><i class="fas fa-tag mr-1 text-amber-600"></i>{{ p.archived_reason }}</span>
+                                                {% else %}
                                                 <span class="block text-[11px] text-slate-400">Reg: {{ p.created_at.strftime("%d/%m/%Y") if p.created_at else "N/D" }}</span>
+                                                {% endif %}
                                             </div>
                                         </div>
                                     </td>
@@ -105,7 +138,11 @@
                                         {% if p.email %}<div class="text-slate-400 text-[11px]"><i class="fas fa-envelope mr-1.5 text-[10px]"></i>{{ p.email }}</div>{% endif %}
                                     </td>
                                     <td class="py-4 px-5">
-                                        {% if card.has_debt %}
+                                        {% if p.is_active == False %}
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                                            <i class="fas fa-box-archive mr-1"></i> Oculto
+                                        </span>
+                                        {% elif card.has_debt %}
                                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
                                             <i class="fas fa-exclamation-circle mr-1"></i> RD$ {{ "%.2f"|format(card.balance_due) }}
                                         </span>
@@ -119,13 +156,23 @@
                                         <a href="/patients/{{ p.id }}" class="inline-flex items-center px-2.5 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-lg text-xs font-medium transition-colors" title="Ver Ficha">
                                             <i class="fas fa-id-card-alt mr-1"></i> Ficha
                                         </a>
-                                        <a href="/appointments/create?patient_id={{ p.id }}" class="inline-flex items-center px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 rounded-lg text-xs font-medium transition-colors" title="Agendar Cita">
-                                            <i class="fas fa-calendar-plus mr-1"></i> Cita
-                                        </a>
-                                        {% if user.has_permission('consultations') %}
-                                        <a href="/consultations/create?patient_id={{ p.id }}" class="inline-flex items-center px-2.5 py-1.5 bg-slate-100 hover:bg-violet-50 text-slate-700 hover:text-violet-600 rounded-lg text-xs font-medium transition-colors" title="Nueva Consulta">
-                                            <i class="fas fa-notes-medical mr-1"></i> Consulta
-                                        </a>
+                                        {% if p.is_active == False %}
+                                            {% if is_admin %}
+                                            <form method="post" action="/patients/{{ p.id }}/restore" class="inline" onsubmit="return confirm('¿Desea restaurar este paciente al estado activo?')">
+                                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition-colors" title="Restaurar a Activos">
+                                                    <i class="fas fa-rotate-left mr-1"></i> Restaurar
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        {% else %}
+                                            <a href="/appointments/create?patient_id={{ p.id }}" class="inline-flex items-center px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 rounded-lg text-xs font-medium transition-colors" title="Agendar Cita">
+                                                <i class="fas fa-calendar-plus mr-1"></i> Cita
+                                            </a>
+                                            {% if user.has_permission('consultations') %}
+                                            <a href="/consultations/create?patient_id={{ p.id }}" class="inline-flex items-center px-2.5 py-1.5 bg-slate-100 hover:bg-violet-50 text-slate-700 hover:text-violet-600 rounded-lg text-xs font-medium transition-colors" title="Nueva Consulta">
+                                                <i class="fas fa-notes-medical mr-1"></i> Consulta
+                                            </a>
+                                            {% endif %}
                                         {% endif %}
                                     </td>
                                 </tr>

@@ -55,6 +55,25 @@ async def run_periodic_sync():
         except Exception as e:
             print(f"[Auto-Sync Background] Error no crítico: {e}")
 
+def ensure_schema_migrations(engine):
+    """Garantiza la adición segura e idempotente de nuevas columnas a SQLite."""
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            res = conn.execute(text("PRAGMA table_info(patients)")).fetchall()
+            col_names = [r[1] for r in res]
+            if "is_active" not in col_names:
+                conn.execute(text("ALTER TABLE patients ADD COLUMN is_active BOOLEAN DEFAULT 1"))
+            if "archived_at" not in col_names:
+                conn.execute(text("ALTER TABLE patients ADD COLUMN archived_at DATETIME"))
+            if "archived_reason" not in col_names:
+                conn.execute(text("ALTER TABLE patients ADD COLUMN archived_reason TEXT"))
+            if "archived_by_id" not in col_names:
+                conn.execute(text("ALTER TABLE patients ADD COLUMN archived_by_id INTEGER"))
+            conn.commit()
+    except Exception as e:
+        print(f"[Schema Migration] Aviso: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Asegurar creación de tablas e inicialización de catálogo oficial CIE-10
@@ -62,6 +81,7 @@ async def lifespan(app: FastAPI):
         from app.database import Base, engine, SessionLocal
         import app.models # Registrar todos los modelos
         Base.metadata.create_all(bind=engine)
+        ensure_schema_migrations(engine)
         
         from app.data.cie10_catalog import seed_cie10_catalog
         with SessionLocal() as db:

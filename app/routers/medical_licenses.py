@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from pathlib import Path
 from datetime import datetime, date, timedelta
 
@@ -45,7 +46,7 @@ def create_license_form(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('licenses'))
 ):
-    patients = db.query(Patient).order_by(Patient.first_name).all()
+    patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.first_name).all()
     selected_patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
     templates_list = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "license").all()
 

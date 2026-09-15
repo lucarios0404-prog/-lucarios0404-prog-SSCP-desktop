@@ -180,7 +180,7 @@ def create_consultation_form(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('consultations'))
 ):
-    patients = db.query(Patient).order_by(Patient.last_name).all()
+    patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.last_name).all()
     selected_patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
     consultation_templates = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "consultation").order_by(ClinicalTemplate.title).all()
     prescription_templates = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "prescription").order_by(ClinicalTemplate.title).all()

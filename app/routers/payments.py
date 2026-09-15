@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from pathlib import Path
 from datetime import datetime
 import random
@@ -80,7 +81,7 @@ def create_payment_form(
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
-    patients = db.query(Patient).order_by(Patient.last_name).all()
+    patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.last_name).all()
     appointments = []
     if patient_id:
         appointments = db.query(Appointment).filter(Appointment.patient_id == patient_id).order_by(Appointment.date.desc()).all()

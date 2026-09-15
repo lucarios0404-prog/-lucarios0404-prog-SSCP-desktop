@@ -64,6 +64,52 @@
                 </div>
                 {% endif %}
 
+                <!-- Banner de Expediente Archivado -->
+                {% if patient.is_active == False %}
+                <div class="p-5 bg-amber-50 border-2 border-amber-400 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 text-amber-950 shadow-md">
+                    <div class="flex items-start space-x-3.5">
+                        <span class="w-12 h-12 rounded-2xl bg-amber-200 text-amber-800 flex items-center justify-center font-extrabold text-xl shadow-sm shrink-0">
+                            <i class="fas fa-box-archive"></i>
+                        </span>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h3 class="text-base font-extrabold text-amber-900">Expediente Clínico Archivado (Oculto)</h3>
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-200 text-amber-900">Inactivo</span>
+                            </div>
+                            <p class="text-xs text-amber-800 mt-1">
+                                Este paciente se encuentra archivado y no aparece en las listas de atención diaria. Todos sus registros históricos permanecen protegidos.
+                            </p>
+                            {% if patient.archived_reason %}
+                            <p class="text-xs font-semibold text-amber-900 mt-1 bg-amber-100/80 px-2.5 py-1 rounded-lg border border-amber-300/60 inline-block">
+                                <i class="fas fa-tag mr-1 text-amber-700"></i> Motivo: {{ patient.archived_reason }}
+                            </p>
+                            {% endif %}
+                            {% if patient.archived_at %}
+                            <span class="text-[11px] text-amber-700 ml-2">({{ patient.archived_at.strftime("%d/%m/%Y %I:%M %p") }})</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if user.role == 'admin' %}
+                    <div class="flex items-center gap-2 self-end md:self-center shrink-0">
+                        <!-- Restaurar Paciente (Admin) -->
+                        <form method="post" action="/patients/{{ patient.id }}/restore" onsubmit="return confirm('¿Desea restaurar este paciente al estado activo?')">
+                            <button type="submit" class="inline-flex items-center px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all">
+                                <i class="fas fa-rotate-left mr-1.5"></i> Restaurar Paciente
+                            </button>
+                        </form>
+                        <!-- Eliminar Definitivamente (Admin) -->
+                        <button type="button" onclick="document.getElementById('modal-delete-patient').classList.remove('hidden')" class="inline-flex items-center px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-all">
+                            <i class="fas fa-trash mr-1.5"></i> Eliminar Definitivamente
+                        </button>
+                    </div>
+                    {% else %}
+                    <div class="text-xs font-semibold text-amber-800 bg-amber-100/80 px-3 py-2 rounded-xl">
+                        <i class="fas fa-lock mr-1"></i> Solo el Administrador puede restaurar o eliminar este expediente.
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <!-- Patient Profile Card -->
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -170,6 +216,11 @@
                             <a href="/patients/{{ patient.id }}/edit" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all">
                                 <i class="fas fa-edit mr-1"></i> Editar
                             </a>
+                            {% if patient.is_active != False %}
+                            <button type="button" onclick="document.getElementById('modal-archive-patient').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-800 text-xs font-semibold border border-slate-200 transition-all" title="Ocultar o archivar expediente clínico">
+                                <i class="fas fa-box-archive mr-1.5 text-amber-600"></i> Archivar
+                            </button>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -529,4 +580,81 @@
         </main>
     </div>
 </div>
+
+<!-- Modal Archivar Paciente -->
+<div id="modal-archive-patient" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-scale-up space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <span class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mr-2 text-sm">
+                    <i class="fas fa-box-archive"></i>
+                </span>
+                Archivar Expediente de Paciente
+            </h3>
+            <button type="button" onclick="document.getElementById('modal-archive-patient').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+        </div>
+        <p class="text-xs text-slate-600">
+            Al archivar a <strong>{{ patient.first_name }} {{ patient.last_name }}</strong>, el expediente quedará oculto en las búsquedas y listas diarias de atención. 
+            <span class="font-semibold text-amber-800">El historial médico permanecerá a salvo y el Administrador podrá restaurarlo cuando lo requiera.</span>
+        </p>
+        <form method="post" action="/patients/{{ patient.id }}/archive" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Motivo de Archivo / Desactivación:</label>
+                <select onchange="if(this.value != 'Otro') { document.getElementById('archive-reason-text').value = this.value; } else { document.getElementById('archive-reason-text').value = ''; document.getElementById('archive-reason-text').focus(); }" class="w-full text-xs border border-slate-300 rounded-xl p-2.5 bg-slate-50 mb-2 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none">
+                    <option value="Registro duplicado">Registro duplicado</option>
+                    <option value="Traslado de clínica / centro médico">Traslado de clínica / centro médico</option>
+                    <option value="Inactividad prolongada del paciente">Inactividad prolongada del paciente</option>
+                    <option value="Error en digitación o alta incorrecta">Error en digitación o alta incorrecta</option>
+                    <option value="Fallecimiento">Fallecimiento</option>
+                    <option value="Otro">Otro (especificar abajo)...</option>
+                </select>
+                <input type="text" id="archive-reason-text" name="reason" value="Registro duplicado" placeholder="Especifique el motivo..." required class="w-full text-xs border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none">
+            </div>
+            <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('modal-archive-patient').classList.add('hidden')" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md shadow-amber-600/20 transition-all">
+                    <i class="fas fa-box-archive mr-1.5"></i> Confirmar Archivo
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if user.role == 'admin' %}
+<!-- Modal Eliminación Definitiva (Admin) -->
+<div id="modal-delete-patient" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-red-200 animate-scale-up space-y-4">
+        <div class="flex items-center justify-between border-b border-red-100 pb-3">
+            <h3 class="text-base font-bold text-red-700 flex items-center">
+                <span class="w-8 h-8 rounded-xl bg-red-100 text-red-700 flex items-center justify-center mr-2 text-sm">
+                    <i class="fas fa-triangle-exclamation"></i>
+                </span>
+                Eliminación Permanente de Expediente
+            </h3>
+            <button type="button" onclick="document.getElementById('modal-delete-patient').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+        </div>
+        <div class="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-900 space-y-1">
+            <p class="font-bold">⚠️ ¡ADVERTENCIA CRÍTICA DE SEGURIDAD!</p>
+            <p>Esta acción eliminará de forma irreversible el expediente de <strong>{{ patient.first_name }} {{ patient.last_name }}</strong>, así como todas sus consultas, recetas, citas, signos vitales y pagos asociados.</p>
+            <p class="text-red-700 font-semibold">Esta acción no se puede deshacer.</p>
+        </div>
+        <form method="post" action="/patients/{{ patient.id }}/permanent-delete" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Escriba la palabra <span class="font-mono text-red-600 font-extrabold">ELIMINAR</span> para confirmar:</label>
+                <input type="text" name="confirm_text" placeholder="ELIMINAR" required autocomplete="off" class="w-full text-xs font-mono font-bold border border-red-300 rounded-xl p-2.5 focus:ring-2 focus:ring-red-500/30 focus:border-red-500 outline-none text-red-700">
+            </div>
+            <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('modal-delete-patient').classList.add('hidden')" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-all">
+                    <i class="fas fa-trash mr-1.5"></i> Borrar Definitivamente
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

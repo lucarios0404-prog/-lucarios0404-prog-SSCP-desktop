@@ -48,12 +48,25 @@ async def check_duplicate_patient(
 def list_patients(
     request: Request,
     q: str = Query(None),
+    status: str = Query("active"),
     page: int = Query(1, ge=1),
     per_page: int = Query(15, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
+    is_admin = getattr(current_user, "role", "") == "admin"
+    view_archived = (status == "archived") and is_admin
+    
+    # Contadores para las pestañas de navegación
+    active_count = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).count()
+    archived_count = db.query(Patient).filter(Patient.is_active == False).count() if is_admin else 0
+
     query = db.query(Patient)
+    if view_archived:
+        query = query.filter(Patient.is_active == False)
+    else:
+        query = query.filter(or_(Patient.is_active == True, Patient.is_active == None))
+
     clean_q = q.strip() if q else ""
     if clean_q:
         search = f"%{clean_q}%"
@@ -74,12 +87,15 @@ def list_patients(
         page = total_pages
         
     offset = (page - 1) * per_page
-    patients = query.order_by(Patient.last_name.asc(), Patient.first_name.asc()).offset(offset).limit(per_page).all()
+    patients = query.order_by(
+        Patient.archived_at.desc() if view_archived else Patient.last_name.asc(),
+        Patient.first_name.asc()
+    ).offset(offset).limit(per_page).all()
     
     # Calcular saldos pendientes solo para los pacientes visibles en esta página
     patient_cards = []
     for p in patients:
-        pending_sum = sum(pay.total for pay in p.payments if pay.status == "pending")
+        pending_sum = sum(pay.total for pay in p.payments if pay.status == "pending") if hasattr(p, "payments") and p.payments else 0
         patient_cards.append({
             "patient": p,
             "balance_due": pending_sum,
@@ -93,6 +109,10 @@ def list_patients(
             "user": current_user,
             "patient_cards": patient_cards,
             "search_query": clean_q,
+            "status_filter": "archived" if view_archived else "active",
+            "active_count": active_count,
+            "archived_count": archived_count,
+            "is_admin": is_admin,
             "page": page,
             "per_page": per_page,
             "total_count": total_count,
@@ -316,3 +336,123 @@ def edit_patient(
     )
 
     return RedirectResponse(url=f"/patients/{patient_id}", status_code=303)
+
+
+@router.post("/{patient_id}/archive")
+def archive_patient(
+    request: Request,
+    patient_id: int,
+    reason: str = Form("Archivado por usuario"),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    """
+    Oculta / Archiva un paciente (Soft Delete).
+    Disponible para personal autorizado (Médico, Secretaria, Admin).
+    """
+    if not (current_user.has_permission('patients') or getattr(current_user, 'role', '') == 'admin'):
+        raise HTTPException(status_code=403, detail="No tiene permisos para archivar pacientes.")
+
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+    clean_reason = reason.strip() if reason and reason.strip() else "Archivado sin motivo especificado"
+    patient.is_active = False
+    patient.archived_at = datetime.utcnow()
+    patient.archived_reason = clean_reason
+    patient.archived_by_id = current_user.id
+    db.commit()
+
+    AuditService.log_change(
+        db=db,
+        entity_type="patient",
+        entity_id=patient.id,
+        action="archive",
+        summary=f"Expediente de {patient.first_name} {patient.last_name} archivado/ocultado. Motivo: {clean_reason}",
+        patient_id=patient.id,
+        user_id=current_user.id,
+        new_data={"reason": clean_reason}
+    )
+
+    return RedirectResponse(url=f"/patients/{patient.id}?archived=1", status_code=303)
+
+
+@router.post("/{patient_id}/restore")
+def restore_patient(
+    request: Request,
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    """
+    Restaura un paciente archivado al estado activo.
+    Exclusivo para el Administrador.
+    """
+    if getattr(current_user, "role", "") != "admin":
+        raise HTTPException(status_code=403, detail="Acceso restringido: Solo un Administrador puede restaurar expedientes archivados.")
+
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+    prev_reason = patient.archived_reason
+    patient.is_active = True
+    patient.archived_at = None
+    patient.archived_reason = None
+    patient.archived_by_id = None
+    db.commit()
+
+    AuditService.log_change(
+        db=db,
+        entity_type="patient",
+        entity_id=patient.id,
+        action="restore",
+        summary=f"Expediente de {patient.first_name} {patient.last_name} restaurado al estado activo por el Administrador",
+        patient_id=patient.id,
+        user_id=current_user.id,
+        old_data={"archived_reason": prev_reason}
+    )
+
+    return RedirectResponse(url=f"/patients/{patient.id}?restored=1", status_code=303)
+
+
+@router.post("/{patient_id}/permanent-delete")
+def permanent_delete_patient(
+    request: Request,
+    patient_id: int,
+    confirm_text: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    """
+    Elimina físicamente un paciente y sus registros dependientes en cascada.
+    Exclusivo para el Administrador con confirmación explícita.
+    """
+    if getattr(current_user, "role", "") != "admin":
+        raise HTTPException(status_code=403, detail="Acceso restringido: Solo un Administrador puede eliminar permanentemente expedientes.")
+
+    if confirm_text.strip().upper() != "ELIMINAR":
+        raise HTTPException(status_code=400, detail="Debe escribir exactamente 'ELIMINAR' para confirmar la eliminación permanente.")
+
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+    from app.models.medical_license import MedicalLicense
+    from app.models.medical_reference import MedicalReference
+    from app.models.audit_log import ClinicalAuditLog
+
+    # Eliminación en cascada segura de tablas dependientes
+    db.query(Appointment).filter(Appointment.patient_id == patient_id).delete(synchronize_session=False)
+    db.query(Consultation).filter(Consultation.patient_id == patient_id).delete(synchronize_session=False)
+    db.query(Payment).filter(Payment.patient_id == patient_id).delete(synchronize_session=False)
+    db.query(VitalSign).filter(VitalSign.patient_id == patient_id).delete(synchronize_session=False)
+    db.query(MedicalLicense).filter(MedicalLicense.patient_id == patient_id).delete(synchronize_session=False)
+    db.query(MedicalReference).filter(MedicalReference.patient_id == patient_id).delete(synchronize_session=False)
+    db.query(ClinicalAuditLog).filter(ClinicalAuditLog.patient_id == patient_id).delete(synchronize_session=False)
+
+    db.delete(patient)
+    db.commit()
+
+    return RedirectResponse(url="/patients?status=archived&deleted=1", status_code=303)

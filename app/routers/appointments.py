@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from pathlib import Path
 from datetime import datetime, date, time, timedelta
 
@@ -52,7 +53,7 @@ def list_appointments(
         })
 
     today_str = date.today().strftime("%Y-%m-%d")
-    all_patients = db.query(Patient).order_by(Patient.last_name).all()
+    all_patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.last_name).all()
     waiting_count = db.query(Appointment).filter(
         Appointment.date == date.today(),
         Appointment.status == "En Espera"
@@ -83,7 +84,7 @@ def create_appointment_form(
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
-    patients = db.query(Patient).order_by(Patient.last_name).all()
+    patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.last_name).all()
     today = date.today()
     
     # Atajos de fecha para F1

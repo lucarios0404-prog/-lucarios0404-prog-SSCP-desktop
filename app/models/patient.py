@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Text, DateTime
+from sqlalchemy import Column, Integer, String, Date, Text, DateTime, Boolean
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -21,6 +21,12 @@ class Patient(Base):
     emergency_contact_name = Column(String, nullable=True)
     emergency_contact_phone = Column(String, nullable=True)
     
+    # Estado de actividad y archivo clínico (Soft Delete / Gobernanza)
+    is_active = Column(Boolean, default=True, index=True)
+    archived_at = Column(DateTime(timezone=True), nullable=True)
+    archived_reason = Column(Text, nullable=True)
+    archived_by_id = Column(Integer, nullable=True)
+
     # Relaciones de sincronización
     sede_origen = Column(String, default="local")
     
