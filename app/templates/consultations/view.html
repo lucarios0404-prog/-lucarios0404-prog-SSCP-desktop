@@ -16,7 +16,7 @@
                 <!-- Top Header Navigation -->
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div class="flex items-center space-x-3">
-                        <a href="/consultations" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100">
+                        <a href="{% if user.has_permission('consultations') %}/consultations{% elif consultation.patient_id %}/patients/{{ consultation.patient_id }}{% else %}/dashboard{% endif %}" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100" title="Volver">
                             <i class="fas fa-arrow-left"></i>
                         </a>
                         <div>
@@ -33,13 +33,17 @@
                         </a>
                         {% endif %}
                         <!-- Botón Receta PDF -->
-                        <a href="/consultations/{{ consultation.id }}/prescription/pdf" target="_blank" class="inline-flex items-center px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm transition-all">
-                            <i class="fas fa-prescription mr-1.5"></i> Receta Médica (PDF)
+                        {% if user.has_permission('print_prescriptions') %}
+                        <a href="/consultations/{{ consultation.id }}/prescription/pdf" target="_blank" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md shadow-teal-600/20 transition-all" title="Descargar o imprimir receta oficial en PDF">
+                            <i class="fas fa-print mr-1.5"></i> Imprimir Receta (PDF)
                         </a>
+                        {% endif %}
                         <!-- Botón Informe Clínico PDF -->
+                        {% if user.has_permission('consultations') %}
                         <a href="/consultations/{{ consultation.id }}/report/pdf" target="_blank" class="inline-flex items-center px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-all">
                             <i class="fas fa-file-pdf mr-1.5"></i> Informe Clínico (PDF)
                         </a>
+                        {% endif %}
                         <button onclick="window.print()" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold shadow-sm transition-all">
                             <i class="fas fa-print mr-1.5"></i> Vista Rápida
                         </button>
@@ -141,7 +145,7 @@
                     </div>
 
                     <!-- Notas Adicionales -->
-                    {% if consultation.notes and consultation.notes.strip() != consultation.symptoms.strip() %}
+                    {% if consultation.notes and (consultation.notes | trim) != ((consultation.symptoms or '') | trim) %}
                     <div>
                         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Notas Adicionales</h3>
                         <div class="mt-1.5 text-xs text-slate-500 italic bg-slate-50 p-3 rounded-lg whitespace-pre-line">

@@ -261,8 +261,13 @@ def view_consultation(
     request: Request,
     consultation_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_permission('consultations'))
+    current_user = Depends(require_current_user)
 ):
+    if not (current_user.has_permission('consultations') or current_user.has_permission('print_prescriptions')):
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: No cuenta con permisos para ver consultas clínicas ni imprimir recetas."
+        )
     consultation = db.query(Consultation).filter(Consultation.id == consultation_id).first()
     if not consultation:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
@@ -387,7 +392,7 @@ def update_consultation(
 def download_prescription_pdf(
     consultation_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('print_prescriptions'))
 ):
     consultation = db.query(Consultation).filter(Consultation.id == consultation_id).first()
     if not consultation:
@@ -407,7 +412,7 @@ def download_prescription_pdf(
 def download_consultation_report_pdf(
     consultation_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('consultations'))
 ):
     consultation = db.query(Consultation).filter(Consultation.id == consultation_id).first()
     if not consultation:

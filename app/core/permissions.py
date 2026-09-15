@@ -34,6 +34,12 @@ AVAILABLE_PERMISSIONS = [
         "category": "Clínica"
     },
     {
+        "key": "print_prescriptions",
+        "label": "Imprimir Recetas Médicas",
+        "description": "Descargar e imprimir prescripciones médicas emitidas en PDF",
+        "category": "Atención"
+    },
+    {
         "key": "templates",
         "label": "Plantillas Clínicas",
         "description": "Gestionar y cargar textos preconfigurados en consultas y recetas",
@@ -115,6 +121,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         "appointments",
         "consultations",
         "prescriptions",
+        "print_prescriptions",
         "templates",
         "licenses",
         "references",
@@ -128,6 +135,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         "dashboard",
         "patients",
         "appointments",
+        "print_prescriptions",
         "payments",
         "inventory",
         "messages"

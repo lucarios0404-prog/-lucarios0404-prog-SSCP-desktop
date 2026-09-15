@@ -123,10 +123,16 @@
                             </form>
                             {% endif %}
 
-                            <!-- F2: Receta Rápida -->
+                            <!-- F2: Receta Rápida (Doctor) -->
                             {% if user.has_permission('prescriptions') %}
                             <a href="/prescriptions/quick?patient_id={{ patient.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm transition-all">
                                 <i class="fas fa-prescription mr-1.5"></i> Receta Rápida
+                            </a>
+                            {% endif %}
+                            <!-- Imprimir Última Receta (Secretaria / Médico / Admin) -->
+                            {% if user.has_permission('print_prescriptions') and latest_prescription %}
+                            <a href="/consultations/{{ latest_prescription.id }}/prescription/pdf" target="_blank" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md shadow-teal-600/20 transition-all" title="Imprimir la última receta médica emitida en PDF">
+                                <i class="fas fa-print mr-1.5"></i> Imprimir Receta
                             </a>
                             {% endif %}
                             <!-- F5: Licencia Médica -->
@@ -196,14 +202,27 @@
                                             <i class="far fa-calendar-alt text-violet-500 mr-1.5"></i>
                                             {{ c.created_at.strftime("%d/%m/%Y") }}
                                         </span>
+                                        {% if user.has_permission('consultations') or user.has_permission('print_prescriptions') %}
                                         <a href="/consultations/{{ c.id }}" class="text-xs text-violet-600 font-bold group-hover:translate-x-0.5 transition-transform flex items-center">
                                             Ver Ficha <i class="fas fa-arrow-right ml-1 text-[10px]"></i>
                                         </a>
+                                        {% endif %}
                                     </div>
                                     <p class="text-xs font-medium text-slate-700 mt-2 leading-snug">{{ c.reason }}</p>
                                     {% if c.diagnosis %}
                                     <div class="mt-2.5 text-[11px] bg-violet-100/70 text-violet-900 px-2.5 py-1 rounded-lg font-mono font-medium inline-block">
                                         <i class="fas fa-stethoscope mr-1 text-violet-600"></i> {{ c.diagnosis }}
+                                    </div>
+                                    {% endif %}
+                                    {% if c.prescription and user.has_permission('print_prescriptions') %}
+                                    <div class="mt-3 pt-2 border-t border-slate-200/70 flex items-center justify-between">
+                                        <div class="text-xs text-teal-800 font-medium flex items-center min-w-0 mr-2">
+                                            <i class="fas fa-prescription text-teal-600 mr-1.5 shrink-0"></i>
+                                            <span class="truncate" title="{{ c.prescription }}">{{ c.prescription }}</span>
+                                        </div>
+                                        <a href="/consultations/{{ c.id }}/prescription/pdf" target="_blank" class="shrink-0 inline-flex items-center px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold border border-teal-200 transition-all shadow-xs" title="Imprimir Receta Médica en PDF">
+                                            <i class="fas fa-print mr-1"></i> Imprimir Receta
+                                        </a>
                                     </div>
                                     {% endif %}
                                 </div>

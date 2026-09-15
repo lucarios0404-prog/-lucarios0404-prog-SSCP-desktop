@@ -44,7 +44,7 @@ def list_users(
         users_data.append({
             "user": u,
             "role_label": ROLE_LABELS.get(u.role, u.role.capitalize()),
-            "perm_count": len(effective_perms) if u.role != "admin" else "Total (17)",
+            "perm_count": len(effective_perms) if u.role != "admin" else f"Total ({len(AVAILABLE_PERMISSIONS)})",
             "is_custom": bool(u.permissions and u.role != "admin")
         })
 

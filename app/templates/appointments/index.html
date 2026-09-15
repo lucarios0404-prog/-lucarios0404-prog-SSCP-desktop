@@ -175,6 +175,11 @@
                                             {% endif %}
                                         {% else %}
                                             <span class="text-xs text-slate-400">Completada</span>
+                                            {% if user.has_permission('print_prescriptions') and a.consultation and a.consultation[0].prescription %}
+                                            <a href="/consultations/{{ a.consultation[0].id }}/prescription/pdf" target="_blank" class="px-2 py-1 bg-teal-50 text-teal-700 hover:bg-teal-100 rounded text-xs font-semibold border border-teal-200 inline-flex items-center" title="Imprimir Receta Médica en PDF">
+                                                <i class="fas fa-print mr-1"></i> Receta
+                                            </a>
+                                            {% endif %}
                                         {% endif %}
                                         <a href="/payments/create?patient_id={{ a.patient_id }}&appointment_id={{ a.id }}" class="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded text-xs font-medium" title="Cobrar Cita">
                                             Cobrar

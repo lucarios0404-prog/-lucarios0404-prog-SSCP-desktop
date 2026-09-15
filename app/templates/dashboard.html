@@ -217,14 +217,29 @@
                             {% for c in recent_consultations %}
                             <div class="py-3 flex items-center justify-between">
                                 <div>
+                                    {% if user.has_permission('consultations') or user.has_permission('print_prescriptions') %}
                                     <a href="/consultations/{{ c.id }}" class="text-sm font-semibold text-indigo-600 hover:underline">
                                         {{ c.patient.first_name }} {{ c.patient.last_name }}
                                     </a>
+                                    {% else %}
+                                    <a href="/patients/{{ c.patient.id }}" class="text-sm font-semibold text-indigo-600 hover:underline">
+                                        {{ c.patient.first_name }} {{ c.patient.last_name }}
+                                    </a>
+                                    {% endif %}
                                     <p class="text-xs text-slate-500">{{ c.created_at.strftime("%d/%m/%Y %H:%M") }} • {{ c.reason }}</p>
                                 </div>
-                                <a href="/consultations/{{ c.id }}" class="text-xs text-slate-400 hover:text-indigo-600 p-1">
-                                    <i class="fas fa-chevron-right"></i>
-                                </a>
+                                <div class="flex items-center space-x-2">
+                                    {% if c.prescription and user.has_permission('print_prescriptions') %}
+                                    <a href="/consultations/{{ c.id }}/prescription/pdf" target="_blank" class="inline-flex items-center px-2 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-xs font-semibold border border-teal-200 transition-all" title="Imprimir Receta Médica en PDF">
+                                        <i class="fas fa-print mr-1"></i> Receta
+                                    </a>
+                                    {% endif %}
+                                    {% if user.has_permission('consultations') or user.has_permission('print_prescriptions') %}
+                                    <a href="/consultations/{{ c.id }}" class="text-xs text-slate-400 hover:text-indigo-600 p-1" title="Ver Detalle">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
                             </div>
                             {% endfor %}
                         </div>

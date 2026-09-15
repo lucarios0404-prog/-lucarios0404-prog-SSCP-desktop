@@ -207,6 +207,9 @@ def view_patient(
         Appointment.status == "En Espera"
     ).first()
 
+    # Buscar la última consulta que tenga receta médica emitida
+    latest_prescription = next((c for c in consultations if c.prescription and c.prescription.strip()), None)
+
     return templates.TemplateResponse(
         request=request,
         name="patients/view.html",
@@ -215,6 +218,7 @@ def view_patient(
             "patient": patient,
             "appointments": appointments,
             "consultations": consultations,
+            "latest_prescription": latest_prescription,
             "payments": payments,
             "vitals": list(reversed(vitals)),
             "vitals_evolution": vitals_evolution,
