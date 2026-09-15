@@ -1,0 +1,247 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Áreas & Permisos del Sistema — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'users' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Gestión de Permisos" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+
+                <!-- Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <a href="/users" class="text-xs text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center gap-1.5 mb-2">
+                            <i class="fas fa-arrow-left"></i> Volver a Usuarios
+                        </a>
+                        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+                            <i class="fas fa-key text-indigo-600"></i>
+                            Áreas y Permisos del Sistema
+                        </h1>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Define qué módulos existen en el sistema, organízalos por área y controla cuáles están activos. Solo el Administrador puede gestionar esta sección.
+                        </p>
+                    </div>
+                    <div class="shrink-0">
+                        <a href="/permissions/create" class="inline-flex items-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-indigo-600/20 transition-all">
+                            <i class="fas fa-plus mr-2"></i> Nuevo Permiso
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Notificaciones -->
+                {% if success == 'creado' %}
+                <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center gap-3">
+                    <i class="fas fa-check-circle text-emerald-600"></i>
+                    <span>Permiso creado y registrado en el catálogo del sistema correctamente.</span>
+                </div>
+                {% elif success == 'actualizado' %}
+                <div class="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-sm flex items-center gap-3">
+                    <i class="fas fa-check-circle text-blue-600"></i>
+                    <span>Cambios guardados en el permiso correctamente.</span>
+                </div>
+                {% elif success == 'eliminado' %}
+                <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-center gap-3">
+                    <i class="fas fa-trash-alt text-amber-600"></i>
+                    <span>El permiso ha sido eliminado del catálogo.</span>
+                </div>
+                {% elif success == 'activado' %}
+                <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center gap-3">
+                    <i class="fas fa-toggle-on text-emerald-600"></i>
+                    <span>Permiso <strong>activado</strong>. Ya está disponible para asignar a usuarios.</span>
+                </div>
+                {% elif success == 'desactivado' %}
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm flex items-center gap-3">
+                    <i class="fas fa-toggle-off text-slate-500"></i>
+                    <span>Permiso <strong>desactivado</strong>. No aparecerá al crear o editar usuarios.</span>
+                </div>
+                {% elif error %}
+                <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-center gap-3">
+                    <i class="fas fa-exclamation-triangle text-red-600"></i>
+                    {% if 'en_uso' in error %}
+                    <span>No se puede eliminar este permiso porque está asignado a uno o más usuarios. Desactívalo en su lugar.</span>
+                    {% else %}
+                    <span>{{ error | replace('_', ' ') | capitalize }}</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Tarjetas de resumen -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {% set total_perms = grouped.values() | sum(start=[]) | list | length %}
+                    {% set active_count = grouped.values() | sum(start=[]) | selectattr('is_active') | list | length %}
+                    {% set area_count = grouped.keys() | list | length %}
+
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg shrink-0">
+                            <i class="fas fa-key"></i>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-extrabold text-slate-900">{{ total_perms }}</p>
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase">Permisos Totales</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg shrink-0">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-extrabold text-slate-900">{{ active_count }}</p>
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase">Activos</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg shrink-0">
+                            <i class="fas fa-layer-group"></i>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-extrabold text-slate-900">{{ area_count }}</p>
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase">Áreas</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-lg shrink-0">
+                            <i class="fas fa-toggle-off"></i>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-extrabold text-slate-900">{{ total_perms - active_count }}</p>
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase">Desactivados</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Permisos agrupados por Área -->
+                {% for category, perms in grouped.items() %}
+                {% set cat_colors = {
+                    'General': ('bg-slate-100', 'text-slate-700', 'border-slate-200', 'bg-slate-600'),
+                    'Atención': ('bg-blue-50', 'text-blue-700', 'border-blue-200', 'bg-blue-600'),
+                    'Clínica': ('bg-emerald-50', 'text-emerald-700', 'border-emerald-200', 'bg-emerald-600'),
+                    'Administración': ('bg-amber-50', 'text-amber-700', 'border-amber-200', 'bg-amber-600'),
+                    'Reportes': ('bg-purple-50', 'text-purple-700', 'border-purple-200', 'bg-purple-600'),
+                    'Sistema': ('bg-rose-50', 'text-rose-700', 'border-rose-200', 'bg-rose-600')
+                } %}
+                {% set c = cat_colors.get(category, ('bg-slate-100', 'text-slate-700', 'border-slate-200', 'bg-slate-600')) %}
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <!-- Encabezado del Área -->
+                    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between {{ c[0] }}">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg {{ c[3] }} flex items-center justify-center text-white text-xs font-bold">
+                                {{ category[0] }}
+                            </div>
+                            <div>
+                                <h3 class="font-bold {{ c[1] }} text-sm">Área: {{ category }}</h3>
+                                <p class="text-[11px] text-slate-500">{{ perms | length }} permiso(s) en esta área</p>
+                            </div>
+                        </div>
+                        <a href="/permissions/create?category={{ category | urlencode }}"
+                           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border {{ c[2] }} {{ c[1] }} text-xs font-semibold hover:opacity-80 transition-opacity">
+                            <i class="fas fa-plus text-[10px]"></i> Agregar permiso aquí
+                        </a>
+                    </div>
+
+                    <!-- Tabla de permisos del área -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
+                                    <th class="py-3 px-5">Clave del Permiso</th>
+                                    <th class="py-3 px-5">Etiqueta del Módulo</th>
+                                    <th class="py-3 px-5">Descripción</th>
+                                    <th class="py-3 px-5">Usuarios con acceso</th>
+                                    <th class="py-3 px-5">Estado</th>
+                                    <th class="py-3 px-5 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50 text-sm">
+                                {% for perm in perms %}
+                                <tr class="hover:bg-slate-50/70 transition-colors {% if not perm.is_active %}opacity-50{% endif %}">
+                                    <td class="py-3.5 px-5">
+                                        <code class="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-700">{{ perm.key }}</code>
+                                    </td>
+                                    <td class="py-3.5 px-5">
+                                        <span class="font-semibold text-slate-800">{{ perm.label }}</span>
+                                    </td>
+                                    <td class="py-3.5 px-5">
+                                        <span class="text-xs text-slate-500">{{ perm.description or '—' }}</span>
+                                    </td>
+                                    <td class="py-3.5 px-5">
+                                        {% set count = usage_count.get(perm.key, 0) %}
+                                        <span class="text-xs font-semibold {% if count > 0 %}text-indigo-600{% else %}text-slate-400{% endif %}">
+                                            {{ count }} usuario(s)
+                                        </span>
+                                    </td>
+                                    <td class="py-3.5 px-5">
+                                        {% if perm.is_active %}
+                                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Activo
+                                        </span>
+                                        {% else %}
+                                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span> Inactivo
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3.5 px-5 text-right">
+                                        {% if perm.id %}
+                                        <div class="inline-flex items-center gap-1.5">
+                                            <!-- Editar -->
+                                            <a href="/permissions/{{ perm.id }}/edit"
+                                               class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Editar permiso">
+                                                <i class="fas fa-pen text-xs"></i>
+                                            </a>
+                                            <!-- Activar/Desactivar -->
+                                            <form action="/permissions/{{ perm.id }}/toggle" method="POST" class="inline">
+                                                <button type="submit"
+                                                    class="p-1.5 rounded-lg transition-colors {% if perm.is_active %}text-slate-500 hover:text-amber-600 hover:bg-amber-50{% else %}text-slate-400 hover:text-emerald-600 hover:bg-emerald-50{% endif %}"
+                                                    title="{% if perm.is_active %}Desactivar{% else %}Activar{% endif %} permiso">
+                                                    <i class="fas fa-toggle-{% if perm.is_active %}on{% else %}off{% endif %} text-xs"></i>
+                                                </button>
+                                            </form>
+                                            <!-- Eliminar -->
+                                            <form action="/permissions/{{ perm.id }}/delete" method="POST" class="inline"
+                                                  onsubmit="return confirm('¿Eliminar el permiso \"{{ perm.key }}\"? Esta acción no se puede deshacer.')">
+                                                <button type="submit"
+                                                    class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Eliminar permiso">
+                                                    <i class="fas fa-trash-alt text-xs"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-[11px] text-slate-400 italic">Sin ID</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% if not grouped %}
+                <div class="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
+                    <div class="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-400 flex items-center justify-center text-3xl mx-auto mb-4">
+                        <i class="fas fa-key"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-700 mb-1">No hay permisos registrados aún</h3>
+                    <p class="text-sm text-slate-500 mb-5">Los permisos del catálogo se cargan automáticamente al iniciar la aplicación.</p>
+                    <a href="/permissions/create" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors">
+                        <i class="fas fa-plus mr-2"></i> Crear primer permiso
+                    </a>
+                </div>
+                {% endif %}
+
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

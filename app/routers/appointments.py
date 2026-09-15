@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -11,6 +11,8 @@ from app.models.appointment import Appointment
 from app.models.patient import Patient
 from app.models.user import User
 from app.core.deps import require_current_user, require_permission
+from app.services.whatsapp_service import WhatsAppService
+from app.services.whatsapp_gateway import gateway_manager
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -39,8 +41,11 @@ def list_appointments(
 
     appointments = query.all()
     
-    # Pre-organizar citas por fecha para el calendario
+    # Pre-organizar citas por fecha para el calendario y recopilar datos WhatsApp
     calendar_events = []
+    whatsapp_info = {}
+    unsent_reminders_count = 0
+
     for a in appointments:
         p_name = f"{a.patient.first_name} {a.patient.last_name}" if a.patient else "Paciente no registrado"
         calendar_events.append({
@@ -51,6 +56,12 @@ def list_appointments(
             "status": a.status,
             "patient_name": p_name,
         })
+        
+        # Información de WhatsApp para 1-clic y Gateway
+        w_data = WhatsAppService.get_appointment_reminder(db, a)
+        whatsapp_info[a.id] = w_data
+        if not a.whatsapp_reminder_sent and a.status in ["Pendiente", "Confirmada"]:
+            unsent_reminders_count += 1
 
     today_str = date.today().strftime("%Y-%m-%d")
     all_patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.last_name).all()
@@ -58,6 +69,8 @@ def list_appointments(
         Appointment.date == date.today(),
         Appointment.status == "En Espera"
     ).count()
+
+    gateway_status = gateway_manager.get_status()
 
     return templates.TemplateResponse(
         request=request,
@@ -73,6 +86,9 @@ def list_appointments(
             "today_str": today_str,
             "filter_date": filter_date or "",
             "status_filter": status or "all",
+            "whatsapp_info": whatsapp_info,
+            "unsent_reminders_count": unsent_reminders_count,
+            "gateway_status": gateway_status,
         }
     )
 
@@ -256,4 +272,144 @@ def attend_now(
         appt_id = appt.id
 
     return RedirectResponse(url=f"/consultations/create?patient_id={patient_id}&appointment_id={appt_id}&walk_in=1", status_code=303)
+
+
+@router.get("/secretary-daily-pdf")
+def redirect_secretary_daily_pdf(report_date: str = Query(None)):
+    """Acceso directo para secretaría al reporte diario en PDF."""
+    url = "/reports/export/secretary-daily-pdf"
+    if report_date:
+        url += f"?report_date={report_date}"
+    return RedirectResponse(url=url, status_code=303)
+
+
+# ---------------------------------------------------------
+# ENDPOINTS DE INTEGRACIÓN DE WHATSAPP (1-CLIC + GATEWAY)
+# ---------------------------------------------------------
+
+@router.get("/{appointment_id}/whatsapp-info")
+def get_appointment_whatsapp_info(
+    appointment_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('appointments'))
+):
+    """Devuelve el texto formateado, enlace wa.me y estado de la cita."""
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+    
+    info = WhatsAppService.get_appointment_reminder(db, appt)
+    return JSONResponse(content=info)
+
+@router.post("/{appointment_id}/whatsapp-send")
+def send_appointment_whatsapp(
+    appointment_id: int,
+    send_mode: str = Form("auto"),  # auto (intenta gateway primero), manual (forzar wa.me)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('appointments'))
+):
+    """
+    Despacha el recordatorio de la cita por WhatsApp:
+    - Si el gateway está conectado y send_mode == 'auto', lo envía desatendido.
+    - Si no, devuelve el enlace wa.me para apertura de 1-clic.
+    - En ambos casos actualiza 'whatsapp_reminder_sent = True'.
+    """
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+    
+    info = WhatsAppService.get_appointment_reminder(db, appt)
+    if not info["clean_phone"]:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "El paciente no tiene un número telefónico registrado."}
+        )
+    
+    force_manual = (send_mode == "manual")
+    dispatch_res = WhatsAppService.dispatch_message(
+        phone=info["clean_phone"],
+        message=info["message"],
+        force_manual=force_manual
+    )
+    
+    # Marcar como enviado en base de datos
+    appt.whatsapp_reminder_sent = True
+    appt.whatsapp_reminder_sent_at = datetime.utcnow()
+    db.commit()
+
+    return JSONResponse(content={
+        "success": dispatch_res.get("success", True),
+        "mode": dispatch_res.get("mode", "wa_link"),
+        "wa_link": dispatch_res.get("wa_link"),
+        "already_sent": True,
+        "sent_at": appt.whatsapp_reminder_sent_at.strftime("%d/%m/%Y %H:%M"),
+        "patient_name": info["patient_name"],
+        "detail": dispatch_res.get("detail", "Recordatorio procesado.")
+    })
+
+@router.get("/{appointment_id}/waiting-alert-wa")
+def get_waiting_alert_wa(
+    appointment_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('appointments'))
+):
+    """Genera el mensaje y enlace de WhatsApp para avisar al Dr. que el paciente llegó."""
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+        
+    alert_info = WhatsAppService.get_waiting_alert(db, appt)
+    return JSONResponse(content=alert_info)
+
+@router.post("/whatsapp/send-all-daily-reminders")
+def send_all_daily_reminders(
+    target_date: str = Form(None),  # YYYY-MM-DD (por defecto: mañana)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('appointments'))
+):
+    """
+    Envía en lote los recordatorios de WhatsApp para todas las citas pendientes/confirmadas
+    de la fecha seleccionada (por defecto mañana) que aún no hayan sido notificadas.
+    """
+    if target_date:
+        try:
+            target = datetime.strptime(target_date, "%Y-%m-%d").date()
+        except ValueError:
+            target = date.today() + timedelta(days=1)
+    else:
+        target = date.today() + timedelta(days=1)
+
+    appts = db.query(Appointment).filter(
+        Appointment.date == target,
+        Appointment.status.in_(["Pendiente", "Confirmada"]),
+        Appointment.whatsapp_reminder_sent == False
+    ).all()
+
+    sent_count = 0
+    skipped_count = 0
+    results = []
+
+    for a in appts:
+        info = WhatsAppService.get_appointment_reminder(db, a)
+        if info["clean_phone"]:
+            res = WhatsAppService.dispatch_message(info["clean_phone"], info["message"])
+            a.whatsapp_reminder_sent = True
+            a.whatsapp_reminder_sent_at = datetime.utcnow()
+            sent_count += 1
+            results.append({"id": a.id, "patient": info["patient_name"], "status": "sent", "mode": res["mode"]})
+        else:
+            skipped_count += 1
+            results.append({"id": a.id, "patient": info["patient_name"], "status": "skipped", "reason": "no_phone"})
+
+    db.commit()
+
+    return JSONResponse(content={
+        "success": True,
+        "target_date": target.strftime("%d/%m/%Y"),
+        "total_eligible": len(appts),
+        "sent_count": sent_count,
+        "skipped_count": skipped_count,
+        "results": results
+    })
+
 

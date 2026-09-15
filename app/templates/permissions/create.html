@@ -1,0 +1,136 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Nuevo Permiso — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'users' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Nuevo Permiso" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-2xl mx-auto space-y-6">
+
+                <!-- Header -->
+                <div>
+                    <a href="/permissions" class="text-xs text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center gap-1.5 mb-2">
+                        <i class="fas fa-arrow-left"></i> Volver al catálogo de permisos
+                    </a>
+                    <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+                        <i class="fas fa-plus-circle text-indigo-600"></i>
+                        Registrar Nuevo Permiso
+                    </h1>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Define un nuevo módulo o acción que podrá asignarse a los usuarios del sistema.
+                    </p>
+                </div>
+
+                {% if error %}
+                <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-center gap-3">
+                    <i class="fas fa-exclamation-circle text-red-600"></i>
+                    <span>{{ error }}</span>
+                </div>
+                {% endif %}
+
+                <form action="/permissions/create" method="POST" class="space-y-5">
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider pb-3 border-b border-slate-100 flex items-center gap-2">
+                            <i class="fas fa-id-badge text-indigo-500"></i>
+                            Datos del Permiso
+                        </h3>
+
+                        <!-- Clave -->
+                        <div>
+                            <label for="key" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Clave (Key) del Permiso *
+                            </label>
+                            <input type="text" id="key" name="key" required
+                                   placeholder="ej: my_module, lab_orders, reports_advanced"
+                                   pattern="[a-z0-9_]+"
+                                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                            <p class="text-[11px] text-slate-400 mt-1">Solo letras minúsculas, números y guiones bajos. Ej: <code class="bg-slate-100 px-1 rounded">lab_orders</code>. No se puede cambiar después.</p>
+                        </div>
+
+                        <!-- Etiqueta -->
+                        <div>
+                            <label for="label" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Etiqueta del Módulo *
+                            </label>
+                            <input type="text" id="label" name="label" required
+                                   placeholder="ej: Órdenes de Laboratorio Avanzadas"
+                                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                            <p class="text-[11px] text-slate-400 mt-1">Nombre visible en la lista de permisos al crear o editar usuarios.</p>
+                        </div>
+
+                        <!-- Descripción -->
+                        <div>
+                            <label for="description" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Descripción (Opcional)
+                            </label>
+                            <textarea id="description" name="description" rows="2"
+                                      placeholder="Breve descripción de qué puede hacer el usuario con este permiso..."
+                                      class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none"></textarea>
+                        </div>
+
+                        <!-- Área / Categoría -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="category" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Área Existente *
+                                </label>
+                                <select id="category" name="category"
+                                        class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                                    {% for cat in categories %}
+                                    <option value="{{ cat }}" {% if request.query_params.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
+                                    {% endfor %}
+                                    {% if not categories %}
+                                    <option value="General">General</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="new_category" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    O Crear Nueva Área
+                                </label>
+                                <input type="text" id="new_category" name="new_category"
+                                       placeholder="ej: Farmacia, Quirófano..."
+                                       class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                                <p class="text-[11px] text-slate-400 mt-1">Si escribes aquí, se ignora el área seleccionada arriba.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Nota informativa -->
+                    <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs flex items-start gap-3">
+                        <i class="fas fa-info-circle text-indigo-500 mt-0.5"></i>
+                        <span>El nuevo permiso quedará <strong>activo</strong> inmediatamente y estará disponible al crear o editar usuarios. Puedes desactivarlo en cualquier momento desde el catálogo.</span>
+                    </div>
+
+                    <!-- Acciones -->
+                    <div class="flex items-center justify-end gap-3">
+                        <a href="/permissions" class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors">
+                            Cancelar
+                        </a>
+                        <button type="submit"
+                                class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-indigo-600/20 transition-all">
+                            <i class="fas fa-plus mr-1.5"></i> Crear Permiso
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+// Auto-format clave a lowercase con guiones bajos
+document.getElementById('key').addEventListener('input', function() {
+    this.value = this.value.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+});
+</script>
+{% endblock %}

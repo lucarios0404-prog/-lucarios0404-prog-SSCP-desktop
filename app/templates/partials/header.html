@@ -1,42 +1,46 @@
-<header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-10 shrink-0">
-    <div class="flex items-center space-x-4">
-        <h2 class="text-xl font-bold text-gray-800 tracking-tight">{% block header_title %}{{ page_title | default("SSCP Desktop") }}{% endblock %}</h2>
-    </div>
+<header class="h-14 bg-white border-b border-slate-200/80 flex items-center justify-between px-5 z-10 shrink-0 shadow-[0_1px_3px_0_rgba(15,23,42,0.05)]">
     <div class="flex items-center space-x-3">
+        <h2 class="text-base font-semibold text-slate-800 tracking-tight">{% block header_title %}{{ page_title | default("SSCP Desktop") }}{% endblock %}</h2>
+    </div>
+    <div class="flex items-center space-x-2">
         {% if user %}
+            <!-- Badge de rol del usuario -->
             {% if user.role == 'doctor' %}
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
-                <i class="fas fa-user-md text-emerald-600"></i> {{ user.name or user.email }}
-                <span class="text-[10px] font-semibold text-emerald-600 bg-emerald-100 px-1.5 py-0.2 rounded">Médico</span>
+            <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                <i class="fas fa-user-md text-emerald-500 text-[11px]"></i>
+                <span class="hidden md:inline">{{ user.name or user.email }} &middot;</span> Médico
             </span>
             {% elif user.role == 'secretaria' %}
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 shadow-sm">
-                <i class="fas fa-headset text-amber-600"></i> {{ user.name or user.email }}
-                <span class="text-[10px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.2 rounded">Recepción</span>
+            <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/80">
+                <i class="fas fa-headset text-amber-500 text-[11px]"></i>
+                <span class="hidden md:inline">{{ user.name or user.email }} &middot;</span> Recepción
             </span>
             {% else %}
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm">
-                <i class="fas fa-shield-alt text-blue-600"></i> {{ user.name or user.email }}
-                <span class="text-[10px] font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded">Admin</span>
+            <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/80">
+                <i class="fas fa-shield-alt text-blue-500 text-[11px]"></i>
+                <span class="hidden md:inline">{{ user.name or user.email }} &middot;</span> Admin
             </span>
             {% endif %}
         {% endif %}
-        <div class="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 shadow-sm">
-            <span class="w-2 h-2 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-            Offline Activo
+
+        <!-- Estado offline -->
+        <div class="hidden sm:inline-flex items-center px-2 py-1 rounded-md text-[11px] font-medium bg-slate-50 text-slate-500 border border-slate-200/80">
+            <span class="w-1.5 h-1.5 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+            Offline
         </div>
 
-        <!-- Selector Modo Claro / Oscuro -->
+        <!-- Toggle Modo Claro / Oscuro -->
         <button id="theme-toggle-btn" type="button" onclick="toggleDarkMode()" 
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-sm transition-all bg-white hover:bg-slate-50 border-slate-200 text-slate-700" 
-            title="Alternar Modo Claro / Modo Oscuro">
-            <i id="theme-icon-sun" class="fas fa-sun text-amber-500 text-xs"></i>
-            <i id="theme-icon-moon" class="fas fa-moon text-indigo-400 text-xs hidden"></i>
-            <span id="theme-label" class="text-xs font-medium">Claro</span>
+            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium shadow-sm transition-all bg-white hover:bg-slate-50 border-slate-200 text-slate-600" 
+            title="Alternar modo claro / oscuro">
+            <i id="theme-icon-sun" class="fas fa-sun text-amber-400 text-[11px]"></i>
+            <i id="theme-icon-moon" class="fas fa-moon text-indigo-400 text-[11px] hidden"></i>
+            <span id="theme-label" class="hidden sm:inline text-[11px]">Claro</span>
         </button>
 
-        <a href="/logout" class="text-xs text-gray-500 hover:text-red-600 font-medium flex items-center px-3 py-1.5 rounded-md hover:bg-red-50 border border-gray-200 transition-colors">
-            <i class="fas fa-sign-out-alt mr-1.5"></i> Salir
+        <a href="/logout" class="text-xs text-slate-500 hover:text-rose-600 font-medium flex items-center px-2.5 py-1.5 rounded-lg hover:bg-rose-50 border border-slate-200 transition-colors">
+            <i class="fas fa-sign-out-alt mr-1.5 text-[11px]"></i>
+            <span class="hidden sm:inline">Salir</span>
         </a>
     </div>
 </header>

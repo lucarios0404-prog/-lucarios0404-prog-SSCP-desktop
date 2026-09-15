@@ -33,9 +33,20 @@
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h1 class="text-2xl font-bold text-slate-900">Agenda de Citas Médicas</h1>
-                        <p class="text-xs text-slate-500 mt-0.5">Control de horarios, confirmación de asistencia, sala de espera y atención inmediata.</p>
+                        <p class="text-xs text-slate-500 mt-0.5">Control de horarios, confirmación de asistencia, recordatorios WhatsApp y sala de espera.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
+                        <!-- Botón Masivo de WhatsApp -->
+                        <button type="button" onclick="openBulkWaModal()" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-md shadow-emerald-600/20 transition-all" title="Enviar recordatorios automáticos de WhatsApp para citas de mañana">
+                            <i class="fab fa-whatsapp mr-2 text-base"></i> Recordatorios WhatsApp
+                            {% if unsent_reminders_count > 0 %}
+                            <span class="ml-1.5 px-1.5 py-0.5 rounded-full bg-emerald-800 text-[10px] font-bold">{{ unsent_reminders_count }}</span>
+                            {% endif %}
+                        </button>
+
+                        <a href="/appointments/secretary-daily-pdf" target="_blank" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-md shadow-teal-500/20 transition-all" title="Descargar Reporte Diario de Entradas y Recepción en PDF">
+                            <i class="fas fa-file-pdf mr-2"></i> Reporte del Día (PDF)
+                        </a>
                         <button onclick="document.getElementById('walkinModal').classList.remove('hidden')" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold shadow-md shadow-amber-500/20 transition-all">
                             <i class="fas fa-user-clock mr-2"></i> Llegada sin Cita (Poner en Espera)
                         </button>
@@ -84,6 +95,7 @@
                                     <th class="py-3.5 px-5">Paciente</th>
                                     <th class="py-3.5 px-5">Motivo / Tipo</th>
                                     <th class="py-3.5 px-5">Estado</th>
+                                    <th class="py-3.5 px-5">WhatsApp</th>
                                     <th class="py-3.5 px-5 text-right">Acciones Rápidas</th>
                                 </tr>
                             </thead>
@@ -144,6 +156,29 @@
                                             {% endif %}
                                         </span>
                                     </td>
+
+                                    <!-- Columna WhatsApp -->
+                                    <td class="py-4 px-5 whitespace-nowrap" id="wa_cell_{{ a.id }}">
+                                        {% if a.patient and a.patient.phone %}
+                                            {% if a.whatsapp_reminder_sent %}
+                                            <div class="inline-flex items-center space-x-1">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200" title="Enviado: {{ a.whatsapp_reminder_sent_at.strftime('%d/%m %H:%M') if a.whatsapp_reminder_sent_at else '' }}">
+                                                    <i class="fab fa-whatsapp text-emerald-600 mr-1 text-xs"></i> Enviado
+                                                </span>
+                                                <button type="button" onclick="openSingleWaModal({{ a.id }})" class="p-1 text-slate-400 hover:text-emerald-700 transition-colors" title="Reenviar o ver mensaje">
+                                                    <i class="fas fa-redo-alt text-[10px]"></i>
+                                                </button>
+                                            </div>
+                                            {% else %}
+                                            <button type="button" onclick="openSingleWaModal({{ a.id }})" class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition-all shadow-sm" title="Enviar recordatorio de cita por WhatsApp">
+                                                <i class="fab fa-whatsapp mr-1 text-emerald-600 text-sm"></i> Recordar
+                                            </button>
+                                            {% endif %}
+                                        {% else %}
+                                        <span class="text-xs text-slate-300 italic">Sin tel.</span>
+                                        {% endif %}
+                                    </td>
+
                                     <td class="py-4 px-5 text-right whitespace-nowrap space-x-1.5">
                                         {% if a.status == 'En Espera' %}
                                             {% if user.has_permission('consultations') %}
@@ -151,8 +186,11 @@
                                                 <i class="fas fa-bolt mr-1.5"></i> Atender Ahora
                                             </a>
                                             {% else %}
-                                            <span class="text-xs text-amber-800 bg-amber-100 px-2.5 py-1 rounded-lg font-semibold inline-flex items-center">
-                                                <i class="fas fa-clock mr-1"></i> Esperando al Dr.
+                                            <button type="button" onclick="notifyDoctorArrival({{ a.id }})" class="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-xs font-bold inline-flex items-center" title="Avisar al WhatsApp del doctor que el paciente está en sala de espera">
+                                                <i class="fab fa-whatsapp mr-1 text-emerald-600"></i> Avisar Dr.
+                                            </button>
+                                            <span class="text-xs text-amber-800 bg-amber-100 px-2 py-1 rounded-lg font-semibold inline-flex items-center">
+                                                <i class="fas fa-clock mr-1"></i> En Espera
                                             </span>
                                             {% endif %}
                                         {% elif a.status != 'Completada' and a.status != 'Cancelada' %}
@@ -188,7 +226,7 @@
                                 </tr>
                                 {% else %}
                                 <tr>
-                                    <td colspan="5" class="py-12 text-center text-slate-400">
+                                    <td colspan="6" class="py-12 text-center text-slate-400">
                                         <i class="far fa-calendar-times text-3xl mb-3 block text-slate-300"></i>
                                         No hay citas registradas para los filtros seleccionados.
                                     </td>
@@ -200,9 +238,9 @@
                 </div>
             </div>
 
-            <!-- Modal: Marcar Llegada de Paciente sin Cita Previa -->
+            <!-- MODAL 1: Llegada sin Cita Previa (Walk-in) -->
             <div id="walkinModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-                <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+                <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-fade-in">
                     <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                         <div class="flex items-center space-x-2.5">
                             <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-lg">
@@ -254,8 +292,255 @@
                 </div>
             </div>
 
+            <!-- MODAL 2: Recordatorio de Cita Individual (WhatsApp) -->
+            <div id="singleWaModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-fade-in">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg">
+                                <i class="fab fa-whatsapp"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900">Recordatorio de Cita por WhatsApp</h3>
+                                <p class="text-xs text-slate-500" id="single_wa_patient">Cargando datos...</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="closeSingleWaModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                Teléfono Destino
+                            </label>
+                            <div class="text-sm font-mono font-bold text-slate-900 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+                                <span id="single_wa_phone">+1...</span>
+                                <span class="text-[11px] text-emerald-600 font-sans font-semibold"><i class="fas fa-check-circle mr-1"></i>Verificado</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                Mensaje Pre-redactado
+                            </label>
+                            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 leading-relaxed font-sans" id="single_wa_message">
+                                Cargando plantilla...
+                            </div>
+                        </div>
+
+                        <!-- Estado del Gateway -->
+                        <div class="p-3 bg-emerald-50/50 border border-emerald-200/80 rounded-xl text-xs text-slate-600 flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full {% if gateway_status.is_connected %}bg-emerald-500 animate-pulse{% else %}bg-slate-400{% endif %}"></span>
+                                <span class="text-[11px] font-semibold text-slate-700">
+                                    Gateway: {% if gateway_status.is_connected %}Conectado (+{{ gateway_status.connected_phone }}){% else %}Modo Enlace Directo (1-Clic){% endif %}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                            <button type="button" onclick="closeSingleWaModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
+                                Cancelar
+                            </button>
+                            <!-- Abrir en WhatsApp 1-Clic -->
+                            <a id="single_wa_open_link" href="#" target="_blank" onclick="markSentViaManual()" class="px-4 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl shadow-sm transition-all inline-flex items-center">
+                                <i class="fas fa-external-link-alt mr-1.5"></i> Abrir WhatsApp (1-Clic)
+                            </a>
+                            <!-- Enviar Directo con Gateway si está conectado -->
+                            {% if gateway_status.is_connected %}
+                            <button type="button" onclick="sendViaAutoGateway()" class="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition-all inline-flex items-center">
+                                <i class="fas fa-paper-plane mr-1.5"></i> Enviar Desatendido
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL 3: Envío Masivo de Recordatorios (WhatsApp) -->
+            <div id="bulkWaModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-fade-in">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg">
+                                <i class="fas fa-paper-plane"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900">Despacho de Recordatorios WhatsApp</h3>
+                                <p class="text-xs text-slate-500">Recordatorios para citas de mañana</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="closeBulkWaModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
+                            <p class="font-bold text-slate-800">
+                                <i class="far fa-calendar-check text-emerald-600 mr-1.5"></i> Resumen de Citas Pendientes:
+                            </p>
+                            <p class="text-slate-600 leading-relaxed">
+                                El sistema buscará todas las citas en estado <strong>Pendiente</strong> o <strong>Confirmada</strong> programadas para mañana que aún no hayan recibido recordatorio, y despachará el mensaje personalizado a cada paciente.
+                            </p>
+                            <div class="text-[11px] text-slate-500">
+                                Modo activo: <strong>{% if gateway_status.is_connected %}Gateway Autónomo (Desatendido){% else %}Generación de cola de enlaces (1-Clic){% endif %}</strong>
+                            </div>
+                        </div>
+
+                        <div id="bulk_status_output" class="hidden p-3 rounded-xl text-xs"></div>
+
+                        <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
+                            <button type="button" onclick="closeBulkWaModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
+                                Cancelar
+                            </button>
+                            <button type="button" id="btn_do_bulk" onclick="executeBulkReminders()" class="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow transition-all flex items-center">
+                                <i class="fas fa-play mr-1.5"></i> Despachar Recordatorios Ahora
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <script>
-                // Abrir automáticamente si la URL contiene action=walkin
+                let currentActiveApptId = null;
+                let currentWaLink = "";
+
+                // Modal 1-Clic Individual
+                async function openSingleWaModal(appointmentId) {
+                    currentActiveApptId = appointmentId;
+                    const modal = document.getElementById('singleWaModal');
+                    modal.classList.remove('hidden');
+
+                    document.getElementById('single_wa_patient').textContent = 'Cargando datos...';
+                    document.getElementById('single_wa_phone').textContent = '...';
+                    document.getElementById('single_wa_message').textContent = 'Cargando plantilla...';
+
+                    try {
+                        const res = await fetch(`/appointments/${appointmentId}/whatsapp-info`);
+                        const data = await res.json();
+                        document.getElementById('single_wa_patient').textContent = data.patient_name;
+                        document.getElementById('single_wa_phone').textContent = data.clean_phone || 'Sin número registrado';
+                        document.getElementById('single_wa_message').textContent = data.message;
+                        currentWaLink = data.wa_link;
+                        document.getElementById('single_wa_open_link').href = data.wa_link || '#';
+                    } catch(e) {
+                        alert('Error al cargar datos del recordatorio.');
+                    }
+                }
+
+                function closeSingleWaModal() {
+                    document.getElementById('singleWaModal').classList.add('hidden');
+                }
+
+                // Enviar via Gateway automático
+                async function sendViaAutoGateway() {
+                    if (!currentActiveApptId) return;
+                    const formData = new FormData();
+                    formData.append('send_mode', 'auto');
+
+                    try {
+                        const res = await fetch(`/appointments/${currentActiveApptId}/whatsapp-send`, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert('¡Recordatorio enviado exitosamente por el Gateway de WhatsApp!');
+                            updateRowWaStatus(currentActiveApptId, data.sent_at);
+                            closeSingleWaModal();
+                        } else {
+                            alert('No se pudo enviar por el gateway: ' + (data.error || 'error desconocido'));
+                        }
+                    } catch(e) {
+                        alert('Error de conexión con el servidor.');
+                    }
+                }
+
+                // Marcar enviado tras abrir WhatsApp manual
+                async function markSentViaManual() {
+                    if (!currentActiveApptId) return;
+                    const formData = new FormData();
+                    formData.append('send_mode', 'manual');
+
+                    try {
+                        const res = await fetch(`/appointments/${currentActiveApptId}/whatsapp-send`, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const data = await res.json();
+                        updateRowWaStatus(currentActiveApptId, data.sent_at);
+                        closeSingleWaModal();
+                    } catch(e) {}
+                }
+
+                function updateRowWaStatus(apptId, sentAt) {
+                    const cell = document.getElementById(`wa_cell_${apptId}`);
+                    if (cell) {
+                        cell.innerHTML = `
+                            <div class="inline-flex items-center space-x-1">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200" title="Enviado: ${sentAt || 'Hoy'}">
+                                    <i class="fab fa-whatsapp text-emerald-600 mr-1 text-xs"></i> Enviado
+                                </span>
+                                <button type="button" onclick="openSingleWaModal(${apptId})" class="p-1 text-slate-400 hover:text-emerald-700 transition-colors" title="Reenviar o ver mensaje">
+                                    <i class="fas fa-redo-alt text-[10px]"></i>
+                                </button>
+                            </div>
+                        `;
+                    }
+                }
+
+                // Notificar al Doctor de llegada a sala de espera
+                async function notifyDoctorArrival(appointmentId) {
+                    try {
+                        const res = await fetch(`/appointments/${appointmentId}/waiting-alert-wa`);
+                        const data = await res.json();
+                        if (data.wa_link) {
+                            window.open(data.wa_link, '_blank');
+                        } else {
+                            alert('No hay un número de teléfono configurado para el doctor en Configuración > WhatsApp.');
+                        }
+                    } catch(e) {
+                        alert('Error al generar alerta para el doctor.');
+                    }
+                }
+
+                // Modal de Envío Masivo
+                function openBulkWaModal() {
+                    document.getElementById('bulkWaModal').classList.remove('hidden');
+                    document.getElementById('bulk_status_output').classList.add('hidden');
+                }
+
+                function closeBulkWaModal() {
+                    document.getElementById('bulkWaModal').classList.add('hidden');
+                }
+
+                async function executeBulkReminders() {
+                    const btn = document.getElementById('btn_do_bulk');
+                    const out = document.getElementById('bulk_status_output');
+                    btn.disabled = true;
+                    btn.innerHTML = `<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1.5"></div> Despachando...`;
+
+                    try {
+                        const res = await fetch('/appointments/whatsapp/send-all-daily-reminders', { method: 'POST' });
+                        const data = await res.json();
+                        out.classList.remove('hidden');
+                        if (data.success) {
+                            out.className = 'p-3 rounded-xl text-xs bg-emerald-50 border border-emerald-200 text-emerald-800';
+                            out.innerHTML = `<strong>¡Proceso completado!</strong><br>Recordatorios enviados para el día ${data.target_date}: <strong>${data.sent_count}</strong> de ${data.total_eligible} citas elegibles.`;
+                            setTimeout(() => { window.location.reload(); }, 2500);
+                        } else {
+                            out.className = 'p-3 rounded-xl text-xs bg-red-50 border border-red-200 text-red-800';
+                            out.innerHTML = `Ocurrió un problema: ${data.error || 'error'}`;
+                        }
+                    } catch(e) {
+                        out.classList.remove('hidden');
+                        out.className = 'p-3 rounded-xl text-xs bg-red-50 border border-red-200 text-red-800';
+                        out.innerHTML = 'Error de conexión con el servidor.';
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerHTML = `<i class="fas fa-play mr-1.5"></i> Despachar Recordatorios Ahora`;
+                    }
+                }
+
                 if (new URLSearchParams(window.location.search).get('action') === 'walkin') {
                     document.getElementById('walkinModal')?.classList.remove('hidden');
                 }

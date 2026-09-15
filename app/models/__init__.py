@@ -15,11 +15,12 @@ from app.models.medical_reference import MedicalReference
 from app.models.sync_log import SyncLog
 from app.models.audit_log import ClinicalAuditLog
 from app.models.cie10 import Cie10Code
+from app.models.permission_catalog import PermissionCatalog
 
 __all__ = [
     "User", "Patient", "Appointment", "Payment", "Consultation",
     "Setting", "VitalSign", "LabResult", "VaccineRecord", "InternalMessage",
     "InventoryItem", "InventoryMovement", "ClinicalTemplate",
     "MedicalLicense", "MedicalReference", "SyncLog", "ClinicalAuditLog",
-    "Cie10Code"
+    "Cie10Code", "PermissionCatalog"
 ]

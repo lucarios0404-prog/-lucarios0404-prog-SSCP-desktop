@@ -134,7 +134,14 @@
                                 </div>
                                 <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                                     <span><i class="fas fa-id-card mr-1 text-slate-400"></i> DNI: <strong>{{ patient.document_id or 'N/D' }}</strong></span>
-                                    <span><i class="fas fa-phone mr-1 text-slate-400"></i> {{ patient.phone or 'Sin teléfono' }}</span>
+                                    <span>
+                                        <i class="fas fa-phone mr-1 text-slate-400"></i> {{ patient.phone or 'Sin teléfono' }}
+                                        {% if patient.phone %}
+                                        <a href="https://wa.me/{{ patient.phone|replace('-', '')|replace(' ', '')|replace('+', '')|replace('(', '')|replace(')', '') }}?text=Estimado(a)%20{{ patient.first_name }}%20{{ patient.last_name }},%20le%20saludamos%20desde%20el%20consultorio%20m%C3%A9dico." target="_blank" class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors" title="Abrir chat de WhatsApp">
+                                            <i class="fab fa-whatsapp mr-1 text-emerald-600"></i> WhatsApp
+                                        </a>
+                                        {% endif %}
+                                    </span>
                                     <span><i class="fas fa-envelope mr-1 text-slate-400"></i> {{ patient.email or 'Sin correo' }}</span>
                                     <span><i class="fas fa-tint mr-1 text-red-400"></i> Sangre: <strong>{{ patient.blood_type or 'N/D' }}</strong></span>
                                 </div>

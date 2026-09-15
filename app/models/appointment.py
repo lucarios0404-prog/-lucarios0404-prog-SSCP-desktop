@@ -21,6 +21,11 @@ class Appointment(Base):
     is_recurring = Column(Boolean, default=False)
     
     sede_origen = Column(String, default="local")
+    
+    # WhatsApp recordatorio
+    whatsapp_reminder_sent = Column(Boolean, default=False)
+    whatsapp_reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

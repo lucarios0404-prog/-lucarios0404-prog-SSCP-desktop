@@ -35,6 +35,7 @@ from app.routers import (
     reports,
     users,
     data_import,
+    permissions,
 )
 from app.core.deps import get_current_user
 
@@ -60,6 +61,7 @@ def ensure_schema_migrations(engine):
     try:
         from sqlalchemy import text
         with engine.connect() as conn:
+            # 1. Migraciones en patients
             res = conn.execute(text("PRAGMA table_info(patients)")).fetchall()
             col_names = [r[1] for r in res]
             if "is_active" not in col_names:
@@ -70,9 +72,88 @@ def ensure_schema_migrations(engine):
                 conn.execute(text("ALTER TABLE patients ADD COLUMN archived_reason TEXT"))
             if "archived_by_id" not in col_names:
                 conn.execute(text("ALTER TABLE patients ADD COLUMN archived_by_id INTEGER"))
+
+            # 2. Migraciones en settings (WhatsApp)
+            res_s = conn.execute(text("PRAGMA table_info(settings)")).fetchall()
+            s_cols = [r[1] for r in res_s]
+            if "whatsapp_doctor_phone" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_doctor_phone TEXT"))
+            if "whatsapp_auto_send" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_auto_send BOOLEAN DEFAULT 0"))
+            if "whatsapp_auto_hour" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_auto_hour TEXT DEFAULT '08:30'"))
+            if "whatsapp_template_reminder" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_template_reminder TEXT"))
+            if "whatsapp_template_waiting" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_template_waiting TEXT"))
+            if "whatsapp_template_followup" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_template_followup TEXT"))
+            if "whatsapp_gateway_status" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_gateway_status TEXT DEFAULT 'disconnected'"))
+            if "whatsapp_connected_phone" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_connected_phone TEXT"))
+
+            # 3. Migraciones en appointments (WhatsApp)
+            res_a = conn.execute(text("PRAGMA table_info(appointments)")).fetchall()
+            a_cols = [r[1] for r in res_a]
+            if "whatsapp_reminder_sent" not in a_cols:
+                conn.execute(text("ALTER TABLE appointments ADD COLUMN whatsapp_reminder_sent BOOLEAN DEFAULT 0"))
+            if "whatsapp_reminder_sent_at" not in a_cols:
+                conn.execute(text("ALTER TABLE appointments ADD COLUMN whatsapp_reminder_sent_at DATETIME"))
+
             conn.commit()
     except Exception as e:
         print(f"[Schema Migration] Aviso: {e}")
+
+_last_whatsapp_cron_day = None
+
+async def run_whatsapp_scheduled_reminders():
+    """Tarea en segundo plano: envía recordatorios automáticos de WhatsApp a la hora configurada."""
+    global _last_whatsapp_cron_day
+    while True:
+        try:
+            await asyncio.sleep(60)  # Revisa cada minuto
+            now = datetime.now()
+            current_time_str = now.strftime("%H:%M")
+            today_str = now.strftime("%Y-%m-%d")
+
+            with SessionLocal() as db:
+                from app.models.setting import Setting
+                from app.models.appointment import Appointment
+                from app.services.whatsapp_service import WhatsAppService
+
+                setting = db.query(Setting).first()
+                if not setting or not setting.whatsapp_auto_send:
+                    continue
+
+                scheduled_time = (setting.whatsapp_auto_hour or "08:30").strip()
+
+                if current_time_str == scheduled_time and _last_whatsapp_cron_day != today_str:
+                    _last_whatsapp_cron_day = today_str
+                    print(f"[WhatsApp Scheduler] Disparando recordatorios automáticos de las {scheduled_time}...")
+                    
+                    target_date = now.date() + timedelta(days=1)
+                    appts = db.query(Appointment).filter(
+                        Appointment.date == target_date,
+                        Appointment.status.in_(["Pendiente", "Confirmada"]),
+                        Appointment.whatsapp_reminder_sent == False
+                    ).all()
+
+                    sent = 0
+                    for a in appts:
+                        info = WhatsAppService.get_appointment_reminder(db, a)
+                        if info["clean_phone"]:
+                            WhatsAppService.dispatch_message(info["clean_phone"], info["message"])
+                            a.whatsapp_reminder_sent = True
+                            a.whatsapp_reminder_sent_at = datetime.utcnow()
+                            sent += 1
+
+                    db.commit()
+                    print(f"[WhatsApp Scheduler] Recordatorios enviados con éxito: {sent}/{len(appts)} citas.")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[WhatsApp Scheduler] Aviso no crítico: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -86,14 +167,22 @@ async def lifespan(app: FastAPI):
         from app.data.cie10_catalog import seed_cie10_catalog
         with SessionLocal() as db:
             seed_cie10_catalog(db)
+            from app.core.permissions import seed_permissions_if_empty
+            seed_permissions_if_empty(db)
     except Exception as e:
         print(f"[Startup Database] Aviso: {e}")
 
     sync_task = asyncio.create_task(run_periodic_sync())
+    wa_task = asyncio.create_task(run_whatsapp_scheduled_reminders())
     yield
     sync_task.cancel()
+    wa_task.cancel()
     try:
         await sync_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await wa_task
     except asyncio.CancelledError:
         pass
 
@@ -125,6 +214,7 @@ app.include_router(medical_licenses.router)
 app.include_router(medical_references.router)
 app.include_router(reports.router)
 app.include_router(users.router)
+app.include_router(permissions.router)
 
 @app.get("/")
 async def root(request: Request, current_user = Depends(get_current_user)):

@@ -1,205 +1,197 @@
-<aside class="w-64 bg-slate-900 text-white flex flex-col hidden md:flex shrink-0 border-r border-slate-800 shadow-xl">
-    <div class="h-16 flex items-center justify-between px-6 border-b border-slate-800 bg-slate-950">
-        <div class="flex items-center space-x-3">
-            <div class="w-9 h-9 rounded-lg bg-slate-800/80 border border-slate-700/50 flex items-center justify-center p-1 shadow-md shadow-blue-500/20">
+<aside class="w-64 bg-slate-900 text-white flex flex-col hidden md:flex shrink-0 border-r border-slate-800/80">
+    <!-- Logo / Brand -->
+    <div class="h-16 flex items-center px-5 border-b border-slate-800/60 bg-slate-950/60 shrink-0">
+        <div class="flex items-center space-x-3 min-w-0">
+            <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700/60 flex items-center justify-center p-1 shrink-0">
                 <img src="/static/images/brand/icon-color.png" alt="SSCP" class="w-full h-full object-contain">
             </div>
-            <div>
-                <h1 class="text-base font-bold tracking-tight text-white leading-tight">SSCP <span class="text-blue-400">Desktop</span></h1>
-                <span class="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Offline Ready</span>
+            <div class="min-w-0">
+                <h1 class="text-sm font-semibold tracking-tight text-white leading-tight truncate">SSCP <span class="text-blue-400">Desktop</span></h1>
+                <span class="text-[10px] text-slate-500 font-medium">Offline Ready</span>
             </div>
         </div>
     </div>
 
-    <div class="flex-1 py-5 overflow-y-auto px-3 space-y-6">
+    <!-- Navigation -->
+    <div class="flex-1 py-4 overflow-y-auto px-2.5 space-y-0.5">
+
         <!-- Principal -->
-        <div>
-            <span class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Principal</span>
-            <nav class="mt-2 space-y-1">
-                {% if user.has_permission('dashboard') %}
-                <a href="/dashboard" class="{% if active_menu == 'dashboard' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-chart-pie mr-3 text-base {% if active_menu == 'dashboard' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Dashboard
-                </a>
-                {% endif %}
+        {% if user.has_permission('dashboard') %}
+        <a href="/dashboard" class="{% if active_menu == 'dashboard' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+            <i class="fas fa-chart-pie w-4 mr-3 text-base {% if active_menu == 'dashboard' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+            Dashboard
+        </a>
+        {% endif %}
 
-                {% if user.has_permission('patients') %}
-                <a href="/patients" class="{% if active_menu == 'patients' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-user-injured mr-3 text-base {% if active_menu == 'patients' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Pacientes
-                </a>
-                <a href="/patients/import" class="{% if active_menu == 'import' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-file-import mr-3 text-base {% if active_menu == 'import' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Importar Consulta Práctica
-                </a>
-                {% endif %}
+        {% if user.has_permission('patients') %}
+        <a href="/patients" class="{% if active_menu == 'patients' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+            <i class="fas fa-user-injured w-4 mr-3 text-base {% if active_menu == 'patients' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+            Pacientes
+        </a>
+        <a href="/patients/import" class="{% if active_menu == 'import' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+            <i class="fas fa-file-import w-4 mr-3 text-base {% if active_menu == 'import' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+            Importar Datos
+        </a>
+        {% endif %}
 
-                {% if user.has_permission('appointments') %}
-                <a href="/appointments" class="{% if active_menu == 'appointments' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-calendar-check mr-3 text-base {% if active_menu == 'appointments' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Citas Médicas
-                </a>
-                {% endif %}
-            </nav>
-        </div>
+        {% if user.has_permission('appointments') %}
+        <a href="/appointments" class="{% if active_menu == 'appointments' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+            <i class="fas fa-calendar-check w-4 mr-3 text-base {% if active_menu == 'appointments' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+            Citas Médicas
+        </a>
+        {% endif %}
 
-        <!-- Módulos Clínicos -->
+        <!-- Divisor — Módulos Clínicos -->
         {% if user.has_permission('consultations') or user.has_permission('labs') or user.has_permission('vaccines') or user.has_permission('inventory') %}
-        <div>
-            <span class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Módulos Clínicos</span>
-            <nav class="mt-2 space-y-1">
-                {% if user.has_permission('consultations') %}
-                <a href="/consultations" class="{% if active_menu == 'consultations' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-notes-medical mr-3 text-base {% if active_menu == 'consultations' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Consultas & Historias
-                </a>
-                {% endif %}
-
-                {% if user.has_permission('labs') %}
-                <a href="/lab-results" class="{% if active_menu == 'labs' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-flask mr-3 text-base {% if active_menu == 'labs' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Laboratorio
-                </a>
-                {% endif %}
-
-                {% if user.has_permission('vaccines') %}
-                <a href="/vaccines" class="{% if active_menu == 'vaccines' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-syringe mr-3 text-base {% if active_menu == 'vaccines' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Vacunas
-                </a>
-                {% endif %}
-
-                {% if user.has_permission('inventory') %}
-                <a href="/inventory" class="{% if active_menu == 'inventory' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-boxes mr-3 text-base {% if active_menu == 'inventory' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Inventario & Insumos
-                </a>
-                {% endif %}
-            </nav>
+        <div class="pt-4 pb-1.5 px-3">
+            <span class="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Clínico</span>
         </div>
+
+            {% if user.has_permission('consultations') %}
+            <a href="/consultations" class="{% if active_menu == 'consultations' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+                <i class="fas fa-notes-medical w-4 mr-3 text-base {% if active_menu == 'consultations' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+                Consultas e Historias
+            </a>
+            {% endif %}
+
+            {% if user.has_permission('labs') %}
+            <a href="/lab-results" class="{% if active_menu == 'labs' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+                <i class="fas fa-flask w-4 mr-3 text-base {% if active_menu == 'labs' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+                Laboratorio
+            </a>
+            {% endif %}
+
+            {% if user.has_permission('vaccines') %}
+            <a href="/vaccines" class="{% if active_menu == 'vaccines' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+                <i class="fas fa-syringe w-4 mr-3 text-base {% if active_menu == 'vaccines' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+                Vacunas
+            </a>
+            {% endif %}
+
+            {% if user.has_permission('inventory') %}
+            <a href="/inventory" class="{% if active_menu == 'inventory' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+                <i class="fas fa-boxes w-4 mr-3 text-base {% if active_menu == 'inventory' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+                Inventario
+            </a>
+            {% endif %}
         {% endif %}
 
-        <!-- Productividad Médica -->
+        <!-- Divisor — Productividad Médica -->
         {% if user.has_permission('prescriptions') or user.has_permission('templates') or user.has_permission('licenses') or user.has_permission('references') %}
-        <div>
-            <span class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Productividad Médica</span>
-            <nav class="mt-2 space-y-1">
-                {% if user.has_permission('prescriptions') %}
-                <a href="/prescriptions/quick" class="{% if active_menu == 'quick_prescriptions' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-bolt mr-3 text-base {% if active_menu == 'quick_prescriptions' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Receta Rápida
-                </a>
-                {% endif %}
-
-                {% if user.has_permission('templates') %}
-                <a href="/templates" class="{% if active_menu == 'templates' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-clipboard-list mr-3 text-base {% if active_menu == 'templates' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Plantillas Clínicas
-                </a>
-                {% endif %}
-
-                {% if user.has_permission('licenses') %}
-                <a href="/licenses" class="{% if active_menu == 'licenses' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-file-medical mr-3 text-base {% if active_menu == 'licenses' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Licencias Médicas
-                </a>
-                {% endif %}
-
-                {% if user.has_permission('references') %}
-                <a href="/references" class="{% if active_menu == 'references' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-envelope-open-text mr-3 text-base {% if active_menu == 'references' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Cartas de Referencia
-                </a>
-                {% endif %}
-            </nav>
+        <div class="pt-4 pb-1.5 px-3">
+            <span class="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Productividad</span>
         </div>
+
+            {% if user.has_permission('prescriptions') %}
+            <a href="/prescriptions/quick" class="{% if active_menu == 'quick_prescriptions' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+                <i class="fas fa-bolt w-4 mr-3 text-base {% if active_menu == 'quick_prescriptions' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+                Receta Rápida
+            </a>
+            {% endif %}
+
+            {% if user.has_permission('templates') %}
+            <a href="/templates" class="{% if active_menu == 'templates' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+                <i class="fas fa-clipboard-list w-4 mr-3 text-base {% if active_menu == 'templates' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+                Plantillas
+            </a>
+            {% endif %}
+
+            {% if user.has_permission('licenses') %}
+            <a href="/licenses" class="{% if active_menu == 'licenses' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+                <i class="fas fa-file-medical w-4 mr-3 text-base {% if active_menu == 'licenses' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+                Licencias Médicas
+            </a>
+            {% endif %}
+
+            {% if user.has_permission('references') %}
+            <a href="/references" class="{% if active_menu == 'references' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+                <i class="fas fa-envelope-open-text w-4 mr-3 text-base {% if active_menu == 'references' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+                Cartas de Referencia
+            </a>
+            {% endif %}
         {% endif %}
 
-        <!-- Administración -->
-        <div>
-            <span class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Administración</span>
-            <nav class="mt-2 space-y-1">
-                {% if user.has_permission('payments') %}
-                <a href="/payments" class="{% if active_menu == 'payments' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-receipt mr-3 text-base {% if active_menu == 'payments' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Facturación & Pagos
-                </a>
-                {% endif %}
-
-                {% if user.has_permission('messages') %}
-                <a href="/messages" class="{% if active_menu == 'messages' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-comments mr-3 text-base {% if active_menu == 'messages' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Mensajes Internos
-                </a>
-                {% endif %}
-
-                {% if user.has_permission('reports') %}
-                <a href="/reports" class="{% if active_menu == 'reports' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-chart-simple mr-3 text-base {% if active_menu == 'reports' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Reportes & Analítica
-                </a>
-                {% endif %}
-
-                {% if user.has_permission('users') %}
-                <a href="/users" class="{% if active_menu == 'users' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-users-cog mr-3 text-base {% if active_menu == 'users' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Usuarios & Permisos
-                </a>
-                {% endif %}
-
-                {% if user.has_permission('settings') %}
-                <a href="/settings" class="{% if active_menu == 'settings' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-cog mr-3 text-base {% if active_menu == 'settings' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Configuración
-                </a>
-                {% endif %}
-
-                {% if user.has_permission('sync') %}
-                <a href="/sync" class="{% if active_menu == 'sync' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all">
-                    <i class="fas fa-cloud-arrow-up mr-3 text-base {% if active_menu == 'sync' %}text-white{% else %}text-slate-400 group-hover:text-blue-400{% endif %}"></i>
-                    Sincronización
-                </a>
-                {% endif %}
-            </nav>
+        <!-- Divisor — Administración -->
+        <div class="pt-4 pb-1.5 px-3">
+            <span class="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Administración</span>
         </div>
+
+        {% if user.has_permission('payments') %}
+        <a href="/payments" class="{% if active_menu == 'payments' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+            <i class="fas fa-receipt w-4 mr-3 text-base {% if active_menu == 'payments' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+            Facturación & Pagos
+        </a>
+        {% endif %}
+
+        {% if user.has_permission('messages') %}
+        <a href="/messages" class="{% if active_menu == 'messages' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+            <i class="fas fa-comments w-4 mr-3 text-base {% if active_menu == 'messages' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+            Mensajes
+        </a>
+        {% endif %}
+
+        {% if user.has_permission('reports') %}
+        <a href="/reports" class="{% if active_menu == 'reports' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+            <i class="fas fa-chart-simple w-4 mr-3 text-base {% if active_menu == 'reports' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+            Reportes & Analítica
+        </a>
+        {% endif %}
+
+        {% if user.has_permission('users') %}
+        <a href="/users" class="{% if active_menu == 'users' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+            <i class="fas fa-users-cog w-4 mr-3 text-base {% if active_menu == 'users' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+            Usuarios & Permisos
+        </a>
+        {% endif %}
+
+        {% if user.has_permission('settings') %}
+        <a href="/settings" class="{% if active_menu == 'settings' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+            <i class="fas fa-cog w-4 mr-3 text-base {% if active_menu == 'settings' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+            Configuración
+        </a>
+        {% endif %}
+
+        {% if user.has_permission('sync') %}
+        <a href="/sync" class="{% if active_menu == 'sync' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+            <i class="fas fa-cloud-arrow-up w-4 mr-3 text-base {% if active_menu == 'sync' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+            Sincronización
+        </a>
+        {% endif %}
+
     </div>
 
-    <!-- User Profile & Status -->
-    <div class="p-3.5 border-t border-slate-800 bg-slate-950/80">
+    <!-- User Profile Footer -->
+    <div class="px-3 py-3 border-t border-slate-800/60 bg-slate-950/40 shrink-0">
         <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-3 truncate">
+            <div class="flex items-center space-x-2.5 min-w-0">
+                <!-- Avatar del usuario con rol codificado por color -->
                 {% if user.role == 'doctor' %}
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 shrink-0">
-                    <i class="fas fa-user-md text-sm"></i>
+                <div class="w-8 h-8 rounded-lg bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                    <i class="fas fa-user-md text-xs"></i>
                 </div>
                 {% elif user.role == 'secretaria' %}
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20 shrink-0">
-                    <i class="fas fa-headset text-sm"></i>
+                <div class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                    <i class="fas fa-headset text-xs"></i>
                 </div>
                 {% else %}
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-600/20 shrink-0">
-                    <i class="fas fa-shield-alt text-sm"></i>
+                <div class="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                    <i class="fas fa-shield-alt text-xs"></i>
                 </div>
                 {% endif %}
-                <div class="truncate">
-                    <p class="text-xs font-bold text-white truncate">{{ user.name or user.email }}</p>
+
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold text-slate-200 truncate leading-tight">{{ user.name or user.email }}</p>
                     {% if user.role == 'doctor' %}
-                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Médico
-                    </span>
+                    <span class="text-[10px] text-emerald-400 font-medium">Médico</span>
                     {% elif user.role == 'secretaria' %}
-                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Recepción
-                    </span>
+                    <span class="text-[10px] text-amber-400 font-medium">Recepción</span>
                     {% else %}
-                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
-                        <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span> Administrador
-                    </span>
+                    <span class="text-[10px] text-blue-400 font-medium">Administrador</span>
                     {% endif %}
                 </div>
             </div>
-            <a href="/logout" title="Cerrar sesión" class="text-slate-400 hover:text-red-400 p-2 rounded-lg hover:bg-slate-800 transition-colors">
-                <i class="fas fa-sign-out-alt text-sm"></i>
+            <a href="/logout" title="Cerrar sesión" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-md hover:bg-slate-800 transition-colors shrink-0">
+                <i class="fas fa-sign-out-alt text-xs"></i>
             </a>
         </div>
     </div>

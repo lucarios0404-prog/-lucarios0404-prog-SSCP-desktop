@@ -15,108 +15,427 @@
             <div class="max-w-4xl mx-auto space-y-6">
                 <div>
                     <h1 class="text-2xl font-bold text-slate-900">Configuración del Consultorio y Sistema</h1>
-                    <p class="text-xs text-slate-500 mt-0.5">Parámetros generales de la clínica, membrete de recetas y conectividad multi-sede.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Parámetros generales de la clínica, integración con WhatsApp (1-Clic y Gateway QR) y conectividad multi-sede.</p>
                 </div>
 
                 {% if saved %}
-                <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center space-x-3 text-emerald-800 text-xs font-semibold">
+                <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center space-x-3 text-emerald-800 text-xs font-semibold animate-fade-in">
                     <i class="fas fa-check-circle text-emerald-600 text-base"></i>
                     <span>¡Configuración guardada exitosamente! Los cambios se aplican de inmediato en todo el sistema.</span>
                 </div>
                 {% endif %}
 
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
-                    <form method="post" action="/settings" class="space-y-6">
-                        <!-- Sección 1: Datos del Consultorio -->
-                        <div>
-                            <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center">
-                                <i class="fas fa-clinic-medical text-blue-600 mr-2"></i> Datos del Consultorio y Membrete
-                            </h2>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre de la Clínica / Consultorio <span class="text-red-500">*</span></label>
-                                    <input type="text" name="clinic_name" value="{{ setting.clinic_name }}" required 
-                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre del Doctor Titular</label>
-                                    <input type="text" name="doctor_name" value="{{ setting.doctor_name or '' }}" 
-                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
-                                </div>
+                {% if request.query_params.get('logo_saved') %}
+                <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center space-x-3 text-emerald-800 text-xs font-semibold animate-fade-in">
+                    <i class="fas fa-image text-emerald-600 text-base"></i>
+                    <span>Logo del consultorio actualizado correctamente. Aparecerá en el membrete de todos los PDF generados.</span>
+                </div>
+                {% endif %}
 
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Especialidad Médica</label>
-                                    <input type="text" name="specialty" value="{{ setting.specialty or '' }}" 
-                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Moneda del Sistema</label>
-                                    <select name="currency" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
-                                        <option value="RD$" {% if setting.currency == 'RD$' %}selected{% endif %}>RD$ (Pesos Dominicanos)</option>
-                                        <option value="USD$" {% if setting.currency == 'USD$' %}selected{% endif %}>USD$ (Dólares)</option>
-                                        <option value="€" {% if setting.currency == '€' %}selected{% endif %}>€ (Euros)</option>
-                                    </select>
-                                </div>
+                <!-- Formulario Principal de Configuración -->
+                <form method="post" action="/settings" class="space-y-6">
+                    <!-- Tarjeta 1: Datos del Consultorio -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                        <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center">
+                            <i class="fas fa-clinic-medical text-blue-600 mr-2"></i> Datos del Consultorio y Membrete
+                        </h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre de la Clínica / Consultorio <span class="text-red-500">*</span></label>
+                                <input type="text" name="clinic_name" value="{{ setting.clinic_name }}" required 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre del Doctor Titular</label>
+                                <input type="text" name="doctor_name" value="{{ setting.doctor_name or '' }}" 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
 
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Teléfono Principal</label>
-                                    <input type="text" name="phone" value="{{ setting.phone or '' }}" 
-                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Correo Electrónico</label>
-                                    <input type="email" name="email" value="{{ setting.email or '' }}" 
-                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
-                                </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Especialidad Médica</label>
+                                <input type="text" name="specialty" value="{{ setting.specialty or '' }}" 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Moneda del Sistema</label>
+                                <select name="currency" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                                    <option value="RD$" {% if setting.currency == 'RD$' %}selected{% endif %}>RD$ (Pesos Dominicanos)</option>
+                                    <option value="USD$" {% if setting.currency == 'USD$' %}selected{% endif %}>USD$ (Dólares)</option>
+                                    <option value="€" {% if setting.currency == '€' %}selected{% endif %}>€ (Euros)</option>
+                                </select>
+                            </div>
 
-                                <div class="md:col-span-2">
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Dirección Física</label>
-                                    <input type="text" name="address" value="{{ setting.address or '' }}" 
-                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Teléfono Principal del Consultorio</label>
+                                <input type="text" name="phone" value="{{ setting.phone or '' }}" 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Correo Electrónico</label>
+                                <input type="email" name="email" value="{{ setting.email or '' }}" 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Dirección Física</label>
+                                <input type="text" name="address" value="{{ setting.address or '' }}" 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 2: Integración WhatsApp (Híbrida: 1-Clic + Gateway Autónomo QR) -->
+                    <div class="bg-white rounded-2xl border border-emerald-200/80 shadow-sm p-6 md:p-8 space-y-6 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none"></div>
+
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                            <div>
+                                <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center">
+                                    <i class="fab fa-whatsapp text-emerald-600 text-lg mr-2"></i> Integración de WhatsApp (1-Clic & Gateway QR)
+                                </h2>
+                                <p class="text-xs text-slate-500 mt-0.5">Envío de recordatorios de citas a pacientes y alertas de llegada para el doctor.</p>
+                            </div>
+                            <!-- Badge de estado del Gateway -->
+                            <div id="gw_status_badge">
+                                {% if gateway_status.is_connected %}
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+                                    Gateway Conectado ({{ gateway_status.connected_phone or setting.whatsapp_connected_phone }})
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                                    <span class="w-2 h-2 rounded-full bg-slate-400 mr-1.5"></span>
+                                    Gateway Desconectado (Modo 1-Clic Activo)
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Sub-sección: Vinculación con Código QR -->
+                        <div class="bg-gradient-to-br from-slate-50 to-emerald-50/40 p-5 rounded-xl border border-emerald-100/80">
+                            <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                <div class="space-y-1">
+                                    <p class="text-xs font-bold text-slate-900 uppercase tracking-wider">Vinculación de WhatsApp Web del Consultorio</p>
+                                    <p class="text-xs text-slate-600 leading-relaxed">
+                                        Escanee el código QR desde la app de WhatsApp de su teléfono en <strong>Dispositivos vinculados</strong> para habilitar el envío desatendido automático.
+                                    </p>
+                                    <p class="text-[11px] text-slate-500">
+                                        <i class="fas fa-shield-alt text-emerald-600 mr-1"></i> Si no está vinculado, el sistema utilizará siempre los <strong>enlaces directos wa.me de 1 clic</strong>.
+                                    </p>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2 shrink-0">
+                                    <button type="button" onclick="openQrModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center">
+                                        <i class="fas fa-qrcode mr-1.5 text-sm"></i> Vincular / Ver Código QR
+                                    </button>
+                                    {% if gateway_status.is_connected %}
+                                    <button type="button" onclick="disconnectGateway()" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl text-xs font-bold border border-red-200 transition-all">
+                                        <i class="fas fa-power-off mr-1"></i> Desconectar
+                                    </button>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Sección 2: Multi-sede y Sincronización -->
-                        <div class="pt-4 border-t border-slate-100">
-                            <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center">
-                                <i class="fas fa-network-wired text-indigo-600 mr-2"></i> Conectividad Multi-sede & Sincronización 
-                            </h2>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre de esta Sede</label>
-                                    <input type="text" name="sede_name" value="{{ setting.sede_name }}" required 
-                                        class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
-                                </div>
+                        <!-- Sub-sección: Parámetros y Automatización -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Teléfono WhatsApp del Doctor</label>
+                                <input type="text" name="whatsapp_doctor_phone" value="{{ setting.whatsapp_doctor_phone or '' }}" placeholder="Ej: 809-555-0199" 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500">
+                                <p class="mt-1 text-[11px] text-slate-400">Recibe avisos inmediatos cuando recepción pasa un paciente a sala de espera.</p>
+                            </div>
 
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Intervalo de Sync Automático</label>
-                                    <select name="sync_interval_minutes" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
-                                        <option value="1" {% if setting.sync_interval_minutes == 1 %}selected{% endif %}>Cada 1 minuto</option>
-                                        <option value="5" {% if setting.sync_interval_minutes == 5 %}selected{% endif %}>Cada 5 minutos (Recomendado)</option>
-                                        <option value="15" {% if setting.sync_interval_minutes == 15 %}selected{% endif %}>Cada 15 minutos</option>
-                                        <option value="30" {% if setting.sync_interval_minutes == 30 %}selected{% endif %}>Cada 30 minutos</option>
-                                    </select>
-                                </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Hora de Envío Automático</label>
+                                <input type="time" name="whatsapp_auto_hour" value="{{ setting.whatsapp_auto_hour or '08:30' }}" 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500">
+                                <p class="mt-1 text-[11px] text-slate-400">Hora matutina para despachar recordatorios de citas del día siguiente.</p>
+                            </div>
 
-                                <div class="md:col-span-2">
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">IP de Tailscale (VPN Multi-sede)</label>
-                                    <input type="text" name="tailscale_ip" value="{{ setting.tailscale_ip or '' }}" placeholder="Ej. 100.x.y.z (Obtenida desde la app de Tailscale)" 
-                                        class="w-full px-3.5 py-2 text-sm font-mono border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
-                                    <p class="mt-1 text-[11px] text-slate-400">Permite enlazar de forma segura múltiples consultorios a través de internet sin abrir puertos.</p>
-                                </div>
+                            <div class="flex flex-col justify-between">
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Envío Desatendido (Scheduler)</label>
+                                <label class="inline-flex items-center cursor-pointer p-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors">
+                                    <input type="checkbox" name="whatsapp_auto_send" value="true" {% if setting.whatsapp_auto_send %}checked{% endif %} class="sr-only peer">
+                                    <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600 relative"></div>
+                                    <span class="ml-3 text-xs font-semibold text-slate-800">Activar envíos automáticos</span>
+                                </label>
+                                <p class="mt-1 text-[11px] text-slate-400">Envía sin intervención manual si el gateway está conectado.</p>
                             </div>
                         </div>
 
-                        <div class="border-t border-slate-100 pt-5 flex items-center justify-end space-x-3">
-                            <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold shadow-md transition-all">
-                                <i class="fas fa-save mr-1.5"></i> Guardar Cambios
+                        <!-- Sub-sección: Plantillas de Mensajes Dinámicos -->
+                        <div class="pt-3 border-t border-slate-100 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <p class="text-xs font-bold text-slate-900 uppercase tracking-wider">Plantillas de Mensajes Personalizables</p>
+                                <div class="text-[11px] text-slate-500">
+                                    Variables disponibles: <code class="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono">{paciente}</code> <code class="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono">{doctor}</code> <code class="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono">{fecha}</code> <code class="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono">{hora}</code> <code class="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono">{clinica}</code>
+                                </div>
+                            </div>
+
+                            <!-- Plantilla 1: Recordatorio de Cita -->
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                    1. Recordatorio Pre-Cita (Para el Paciente)
+                                </label>
+                                <textarea name="whatsapp_template_reminder" rows="2" class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 font-sans leading-relaxed">{{ setting.whatsapp_template_reminder }}</textarea>
+                            </div>
+
+                            <!-- Plantilla 2: Paciente en Sala de Espera -->
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                    2. Notificación de Llegada (Aviso al WhatsApp del Doctor)
+                                </label>
+                                <textarea name="whatsapp_template_waiting" rows="2" class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 font-sans leading-relaxed">{{ setting.whatsapp_template_waiting }}</textarea>
+                            </div>
+
+                            <!-- Plantilla 3: Seguimiento Post-Consulta -->
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                    3. Seguimiento Post-Consulta / Receta Médica
+                                </label>
+                                <textarea name="whatsapp_template_followup" rows="2" class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 font-sans leading-relaxed">{{ setting.whatsapp_template_followup }}</textarea>
+                            </div>
+                        </div>
+
+                        <!-- Prueba de Envío Rápido -->
+                        <div class="pt-3 border-t border-slate-100 bg-slate-50/60 -mx-6 md:-mx-8 -mb-6 md:-mb-8 p-5 rounded-b-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div class="flex items-center space-x-2 w-full sm:w-auto">
+                                <span class="text-xs font-bold text-slate-700 shrink-0">Probar Mensaje:</span>
+                                <input type="text" id="test_wa_phone" placeholder="Número (ej: 8095550199)" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 w-full sm:w-44">
+                                <button type="button" onclick="sendTestWhatsApp()" class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shrink-0 shadow-sm transition-all">
+                                    <i class="fas fa-paper-plane mr-1"></i> Enviar Prueba
+                                </button>
+                            </div>
+                            <span id="test_wa_result" class="text-xs text-slate-500"></span>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 3: Multi-sede y Sincronización -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                        <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center">
+                            <i class="fas fa-network-wired text-indigo-600 mr-2"></i> Conectividad Multi-sede & Sincronización 
+                        </h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre de esta Sede</label>
+                                <input type="text" name="sede_name" value="{{ setting.sede_name }}" required 
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Intervalo de Sync Automático</label>
+                                <select name="sync_interval_minutes" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
+                                    <option value="1" {% if setting.sync_interval_minutes == 1 %}selected{% endif %}>Cada 1 minuto</option>
+                                    <option value="5" {% if setting.sync_interval_minutes == 5 %}selected{% endif %}>Cada 5 minutos (Recomendado)</option>
+                                    <option value="15" {% if setting.sync_interval_minutes == 15 %}selected{% endif %}>Cada 15 minutos</option>
+                                    <option value="30" {% if setting.sync_interval_minutes == 30 %}selected{% endif %}>Cada 30 minutos</option>
+                                </select>
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">IP de Tailscale (VPN Multi-sede)</label>
+                                <input type="text" name="tailscale_ip" value="{{ setting.tailscale_ip or '' }}" placeholder="Ej. 100.x.y.z (Obtenida desde la app de Tailscale)" 
+                                    class="w-full px-3.5 py-2 text-sm font-mono border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
+                                <p class="mt-1 text-[11px] text-slate-400">Permite enlazar de forma segura múltiples consultorios a través de internet sin abrir puertos.</p>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-slate-100 pt-5 mt-6 flex items-center justify-end space-x-3">
+                            <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold shadow-md transition-all">
+                                <i class="fas fa-save mr-1.5"></i> Guardar Toda la Configuración
                             </button>
                         </div>
-                    </form>
+                    </div>
+                </form>
+
+                <!-- Tarjeta Separada: Logo / Talonario del Doctor (Form Independiente) -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-1 flex items-center">
+                        <i class="fas fa-id-badge text-violet-600 mr-2"></i> Talonario y Logo del Consultorio
+                    </h2>
+                    <p class="text-xs text-slate-500 mb-4">El logo aparecer&aacute; en el membrete de <strong>recetas m&eacute;dicas</strong>, <strong>licencias</strong>, <strong>referencias</strong> y <strong>reportes PDF</strong>. Recomendado: PNG con fondo transparente, m&iacute;n. 200&times;200 px.</p>
+
+                    <div class="flex flex-col sm:flex-row items-start gap-6">
+                        <!-- Vista previa -->
+                        <div class="shrink-0">
+                            <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Logo Actual</p>
+                            {% if setting.doctor_logo_path %}
+                            <div class="w-28 h-28 border-2 border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center">
+                                <img src="/static/uploads/{{ setting.doctor_logo_path.replace('\\', '/').split('/')[-1] }}"
+                                     alt="Logo del Consultorio" class="w-full h-full object-contain p-2">
+                            </div>
+                            <p class="text-[10px] text-emerald-600 font-semibold mt-1 text-center"><i class="fas fa-check-circle mr-1"></i>Logo activo</p>
+                            {% else %}
+                            <div class="w-28 h-28 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/60 flex flex-col items-center justify-center text-slate-400">
+                                <i class="fas fa-image text-2xl mb-1"></i>
+                                <span class="text-[10px] font-medium text-center leading-tight">Sin logo<br>cargado</span>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Formulario de Subida del Logo -->
+                        <div class="flex-1 w-full">
+                            <form method="post" action="/settings/upload-logo" enctype="multipart/form-data" class="space-y-3">
+                                <div class="border-2 border-dashed border-slate-200 hover:border-violet-400 rounded-xl p-5 text-center transition-colors cursor-pointer"
+                                     onclick="document.getElementById('logo_file_input').click()">
+                                    <i class="fas fa-cloud-upload-alt text-slate-400 text-2xl mb-2 block"></i>
+                                    <p class="text-sm font-semibold text-slate-600">Seleccionar logo del consultorio</p>
+                                    <p class="text-[11px] text-slate-400 mt-0.5">PNG, JPG o WEBP &bull; M&aacute;x. 5 MB</p>
+                                    <input id="logo_file_input" name="file" type="file" accept=".png,.jpg,.jpeg,.webp"
+                                           class="hidden"
+                                           onchange="document.getElementById('logo_fname').textContent = this.files[0]?.name || 'Ningún archivo'">
+                                </div>
+                                <p class="text-[11px] text-slate-400" id="logo_fname">Ningún archivo seleccionado</p>
+                                <button type="submit" class="inline-flex items-center px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-all">
+                                    <i class="fas fa-upload mr-1.5"></i> Subir Logo al Sistema
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL: CÓDIGO QR DE WHATSAPP GATEWAY -->
+            <div id="qrModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-fade-in">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg">
+                                <i class="fab fa-whatsapp"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900">Vincular WhatsApp Gateway</h3>
+                                <p class="text-xs text-slate-500">Escanee con WhatsApp en su celular</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="closeQrModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                    </div>
+
+                    <div class="space-y-4 text-center">
+                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col items-center justify-center min-h-[220px]" id="qrContainer">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-2"></div>
+                            <span class="text-xs text-slate-500">Generando código QR seguro...</span>
+                        </div>
+
+                        <div class="text-left bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3 text-xs text-slate-700 space-y-1.5">
+                            <p class="font-bold text-emerald-900 flex items-center">
+                                <i class="fas fa-mobile-screen-button mr-1.5"></i> Instrucciones desde el teléfono:
+                            </p>
+                            <ol class="list-decimal list-inside space-y-0.5 text-[11px] text-slate-600">
+                                <li>Abra WhatsApp en su teléfono móvil.</li>
+                                <li>Toque <strong>Ajustes / Menú</strong> &gt; <strong>Dispositivos vinculados</strong>.</li>
+                                <li>Presione <strong>Vincular un dispositivo</strong> y apunte su cámara a este código.</li>
+                            </ol>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-2">
+                            <button type="button" onclick="refreshQr()" class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-semibold flex items-center">
+                                <i class="fas fa-redo-alt mr-1"></i> Regenerar QR
+                            </button>
+                            <button type="button" onclick="confirmPairing()" class="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow transition-all flex items-center">
+                                <i class="fas fa-check mr-1.5"></i> Confirmar Vinculación
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 </div>
+
+<script>
+async function openQrModal() {
+    document.getElementById('qrModal').classList.remove('hidden');
+    await refreshQr();
+}
+
+function closeQrModal() {
+    document.getElementById('qrModal').classList.add('hidden');
+}
+
+async function refreshQr() {
+    const container = document.getElementById('qrContainer');
+    container.innerHTML = `
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-2"></div>
+        <span class="text-xs text-slate-500">Generando código QR seguro...</span>
+    `;
+    try {
+        const res = await fetch('/settings/whatsapp/generate-qr', { method: 'POST' });
+        const data = await res.json();
+        if (data.qr_image_base64) {
+            container.innerHTML = `
+                <img src="${data.qr_image_base64}" alt="Código QR WhatsApp" class="w-48 h-48 rounded-lg shadow-sm border border-slate-200 bg-white p-1">
+                <p class="text-[11px] text-slate-500 mt-2"><i class="fas fa-clock mr-1"></i>Válido para escaneo inmediato</p>
+            `;
+        } else {
+            container.innerHTML = `<p class="text-xs text-red-500">Error al generar código QR</p>`;
+        }
+    } catch(e) {
+        container.innerHTML = `<p class="text-xs text-red-500">No se pudo conectar con el servidor.</p>`;
+    }
+}
+
+async function confirmPairing() {
+    const phoneInput = document.querySelector('input[name="whatsapp_doctor_phone"]');
+    const phone = phoneInput ? phoneInput.value : "+1 (809) 555-0199";
+    
+    const formData = new FormData();
+    formData.append('phone', phone || "+1 (809) 555-0199");
+
+    try {
+        const res = await fetch('/settings/whatsapp/confirm-pairing', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.is_connected) {
+            alert('¡WhatsApp Gateway vinculado con éxito! Ahora puede enviar recordatorios automáticamente.');
+            closeQrModal();
+            window.location.reload();
+        }
+    } catch(e) {
+        alert('Error al confirmar vinculación.');
+    }
+}
+
+async function disconnectGateway() {
+    if (!confirm('¿Está seguro de desconectar la sesión del Gateway de WhatsApp?')) return;
+    try {
+        const res = await fetch('/settings/whatsapp/disconnect', { method: 'POST' });
+        const data = await res.json();
+        if (!data.is_connected) {
+            window.location.reload();
+        }
+    } catch(e) {
+        alert('Error al desconectar gateway.');
+    }
+}
+
+async function sendTestWhatsApp() {
+    const phone = document.getElementById('test_wa_phone').value;
+    const resElem = document.getElementById('test_wa_result');
+    if (!phone) {
+        resElem.innerHTML = '<span class="text-red-500 font-bold">Ingrese un número</span>';
+        return;
+    }
+    resElem.innerHTML = '<span class="text-slate-500">Enviando prueba...</span>';
+    const formData = new FormData();
+    formData.append('phone', phone);
+    formData.append('message', 'Prueba de WhatsApp desde SSCP Desktop: Integración activa y funcionando.');
+
+    try {
+        const res = await fetch('/settings/whatsapp/send-test', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            if (data.mode === 'wa_link') {
+                resElem.innerHTML = `<a href="${data.wa_link}" target="_blank" class="text-emerald-700 font-bold underline"><i class="fas fa-external-link-alt mr-1"></i>Abrir WhatsApp (1-Clic)</a>`;
+                window.open(data.wa_link, '_blank');
+            } else {
+                resElem.innerHTML = `<span class="text-emerald-600 font-bold"><i class="fas fa-check-circle mr-1"></i>Enviado por Gateway</span>`;
+            }
+        } else {
+            resElem.innerHTML = `<span class="text-red-500 font-bold">${data.error || 'Error'}</span>`;
+        }
+    } catch(e) {
+        resElem.innerHTML = '<span class="text-red-500 font-bold">Error de conexión</span>';
+    }
+}
+</script>
 {% endblock %}

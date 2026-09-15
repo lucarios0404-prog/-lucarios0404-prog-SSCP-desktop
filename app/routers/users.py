@@ -11,7 +11,7 @@ from app.database import get_db
 from app.models.user import User
 from app.core.deps import require_current_user, require_admin
 from app.core.security import get_password_hash
-from app.core.permissions import AVAILABLE_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, ROLE_LABELS
+from app.core.permissions import AVAILABLE_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, ROLE_LABELS, get_available_permissions
 
 router = APIRouter(prefix="/users", tags=["users"])
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -54,6 +54,7 @@ def list_users(
         context={
             "user": current_user,
             "users_data": users_data,
+            "available_permissions": get_available_permissions(db),
             "success": request.query_params.get("success"),
             "error": request.query_params.get("error")
         }
@@ -70,7 +71,7 @@ def create_user_form(
         name="users/create.html",
         context={
             "user": current_user,
-            "available_permissions": AVAILABLE_PERMISSIONS,
+            "available_permissions": get_available_permissions(db),
             "default_permissions_json": json.dumps(DEFAULT_ROLE_PERMISSIONS),
             "role_labels": ROLE_LABELS,
             "error": None
@@ -99,7 +100,7 @@ def create_user_submit(
             name="users/create.html",
             context={
                 "user": current_user,
-                "available_permissions": AVAILABLE_PERMISSIONS,
+                "available_permissions": get_available_permissions(db),
                 "default_permissions_json": json.dumps(DEFAULT_ROLE_PERMISSIONS),
                 "role_labels": ROLE_LABELS,
                 "error": f"Ya existe un usuario registrado con el correo '{clean_email}'."
@@ -157,7 +158,7 @@ def edit_user_form(
             "target_user": target_user,
             "current_perms": current_perms,
             "has_custom": has_custom,
-            "available_permissions": AVAILABLE_PERMISSIONS,
+            "available_permissions": get_available_permissions(db),
             "default_permissions_json": json.dumps(DEFAULT_ROLE_PERMISSIONS),
             "role_labels": ROLE_LABELS,
             "error": None

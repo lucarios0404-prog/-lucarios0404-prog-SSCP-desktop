@@ -1,47 +1,121 @@
 /* ==========================================================================
-   SSCP Desktop - Global Styles & Dark/Light Mode Theme System
+   SSCP Desktop — Global Styles v2.0 (taste-skill medical edition)
+   Design Tokens: Inter font · Unified radius scale · Tinted shadows
    ========================================================================== */
 
-/* Transición suave al cambiar de tema */
+/* --- CSS Custom Properties (Design Token System) --- */
+:root {
+    /* Color accent — azul clínico (solo uno, consistente en toda la app) */
+    --color-accent: 37 99 235;          /* blue-600 */
+    --color-accent-light: 219 234 254;  /* blue-100 */
+    --color-accent-dark: 29 78 216;     /* blue-700 */
+
+    /* Semantic surface tokens */
+    --surface-base: 248 250 252;        /* slate-50 */
+    --surface-card: 255 255 255;        /* white */
+    --surface-sidebar: 15 23 42;        /* slate-900 */
+
+    /* Border tokens */
+    --border-default: 226 232 240;      /* slate-200 */
+    --border-subtle: 241 245 249;       /* slate-100 */
+
+    /* Text tokens */
+    --text-primary: 15 23 42;           /* slate-900 */
+    --text-secondary: 100 116 139;      /* slate-500 */
+    --text-muted: 148 163 184;          /* slate-400 */
+
+    /* Radius — un solo sistema en toda la app */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 10px;
+    --radius-xl: 12px;
+    --radius-2xl: 16px;
+}
+
+/* --- Dark Mode Tokens --- */
+html.dark {
+    color-scheme: dark;
+    --surface-base: 9 13 22;
+    --surface-card: 18 25 41;
+    --border-default: 32 43 61;
+    --border-subtle: 24 35 52;
+    --text-primary: 248 250 252;
+    --text-secondary: 148 163 184;
+    --text-muted: 100 116 139;
+}
+
+/* --- Transición suave al cambiar de tema --- */
 html.theme-transition,
 html.theme-transition *,
 html.theme-transition *:before,
 html.theme-transition *:after {
-    transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease !important;
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease !important;
 }
 
-/* Scrollbars personalizados */
+/* --- Fuente global --- */
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';  /* Inter optical features */
+}
+
+/* Números tabulares para datos clínicos (TA, glucosa, dosis, cédulas) */
+.tabular-nums, table td, .font-mono {
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- Scrollbars — sutiles y tintadas --- */
 ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
 }
 ::-webkit-scrollbar-track {
     background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: rgba(148, 163, 184, 0.4);
     border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: rgba(100, 116, 139, 0.6);
+}
+html.dark ::-webkit-scrollbar-thumb {
+    background: rgba(51, 65, 85, 0.8);
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(71, 85, 105, 0.9);
 }
 
-/* ==========================================================================
-   DARK MODE THEME OVERRIDES (Modo Negro / Oscuro)
-   ========================================================================== */
-html.dark {
-    color-scheme: dark;
+/* --- Micro-interacciones táctiles en botones --- */
+.btn-press:active,
+button[type="submit"]:active:not(:disabled),
+a[class*="bg-blue-6"]:active,
+a[class*="bg-emerald-6"]:active,
+a[class*="bg-amber-5"]:active {
+    transform: scale(0.98) translateY(0.5px);
+    transition: transform 80ms ease;
 }
 
-html.dark body {
-    background-color: #090d16 !important;
-    color: #f1f5f9 !important;
+/* --- Sombra de tarjeta tintada (no sombra negra genérica) --- */
+.card-shadow {
+    box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+}
+.card-shadow-hover:hover {
+    box-shadow: 0 4px 12px 0 rgba(15, 23, 42, 0.08), 0 2px 4px -1px rgba(15, 23, 42, 0.05);
+    transition: box-shadow 150ms ease;
 }
 
-/* Contenedores principales y fondos base */
+/* ============================================================
+   DARK MODE — Overrides limpios (sin !important masivo)
+   ============================================================ */
+
+/* Fondos base */
+html.dark body,
 html.dark .bg-slate-50,
 html.dark .bg-gray-50 {
-    background-color: #090d16 !important;
+    background-color: #090d16;
+    color: #f1f5f9;
 }
 
 html.dark .bg-white {
@@ -60,17 +134,15 @@ html.dark header {
     background-color: #101624 !important;
     border-color: #1d283b !important;
 }
-
 html.dark header h2 {
     color: #f8fafc !important;
 }
-
 html.dark aside {
     background-color: #0a0f1b !important;
     border-color: #1d283b !important;
 }
 
-/* Botón de alternar tema en header */
+/* Toggle de tema */
 html.dark #theme-toggle-btn {
     background-color: #172134 !important;
     border-color: #29384e !important;
@@ -80,50 +152,44 @@ html.dark #theme-toggle-btn:hover {
     background-color: #1e2c44 !important;
 }
 
-/* Textos en Modo Oscuro */
+/* Textos */
 html.dark .text-slate-900,
 html.dark .text-gray-900,
 html.dark .text-slate-800,
 html.dark .text-gray-800 {
     color: #f8fafc !important;
 }
-
 html.dark .text-slate-700,
 html.dark .text-gray-700 {
     color: #cbd5e1 !important;
 }
-
 html.dark .text-slate-600,
 html.dark .text-gray-600 {
     color: #94a3b8 !important;
 }
-
 html.dark .text-slate-500,
 html.dark .text-gray-500 {
     color: #64748b !important;
 }
 
-/* Bordes y Divisiones */
+/* Bordes */
 html.dark .border-slate-200,
 html.dark .border-gray-200 {
     border-color: #202b3d !important;
 }
-
 html.dark .border-slate-100,
 html.dark .border-gray-100 {
     border-color: #182334 !important;
 }
-
 html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
 html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
     border-color: #182334 !important;
 }
-
 html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
     border-color: #202b3d !important;
 }
 
-/* Inputs, Selects y Textareas */
+/* Inputs, Selects, Textareas */
 html.dark input:not([type="checkbox"]):not([type="radio"]),
 html.dark select,
 html.dark textarea {
@@ -131,14 +197,12 @@ html.dark textarea {
     border-color: #24334a !important;
     color: #f8fafc !important;
 }
-
 html.dark input:focus,
 html.dark select:focus,
 html.dark textarea:focus {
-    border-color: #6366f1 !important;
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25) !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
 }
-
 html.dark input::placeholder,
 html.dark textarea::placeholder {
     color: #475569 !important;
@@ -150,24 +214,11 @@ html.dark table thead {
     border-color: #202b3d !important;
     color: #94a3b8 !important;
 }
-
 html.dark table tbody tr:hover {
     background-color: rgba(30, 42, 62, 0.5) !important;
 }
 
-/* Cajas destacadas y tarjetas de colores adaptativas */
-html.dark .bg-violet-50,
-html.dark .bg-violet-50\/50,
-html.dark .bg-violet-50\/80 {
-    background-color: rgba(139, 92, 246, 0.12) !important;
-    border-color: rgba(139, 92, 246, 0.25) !important;
-}
-html.dark .text-violet-950,
-html.dark .text-violet-900,
-html.dark .text-violet-800 {
-    color: #ddd6fe !important;
-}
-
+/* Tarjetas de colores semánticos */
 html.dark .bg-blue-50,
 html.dark .bg-blue-50\/30 {
     background-color: rgba(59, 130, 246, 0.12) !important;
@@ -207,6 +258,18 @@ html.dark .text-rose-800 {
     color: #fecdd3 !important;
 }
 
+html.dark .bg-violet-50,
+html.dark .bg-violet-50\/50,
+html.dark .bg-violet-50\/80 {
+    background-color: rgba(139, 92, 246, 0.12) !important;
+    border-color: rgba(139, 92, 246, 0.25) !important;
+}
+html.dark .text-violet-950,
+html.dark .text-violet-900,
+html.dark .text-violet-800 {
+    color: #ddd6fe !important;
+}
+
 html.dark .bg-indigo-50 {
     background-color: rgba(99, 102, 241, 0.12) !important;
     border-color: rgba(99, 102, 241, 0.25) !important;
@@ -216,10 +279,28 @@ html.dark .text-indigo-800 {
     color: #c7d2fe !important;
 }
 
-/* Scrollbar en modo oscuro */
-html.dark ::-webkit-scrollbar-thumb {
-    background: #334155;
+/* Textos de estado activo/acento en modo oscuro */
+html.dark .text-indigo-600 { color: #818cf8 !important; }
+html.dark .text-violet-600 { color: #a78bfa !important; }
+html.dark .text-teal-700 { color: #5eead4 !important; }
+
+/* --- Estados vacíos (empty states) --- */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    gap: 0.75rem;
 }
-html.dark ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
+.empty-state-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
 }

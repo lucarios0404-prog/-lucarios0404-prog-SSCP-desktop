@@ -19,6 +19,10 @@ class User(Base):
         """Verifica si el usuario tiene un permiso específico por rol o personalización."""
         if self.role == "admin":
             return True
+        # Si el permiso fue desactivado globalmente por el administrador, se bloquea el acceso
+        from app.core.permissions import get_inactive_permission_keys
+        if perm_key in get_inactive_permission_keys():
+            return False
         # El rol secretaria nunca puede realizar actos médicos estrictos (consultas, recetas, licencias, referencias)
         if self.role == "secretaria" and perm_key in ["consultations", "prescriptions", "licenses", "references"]:
             return False
@@ -32,3 +36,4 @@ class User(Base):
                 pass
         from app.core.permissions import DEFAULT_ROLE_PERMISSIONS
         return perm_key in DEFAULT_ROLE_PERMISSIONS.get(self.role, [])
+

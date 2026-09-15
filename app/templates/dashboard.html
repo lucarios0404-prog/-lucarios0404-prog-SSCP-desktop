@@ -11,114 +11,105 @@
         {% set page_title = "Panel de Control" %}
         {% include "partials/header.html" %}
 
-        <main class="flex-1 overflow-y-auto p-6 md:p-8">
-            <div class="max-w-7xl mx-auto space-y-6">
-                <!-- Welcome Banner -->
-                <div class="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 rounded-2xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
-                    <div class="relative z-10 max-w-2xl">
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-blue-100 backdrop-blur-sm mb-3">
-                            <i class="fas fa-shield-alt mr-1.5"></i> Sistema Clínico de Escritorio v1.0
-                        </span>
-                        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">Bienvenido, {{ user.name or user.email }}</h1>
-                        <p class="mt-2 text-blue-100 text-sm md:text-base leading-relaxed">
-                            Gestiona pacientes, citas, historias clínicas y facturación local con respaldo y sincronización multi-sede.
-                        </p>
-                        <div class="mt-6 flex flex-wrap gap-3">
-                            <a href="/patients/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-white text-blue-700 font-semibold text-sm hover:bg-blue-50 shadow transition-all">
-                                <i class="fas fa-user-plus mr-2"></i> Nuevo Paciente
-                            </a>
-                            <a href="/appointments/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-blue-600/60 hover:bg-blue-600 text-white font-semibold text-sm border border-white/30 backdrop-blur-sm transition-all">
-                                <i class="fas fa-calendar-plus mr-2"></i> Agendar Cita
-                            </a>
-                            <a href="/appointments?action=walkin" class="inline-flex items-center px-4 py-2 rounded-xl bg-amber-500/80 hover:bg-amber-500 text-white font-semibold text-sm border border-white/30 backdrop-blur-sm transition-all" title="Indicar que un paciente llegó hoy (con o sin cita) y ponerlo en espera">
-                                <i class="fas fa-user-clock mr-2"></i> Marcar Llegada Paciente
-                            </a>
-                            {% if user.has_permission('consultations') %}
-                            <a href="/consultations/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-indigo-600/60 hover:bg-indigo-600 text-white font-semibold text-sm border border-white/30 backdrop-blur-sm transition-all">
-                                <i class="fas fa-stethoscope mr-2"></i> Nueva Consulta
-                            </a>
-                            {% endif %}
-                            <a href="/payments/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-emerald-600/60 hover:bg-emerald-600 text-white font-semibold text-sm border border-white/30 backdrop-blur-sm transition-all">
-                                <i class="fas fa-receipt mr-2"></i> Registrar Pago
-                            </a>
+        <main class="flex-1 overflow-y-auto p-5 md:p-7">
+            <div class="max-w-7xl mx-auto space-y-5">
+
+                <!-- Welcome Banner — estilo Enterprise Clean, sin gradiente genérico -->
+                <div class="bg-slate-900 rounded-xl p-6 md:p-7 text-white relative overflow-hidden border border-slate-800">
+                    <!-- Borde izquierdo acento clínico -->
+                    <div class="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-l-xl"></div>
+                    <div class="relative z-10 pl-1">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-5">
+                            <div class="max-w-xl">
+                                <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">Sistema Clínico · v1.0</p>
+                                <h1 class="text-xl md:text-2xl font-semibold tracking-tight text-white leading-snug">
+                                    Bienvenido, <span class="text-blue-300">{{ user.name or user.email }}</span>
+                                </h1>
+                                <p class="mt-1.5 text-slate-400 text-sm leading-relaxed max-w-lg">
+                                    Gestiona pacientes, citas, historias clínicas y facturación de forma local y segura.
+                                </p>
+                            </div>
+                            <!-- Acciones primarias — máx 3 para no sobrecargar el banner -->
+                            <div class="flex flex-wrap gap-2 shrink-0">
+                                <a href="/patients/create" class="inline-flex items-center px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all shadow-sm">
+                                    <i class="fas fa-user-plus mr-2 text-xs"></i> Nuevo Paciente
+                                </a>
+                                <a href="/appointments/create" class="inline-flex items-center px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm border border-slate-700 transition-all">
+                                    <i class="fas fa-calendar-plus mr-2 text-xs"></i> Agendar Cita
+                                </a>
+                                <a href="/appointments?action=walkin" class="inline-flex items-center px-3.5 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold text-sm border border-amber-500/30 transition-all" title="Indicar que un paciente llegó hoy y ponerlo en espera">
+                                    <i class="fas fa-user-clock mr-2 text-xs"></i> Marcar Llegada
+                                </a>
+                            </div>
                         </div>
                     </div>
-                    <div class="hidden lg:block absolute -right-6 -bottom-8 opacity-25 pointer-events-none w-72 h-72">
-                        <img src="/static/images/hero/hero-illustration.png" alt="SSCP Medical Illustration" class="w-full h-full object-contain filter drop-shadow-lg">
+                    <!-- Ilustración decorativa sutil -->
+                    <div class="hidden lg:block absolute -right-4 -bottom-4 opacity-10 pointer-events-none w-48 h-48">
+                        <img src="/static/images/hero/hero-illustration.png" alt="" class="w-full h-full object-contain">
                     </div>
                 </div>
 
-                <!-- Sala de Espera Activa (Notificación para Doctor y Recepción) -->
+                <!-- Sala de Espera Activa -->
                 {% if waiting_patients %}
-                <div class="bg-gradient-to-r from-amber-500/10 via-amber-50/80 to-emerald-500/10 border-2 border-amber-300 rounded-2xl p-5 md:p-6 shadow-sm">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/60 pb-3 mb-4">
-                        <div class="flex items-center space-x-3">
-                            <span class="relative flex h-3.5 w-3.5">
+                <div class="bg-white border border-amber-200 rounded-xl p-5 shadow-[0_1px_3px_0_rgba(245,158,11,0.08)]">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                        <div class="flex items-center space-x-2.5">
+                            <span class="relative flex h-3 w-3 shrink-0">
                                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
                             </span>
                             <div>
-                                <h2 class="text-base md:text-lg font-extrabold text-amber-950 flex items-center gap-2">
-                                    <i class="fas fa-couch text-amber-600"></i> Sala de Espera Activa
-                                    <span class="text-xs px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold">
-                                        {{ waiting_patients|length }} paciente{{ 's' if waiting_patients|length != 1 else '' }} esperando
+                                <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                    Sala de Espera
+                                    <span class="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-200/60">
+                                        {{ waiting_patients|length }} esperando
                                     </span>
                                 </h2>
-                                <p class="text-xs text-amber-800/80">Pacientes presentes en clínica listos para pasar a consulta con el médico.</p>
+                                <p class="text-xs text-slate-500">Pacientes presentes listos para ser atendidos.</p>
                             </div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <a href="/appointments?status=En Espera" class="text-xs text-amber-800 hover:text-amber-950 font-bold underline">
-                                Ver todos en espera &rarr;
-                            </a>
-                        </div>
+                        <a href="/appointments?status=En Espera" class="text-xs text-amber-700 hover:text-amber-900 font-semibold">
+                            Ver todos →
+                        </a>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {% for wp in waiting_patients %}
-                        <div class="bg-white rounded-xl border border-amber-200/90 shadow-sm p-4 flex flex-col justify-between hover:shadow-md transition-shadow">
+                        <div class="bg-slate-50 rounded-lg border border-slate-200/80 p-4 flex flex-col justify-between hover:border-amber-300 transition-colors duration-150">
                             <div>
                                 <div class="flex items-start justify-between gap-2">
                                     <div>
-                                        <h3 class="text-sm font-bold text-slate-900">
+                                        <h3 class="text-sm font-semibold text-slate-900">
                                             <a href="/patients/{{ wp.patient_id }}" class="hover:text-blue-600">
                                                 {{ wp.patient.first_name }} {{ wp.patient.last_name }}
                                             </a>
                                         </h3>
-                                        <p class="text-[11px] text-slate-500 font-mono">
-                                            DNI: {{ wp.patient.document_id or 'Sin DNI' }}
-                                        </p>
+                                        <p class="text-[11px] text-slate-400 font-mono mt-0.5">{{ wp.patient.document_id or 'Sin DNI' }}</p>
                                     </div>
-                                    <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold {% if 'Sin cita' in wp.reason or 'espontánea' in wp.reason %}bg-amber-100 text-amber-800 border border-amber-300{% else %}bg-blue-100 text-blue-800 border border-blue-200{% endif %}">
+                                    <span class="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full font-bold shrink-0 {% if 'Sin cita' in wp.reason or 'espontánea' in wp.reason %}bg-amber-100 text-amber-700{% else %}bg-blue-100 text-blue-700{% endif %}">
                                         {% if 'Sin cita' in wp.reason or 'espontánea' in wp.reason %}Sin Cita{% else %}Con Cita{% endif %}
                                     </span>
                                 </div>
 
-                                <div class="mt-2.5 flex items-center text-xs text-slate-600 space-x-2">
-                                    <span class="inline-flex items-center text-amber-700 font-semibold">
-                                        <i class="far fa-clock mr-1 text-amber-500"></i> Llegó: {{ wp.start_time.strftime("%I:%M %p") }}
-                                    </span>
+                                <div class="mt-2 text-xs text-amber-700 font-medium">
+                                    <i class="far fa-clock mr-1"></i>{{ wp.start_time.strftime("%I:%M %p") }}
                                 </div>
 
                                 {% if wp.notes or wp.reason %}
-                                <div class="mt-2 p-2 bg-slate-50 rounded-lg text-xs text-slate-600 italic border border-slate-100">
-                                    {{ wp.notes or wp.reason }}
-                                </div>
+                                <p class="mt-1.5 text-xs text-slate-500 italic line-clamp-2">{{ wp.notes or wp.reason }}</p>
                                 {% endif %}
                             </div>
 
-                            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                                <a href="/patients/{{ wp.patient_id }}" class="text-xs text-slate-500 hover:text-slate-800 font-medium">
-                                    Ver Ficha
-                                </a>
+                            <div class="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-between">
+                                <a href="/patients/{{ wp.patient_id }}" class="text-xs text-slate-400 hover:text-slate-700 font-medium">Ver Ficha</a>
                                 {% if user.has_permission('consultations') %}
                                 <a href="/consultations/create?patient_id={{ wp.patient_id }}&appointment_id={{ wp.id }}&walk_in=1" 
-                                   class="inline-flex items-center px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow shadow-emerald-500/20 transition-all">
-                                    <i class="fas fa-bolt mr-1.5"></i> Atender Ahora
+                                   class="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all">
+                                    <i class="fas fa-bolt mr-1.5 text-[10px]"></i> Atender
                                 </a>
                                 {% else %}
-                                <span class="inline-flex items-center text-xs font-semibold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full">
-                                    <i class="fas fa-clock mr-1"></i> Esperando al Doctor
+                                <span class="text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                                    <i class="fas fa-clock mr-1 text-[10px]"></i> En espera
                                 </span>
                                 {% endif %}
                             </div>
@@ -128,115 +119,136 @@
                 </div>
                 {% endif %}
 
-                <!-- KPI Cards -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Pacientes</p>
-                            <h3 class="text-2xl font-bold text-slate-900 mt-1">{{ total_patients | default(0) }}</h3>
-                            <a href="/patients" class="text-xs text-blue-600 font-medium hover:underline mt-2 inline-block">Ver listado &rarr;</a>
+                <!-- KPI Cards — iconos tintados, sin colores sólidos masivos -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Pacientes -->
+                    <div class="bg-white rounded-xl p-5 border border-slate-200/80 shadow-card flex items-center gap-4">
+                        <div class="w-11 h-11 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                            <i class="fas fa-users text-base"></i>
                         </div>
-                        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
-                            <i class="fas fa-users"></i>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Citas Programadas</p>
-                            <h3 class="text-2xl font-bold text-indigo-900 mt-1">{{ total_appointments | default(0) }}</h3>
-                            <a href="/appointments" class="text-xs text-indigo-600 font-medium hover:underline mt-2 inline-block">Ver calendario &rarr;</a>
-                        </div>
-                        <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl font-bold">
-                            <i class="fas fa-calendar-alt"></i>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wide truncate">Pacientes</p>
+                            <p class="text-2xl font-bold text-slate-900 tabular-nums leading-tight">{{ total_patients | default(0) }}</p>
+                            <a href="/patients" class="text-[11px] text-blue-600 font-medium hover:underline">Ver listado →</a>
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Consultas Médicas</p>
-                            <h3 class="text-2xl font-bold text-violet-900 mt-1">{{ total_consultations | default(0) }}</h3>
-                            <a href="/consultations" class="text-xs text-violet-600 font-medium hover:underline mt-2 inline-block">Historias clínicas &rarr;</a>
+                    <!-- Citas -->
+                    <div class="bg-white rounded-xl p-5 border border-slate-200/80 shadow-card flex items-center gap-4">
+                        <div class="w-11 h-11 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                            <i class="fas fa-calendar-alt text-base"></i>
                         </div>
-                        <div class="w-12 h-12 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center text-xl font-bold">
-                            <i class="fas fa-notes-medical"></i>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wide truncate">Citas</p>
+                            <p class="text-2xl font-bold text-slate-900 tabular-nums leading-tight">{{ total_appointments | default(0) }}</p>
+                            <a href="/appointments" class="text-[11px] text-indigo-600 font-medium hover:underline">Ver agenda →</a>
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Saldo por Cobrar</p>
-                            <h3 class="text-2xl font-bold text-amber-600 mt-1">RD$ {{ "%.2f"|format(total_pending_debt|default(0.0)) }}</h3>
-                            <a href="/payments?status=pending" class="text-xs text-amber-600 font-medium hover:underline mt-2 inline-block">Cobros pendientes &rarr;</a>
+                    <!-- Consultas -->
+                    {% if user.has_permission('consultations') %}
+                    <div class="bg-white rounded-xl p-5 border border-slate-200/80 shadow-card flex items-center gap-4">
+                        <div class="w-11 h-11 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+                            <i class="fas fa-notes-medical text-base"></i>
                         </div>
-                        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
-                            <i class="fas fa-hand-holding-usd"></i>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wide truncate">Consultas</p>
+                            <p class="text-2xl font-bold text-slate-900 tabular-nums leading-tight">{{ total_consultations | default(0) }}</p>
+                            <a href="/consultations" class="text-[11px] text-violet-600 font-medium hover:underline">Historias →</a>
+                        </div>
+                    </div>
+                    {% endif %}
+
+
+                    <!-- Saldo por cobrar -->
+                    <div class="bg-white rounded-xl p-5 border border-slate-200/80 shadow-card flex items-center gap-4">
+                        <div class="w-11 h-11 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                            <i class="fas fa-hand-holding-usd text-base"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wide truncate">Por Cobrar</p>
+                            <p class="text-lg font-bold text-slate-900 tabular-nums leading-tight">RD$ {{ "%.0f"|format(total_pending_debt|default(0.0)) }}</p>
+                            <a href="/payments?status=pending" class="text-[11px] text-amber-600 font-medium hover:underline">Pendientes →</a>
                         </div>
                     </div>
                 </div>
 
-                <!-- Recent Grid -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Recent Appointments -->
-                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                            <h3 class="text-base font-bold text-slate-800 flex items-center">
-                                <i class="fas fa-calendar-day text-blue-600 mr-2"></i> Próximas Citas
+                <!-- Tablas recientes -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+                    <!-- Próximas Citas -->
+                    <div class="bg-white rounded-xl border border-slate-200/80 shadow-card">
+                        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                            <h3 class="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                Próximas Citas
                             </h3>
-                            <a href="/appointments" class="text-xs text-blue-600 hover:underline font-semibold">Ver todas</a>
+                            <a href="/appointments" class="text-xs text-blue-600 hover:underline font-medium">Ver todas</a>
                         </div>
                         {% if recent_appointments %}
                         <div class="divide-y divide-slate-100">
                             {% for a in recent_appointments %}
-                            <div class="py-3 flex items-center justify-between">
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-900">{{ a.patient.first_name }} {{ a.patient.last_name }}</p>
-                                    <p class="text-xs text-slate-500">{{ a.date.strftime("%d/%m/%Y") }} • {{ a.start_time.strftime("%H:%M") }} • {{ a.reason }}</p>
+                            <div class="px-5 py-3 flex items-center justify-between hover:bg-slate-50/70 transition-colors duration-100">
+                                <div class="min-w-0 mr-3">
+                                    <p class="text-sm font-medium text-slate-900 truncate">{{ a.patient.first_name }} {{ a.patient.last_name }}</p>
+                                    <p class="text-xs text-slate-400 font-mono">{{ a.date.strftime("%d/%m/%Y") }} · {{ a.start_time.strftime("%H:%M") }}</p>
                                 </div>
-                                <span class="px-2.5 py-1 text-xs rounded-full font-medium {% if a.status == 'Confirmada' %}bg-blue-100 text-blue-800{% elif a.status == 'Completada' %}bg-emerald-100 text-emerald-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+                                <span class="text-[11px] px-2.5 py-1 rounded-full font-semibold shrink-0 {% if a.status == 'Confirmada' %}bg-blue-100 text-blue-700{% elif a.status == 'Completada' %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %}">
                                     {{ a.status }}
                                 </span>
                             </div>
                             {% endfor %}
                         </div>
                         {% else %}
-                        <p class="text-xs text-slate-400 py-6 text-center">No hay citas programadas recientemente.</p>
+                        <div class="empty-state">
+                            <div class="empty-state-icon bg-slate-100 text-slate-400">
+                                <i class="fas fa-calendar"></i>
+                            </div>
+                            <p class="text-sm font-medium text-slate-500">Sin citas próximas</p>
+                            <a href="/appointments/create" class="text-xs text-blue-600 hover:underline font-medium">Agendar la primera →</a>
+                        </div>
                         {% endif %}
                     </div>
 
-                    <!-- Recent Consultations -->
-                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                            <h3 class="text-base font-bold text-slate-800 flex items-center">
-                                <i class="fas fa-history text-indigo-600 mr-2"></i> Consultas Recientes
+                    <!-- Consultas Recientes -->
+                    {% if user.has_permission('consultations') or user.has_permission('print_prescriptions') %}
+                    <div class="bg-white rounded-xl border border-slate-200/80 shadow-card">
+                        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                            <h3 class="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-violet-500"></span>
+                                Consultas Recientes
                             </h3>
-                            <a href="/consultations" class="text-xs text-indigo-600 hover:underline font-semibold">Ver todas</a>
+                            {% if user.has_permission('consultations') %}
+                            <a href="/consultations" class="text-xs text-violet-600 hover:underline font-medium">Ver todas</a>
+                            {% endif %}
                         </div>
                         {% if recent_consultations %}
                         <div class="divide-y divide-slate-100">
                             {% for c in recent_consultations %}
-                            <div class="py-3 flex items-center justify-between">
-                                <div>
+                            <div class="px-5 py-3 flex items-center justify-between hover:bg-slate-50/70 transition-colors duration-100">
+                                <div class="min-w-0 mr-3">
                                     {% if user.has_permission('consultations') or user.has_permission('print_prescriptions') %}
-                                    <a href="/consultations/{{ c.id }}" class="text-sm font-semibold text-indigo-600 hover:underline">
+                                    <a href="/consultations/{{ c.id }}" class="text-sm font-medium text-slate-900 hover:text-violet-600 truncate block">
                                         {{ c.patient.first_name }} {{ c.patient.last_name }}
                                     </a>
                                     {% else %}
-                                    <a href="/patients/{{ c.patient.id }}" class="text-sm font-semibold text-indigo-600 hover:underline">
+                                    <a href="/patients/{{ c.patient.id }}" class="text-sm font-medium text-slate-900 hover:text-violet-600 truncate block">
                                         {{ c.patient.first_name }} {{ c.patient.last_name }}
                                     </a>
                                     {% endif %}
-                                    <p class="text-xs text-slate-500">{{ c.created_at.strftime("%d/%m/%Y %H:%M") }} • {{ c.reason }}</p>
+                                    <p class="text-xs text-slate-400 font-mono">{{ c.created_at.strftime("%d/%m/%Y %H:%M") }}</p>
                                 </div>
-                                <div class="flex items-center space-x-2">
+                                <div class="flex items-center gap-2 shrink-0">
                                     {% if c.prescription and user.has_permission('print_prescriptions') %}
-                                    <a href="/consultations/{{ c.id }}/prescription/pdf" target="_blank" class="inline-flex items-center px-2 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-xs font-semibold border border-teal-200 transition-all" title="Imprimir Receta Médica en PDF">
+                                    <a href="/consultations/{{ c.id }}/prescription/pdf" target="_blank" 
+                                       class="inline-flex items-center px-2 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-md text-[11px] font-semibold border border-teal-200 transition-all" 
+                                       title="Imprimir Receta PDF">
                                         <i class="fas fa-print mr-1"></i> Receta
                                     </a>
                                     {% endif %}
                                     {% if user.has_permission('consultations') or user.has_permission('print_prescriptions') %}
-                                    <a href="/consultations/{{ c.id }}" class="text-xs text-slate-400 hover:text-indigo-600 p-1" title="Ver Detalle">
-                                        <i class="fas fa-chevron-right"></i>
+                                    <a href="/consultations/{{ c.id }}" class="text-slate-300 hover:text-violet-500 p-1 transition-colors">
+                                        <i class="fas fa-chevron-right text-xs"></i>
                                     </a>
                                     {% endif %}
                                 </div>
@@ -244,9 +256,20 @@
                             {% endfor %}
                         </div>
                         {% else %}
-                        <p class="text-xs text-slate-400 py-6 text-center">No hay historias médicas registradas aún.</p>
+                        <div class="empty-state">
+                            <div class="empty-state-icon bg-slate-100 text-slate-400">
+                                <i class="fas fa-notes-medical"></i>
+                            </div>
+                            <p class="text-sm font-medium text-slate-500">Sin consultas registradas</p>
+                            {% if user.has_permission('consultations') %}
+                            <a href="/consultations/create" class="text-xs text-violet-600 hover:underline font-medium">Registrar primera consulta →</a>
+                            {% endif %}
+                        </div>
                         {% endif %}
                     </div>
+                    {% endif %}
+
+
                 </div>
             </div>
         </main>

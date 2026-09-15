@@ -167,7 +167,7 @@ def run_tests():
         dash_doc = client.get("/dashboard")
         assert dash_doc.status_code == 200
         assert "Receta Rápida" in dash_doc.text
-        assert "Plantillas Clínicas" in dash_doc.text
+        assert "Plantillas" in dash_doc.text
         assert "Usuarios & Permisos" not in dash_doc.text
         print("  OK: Sidebar de Médico delimitado: Muestra clínica y prescripciones, oculta usuarios.")
 

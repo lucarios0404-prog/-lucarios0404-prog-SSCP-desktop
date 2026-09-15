@@ -20,6 +20,19 @@
                         <p class="text-xs text-slate-500 mt-0.5">Métricas epidemiológicas, demografía de pacientes y exportación de bases de datos a formato Excel/CSV.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
+                        <a href="/reports/export/pdf" class="inline-flex items-center px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-sm transition-all" title="Exportar Reporte Ejecutivo Clínico en PDF con membrete del doctor">
+                            <i class="fas fa-file-pdf mr-2"></i> Reporte Clínico (PDF)
+                        </a>
+
+                        <!-- Botón y selector para Reporte de Recepción / Secretaria -->
+                        <div class="inline-flex items-center bg-teal-50 border border-teal-200 rounded-xl p-1 gap-1.5 shadow-sm">
+                            <input type="date" id="secDateInput" value="{{ today_str }}" class="text-xs bg-white border border-teal-200 text-teal-900 rounded-lg px-2 py-1 font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500">
+                            <button onclick="window.location.href='/reports/export/secretary-daily-pdf?report_date=' + document.getElementById('secDateInput').value" class="inline-flex items-center px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all shadow-xs" title="Descargar Reporte Diario de Recepción / Entrada de la Secretaria para la fecha seleccionada">
+                                <i class="fas fa-clipboard-user mr-1.5"></i> Recepción del Día (PDF)
+                            </button>
+                        </div>
+
+                        <span class="w-px h-6 bg-slate-200"></span>
                         <a href="/reports/export/patients" class="inline-flex items-center px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all">
                             <i class="fas fa-file-excel mr-2"></i> Pacientes (.csv)
                         </a>
@@ -30,6 +43,7 @@
                             <i class="fas fa-file-invoice-dollar mr-2"></i> Facturación (.csv)
                         </a>
                     </div>
+
                 </div>
 
                 <!-- Métricas Principales (KPIs) -->

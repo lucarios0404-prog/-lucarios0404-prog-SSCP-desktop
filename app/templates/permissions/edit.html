@@ -1,0 +1,160 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Editar Permiso — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'users' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Editar Permiso" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-2xl mx-auto space-y-6">
+
+                <!-- Header -->
+                <div>
+                    <a href="/permissions" class="text-xs text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center gap-1.5 mb-2">
+                        <i class="fas fa-arrow-left"></i> Volver al catálogo de permisos
+                    </a>
+                    <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+                        <i class="fas fa-pen text-indigo-600"></i>
+                        Editar Permiso
+                    </h1>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Modifica la etiqueta, descripción o área del permiso <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-[11px]">{{ perm.key }}</code>.
+                    </p>
+                </div>
+
+                {% if error %}
+                <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-center gap-3">
+                    <i class="fas fa-exclamation-circle text-red-600"></i>
+                    <span>{{ error }}</span>
+                </div>
+                {% endif %}
+
+                {% if usage_count > 0 %}
+                <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-start gap-3">
+                    <i class="fas fa-users text-amber-500 mt-0.5 shrink-0"></i>
+                    <span>
+                        <strong>{{ usage_count }} usuario(s)</strong> tienen asignado este permiso actualmente.
+                        Los cambios de etiqueta o área no afectan su acceso. Si necesitas quitarles el acceso, edita cada usuario individualmente.
+                    </span>
+                </div>
+                {% endif %}
+
+                <form action="/permissions/{{ perm.id }}/edit" method="POST" class="space-y-5">
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider pb-3 border-b border-slate-100 flex items-center gap-2">
+                            <i class="fas fa-id-badge text-indigo-500"></i>
+                            Datos del Permiso
+                        </h3>
+
+                        <!-- Clave (solo lectura) -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Clave del Permiso (no editable)
+                            </label>
+                            <div class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-mono text-slate-500 flex items-center gap-2">
+                                <i class="fas fa-lock text-[11px] text-slate-400"></i>
+                                {{ perm.key }}
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-1">La clave es inmutable para no romper las asignaciones existentes.</p>
+                        </div>
+
+                        <!-- Etiqueta -->
+                        <div>
+                            <label for="label" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Etiqueta del Módulo *
+                            </label>
+                            <input type="text" id="label" name="label" required
+                                   value="{{ perm.label }}"
+                                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                        </div>
+
+                        <!-- Descripción -->
+                        <div>
+                            <label for="description" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Descripción (Opcional)
+                            </label>
+                            <textarea id="description" name="description" rows="2"
+                                      placeholder="Breve descripción de qué puede hacer el usuario con este permiso..."
+                                      class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none">{{ perm.description or '' }}</textarea>
+                        </div>
+
+                        <!-- Área / Categoría -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="category" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Área Existente *
+                                </label>
+                                <select id="category" name="category"
+                                        class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                                    {% for cat in categories %}
+                                    <option value="{{ cat }}" {% if perm.category == cat %}selected{% endif %}>{{ cat }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="new_category" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    O Mover a Nueva Área
+                                </label>
+                                <input type="text" id="new_category" name="new_category"
+                                       placeholder="ej: Farmacia, Quirófano..."
+                                       class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                                <p class="text-[11px] text-slate-400 mt-1">Si escribes aquí, se ignora el área seleccionada arriba.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Estado del permiso -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-bold text-slate-800">Estado actual del permiso</p>
+                            <p class="text-xs text-slate-500 mt-0.5">Un permiso inactivo no aparece al crear o editar usuarios, pero no pierde las asignaciones existentes.</p>
+                        </div>
+                        <div class="shrink-0">
+                            {% if perm.is_active %}
+                            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Activo
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-500 text-xs font-bold">
+                                <span class="w-2 h-2 rounded-full bg-slate-400"></span> Inactivo
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Acciones -->
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                        <!-- Toggle activo/inactivo -->
+                        <form action="/permissions/{{ perm.id }}/toggle" method="POST" class="inline">
+                            <button type="submit"
+                                    class="w-full sm:w-auto px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all
+                                    {% if perm.is_active %}border-amber-300 text-amber-700 hover:bg-amber-50{% else %}border-emerald-300 text-emerald-700 hover:bg-emerald-50{% endif %}">
+                                <i class="fas fa-toggle-{% if perm.is_active %}off{% else %}on{% endif %} mr-1.5"></i>
+                                {% if perm.is_active %}Desactivar Permiso{% else %}Activar Permiso{% endif %}
+                            </button>
+                        </form>
+
+                        <div class="flex items-center gap-3">
+                            <a href="/permissions" class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors">
+                                Cancelar
+                            </a>
+                            <button type="submit"
+                                    class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-indigo-600/20 transition-all">
+                                <i class="fas fa-save mr-1.5"></i> Guardar Cambios
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}
