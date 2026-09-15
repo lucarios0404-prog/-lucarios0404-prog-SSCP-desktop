@@ -40,6 +40,13 @@ CIE10_COMMON = [
     {"code": "E78.5", "description": "Dislipidemia / Hiperlipidemia"},
 ]
 
+import unicodedata
+
+def strip_accents(s: str) -> str:
+    if not s:
+        return ""
+    return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn").lower()
+
 @router.get("/cie10/search")
 def search_cie10_codes(
     q: str = Query("", description="Término o código a buscar"),
@@ -47,36 +54,33 @@ def search_cie10_codes(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('consultations'))
 ):
-    clean_q = q.strip() if q else ""
-    query = db.query(Cie10Code)
-    
-    if clean_q:
-        search_pattern = f"%{clean_q}%"
-        query = query.filter(
-            or_(
-                Cie10Code.code.ilike(search_pattern),
-                Cie10Code.description.ilike(search_pattern),
-                Cie10Code.chapter.ilike(search_pattern)
-            )
-        )
-        # Ordenar: primero coincidencias exactas o que inicien con el código, luego custom, luego alfabético
-        query = query.order_by(
-            Cie10Code.code.ilike(f"{clean_q}%").desc(),
-            Cie10Code.is_custom.desc(),
-            Cie10Code.code.asc()
-        )
-    else:
-        # Top oficiales más utilizados
-        query = query.order_by(Cie10Code.is_custom.desc(), Cie10Code.id.asc())
-
-    results = query.limit(limit).all()
-    
     # Si la BD no estaba sembrada aún, autosembrar al vuelo
-    if not results and not clean_q:
+    if not db.query(Cie10Code).first():
         seed_cie10_catalog(db)
-        results = db.query(Cie10Code).limit(limit).all()
 
-    return [r.to_dict() for r in results]
+    clean_q = q.strip() if q else ""
+    if not clean_q:
+        results = db.query(Cie10Code).order_by(Cie10Code.is_custom.desc(), Cie10Code.id.asc()).limit(limit).all()
+        return [r.to_dict() for r in results]
+
+    # Búsqueda tolerante a tildes/acentos y mayúsculas
+    norm_q = strip_accents(clean_q)
+    all_codes = db.query(Cie10Code).all()
+    matching = []
+    for c in all_codes:
+        c_code_norm = strip_accents(c.code)
+        c_desc_norm = strip_accents(c.description)
+        c_chap_norm = strip_accents(c.chapter or "")
+        if norm_q in c_code_norm or norm_q in c_desc_norm or norm_q in c_chap_norm:
+            matching.append(c)
+
+    # Ordenar: primero códigos que empiezan con la consulta, luego custom, luego alfabético
+    matching.sort(key=lambda x: (
+        not strip_accents(x.code).startswith(norm_q),
+        not x.is_custom,
+        x.code
+    ))
+    return [r.to_dict() for r in matching[:limit]]
 
 
 @router.post("/cie10/custom")
