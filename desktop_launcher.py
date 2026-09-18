@@ -6,6 +6,22 @@ import threading
 import webbrowser
 from pathlib import Path
 
+# En modo sin consola (console=False / runw.exe), sys.stdout, stderr y stdin son None.
+# Proveer flujos nulos seguros para prevenir excepciones de formateo (isatty / ValueError en uvicorn).
+class NullStream:
+    def write(self, s): pass
+    def flush(self): pass
+    def isatty(self): return False
+    def read(self, *args): return ""
+    def readline(self, *args): return ""
+
+if sys.stdout is None:
+    sys.stdout = NullStream()
+if sys.stderr is None:
+    sys.stderr = NullStream()
+if sys.stdin is None:
+    sys.stdin = NullStream()
+
 # Configurar encoding UTF-8 en Windows
 if sys.platform == "win32":
     try:
@@ -53,7 +69,8 @@ def run():
         app,
         host=SERVER_HOST,
         port=SERVER_PORT,
-        log_level="warning",
+        log_config=None,
+        log_level="critical",
         access_log=False
     )
     server = uvicorn.Server(config)
