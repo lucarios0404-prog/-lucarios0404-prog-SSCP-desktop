@@ -12,8 +12,10 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+from app.database import DATA_DIR
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-SESSION_FILE = BASE_DIR / "data" / "whatsapp_session.json"
+SESSION_FILE = DATA_DIR / "whatsapp_session.json"
 
 class WhatsAppGatewayManager:
     """Administrador local del Gateway de WhatsApp."""

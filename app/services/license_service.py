@@ -22,9 +22,9 @@ import httpx
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.exceptions import InvalidSignature
+from app.database import DATA_DIR
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DATA_DIR = BASE_DIR / "data"
 LICENSE_CACHE_FILE = DATA_DIR / "license_cache.json"
 LICENSE_MODE_FILE = DATA_DIR / "license_mode.txt"
 

@@ -170,6 +170,8 @@ async def lifespan(app: FastAPI):
             seed_cie10_catalog(db)
             from app.core.permissions import seed_permissions_if_empty
             seed_permissions_if_empty(db)
+            from app.core.initial_data import seed_initial_data_if_empty
+            seed_initial_data_if_empty(db)
     except Exception as e:
         print(f"[Startup Database] Aviso: {e}")
 

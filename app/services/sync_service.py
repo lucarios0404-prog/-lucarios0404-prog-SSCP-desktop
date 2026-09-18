@@ -277,6 +277,24 @@ class SyncService:
         }
 
     @staticmethod
+    def _get_auth_headers(db: Session) -> dict:
+        """Genera las cabeceras de autenticación para comunicarse con la nube de SSCP."""
+        headers = {
+            "Content-Type": "application/json",
+            "X-License-Key": "sscp-license-api-sec-2026-laxarus",
+        }
+        try:
+            from app.models.license_config import LicenseConfig
+            lic = db.query(LicenseConfig).first()
+            if lic and lic.license_key:
+                headers["X-License-Token"] = lic.license_key
+            if lic and lic.machine_id:
+                headers["X-Machine-Id"] = lic.machine_id
+        except Exception:
+            pass
+        return headers
+
+    @staticmethod
     async def push_to_remote(db: Session, remote_url: str, node_ip: str = None) -> dict:
         """
         Envía los datos locales al servidor central remoto vía HTTP POST y registra en sync_logs.
@@ -284,12 +302,19 @@ class SyncService:
         package = SyncService.export_full_package(db)
         total_records = sum(package.get("counts", {}).values())
         endpoint = f"{remote_url.rstrip('/')}/api/sync/push"
+        headers = SyncService._get_auth_headers(db)
         
         try:
-            async with httpx.AsyncClient(timeout=8.0, verify=False) as client:
-                resp = await client.post(endpoint, json=package)
+            async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+                resp = await client.post(endpoint, json=package, headers=headers)
                 status_code = resp.status_code
-                if status_code < 400:
+                if 200 <= status_code < 300:
+                    resp_data = {}
+                    try:
+                        resp_data = resp.json()
+                    except Exception:
+                        pass
+                    msg = resp_data.get("message", f"Datos enviados exitosamente al servidor central (HTTP {status_code}).")
                     log = SyncLog(
                         sync_type="push",
                         status="success",
@@ -299,18 +324,23 @@ class SyncService:
                     )
                     db.add(log)
                     db.commit()
-                    return {"success": True, "status": "success", "sent": total_records, "message": "Datos enviados exitosamente al servidor central."}
+                    return {"success": True, "status": "success", "sent": total_records, "message": msg}
                 else:
+                    error_detail = ""
+                    try:
+                        error_detail = resp.json().get("error") or resp.json().get("message")
+                    except Exception:
+                        error_detail = resp.text[:120]
                     log = SyncLog(
                         sync_type="push",
-                        status="success" if status_code == 404 else "failed",
-                        records_sent=total_records,
+                        status="failed",
+                        records_sent=0,
                         node_ip=node_ip,
-                        error_message=f"Servidor central respondió HTTP {status_code} (paquete preparado y registrado localmente)"
+                        error_message=f"Servidor central respondió HTTP {status_code}: {error_detail}"
                     )
                     db.add(log)
                     db.commit()
-                    return {"success": True, "status": "simulated", "sent": total_records, "message": f"Servidor remoto respondió HTTP {status_code}. Paquete preparado y registrado en bitácora."}
+                    return {"success": False, "status": "failed", "sent": 0, "message": f"Servidor central respondió HTTP {status_code}: {error_detail}"}
         except Exception as e:
             log = SyncLog(
                 sync_type="push",
@@ -329,10 +359,11 @@ class SyncService:
         Descarga e integra registros del servidor central remoto con política 'último gana'.
         """
         endpoint = f"{remote_url.rstrip('/')}/api/sync/pull"
+        headers = SyncService._get_auth_headers(db)
         try:
-            async with httpx.AsyncClient(timeout=8.0, verify=False) as client:
-                resp = await client.get(endpoint)
-                if resp.status_code == 200:
+            async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+                resp = await client.get(endpoint, headers=headers)
+                if 200 <= resp.status_code < 300:
                     data = resp.json()
                     res = SyncService.import_package(db, data)
                     recv_count = sum(res.get("counts", {}).values())
@@ -347,16 +378,21 @@ class SyncService:
                     db.commit()
                     return {"success": True, "status": "success", "received": recv_count, "message": res.get("message")}
                 else:
+                    error_detail = ""
+                    try:
+                        error_detail = resp.json().get("error") or resp.json().get("message")
+                    except Exception:
+                        error_detail = resp.text[:120]
                     log = SyncLog(
                         sync_type="pull",
-                        status="success",
+                        status="failed",
                         records_received=0,
                         node_ip=node_ip,
-                        error_message=f"Servidor central consultado (HTTP {resp.status_code}) - sin registros pendientes"
+                        error_message=f"Error HTTP {resp.status_code} al consultar servidor central: {error_detail}"
                     )
                     db.add(log)
                     db.commit()
-                    return {"success": True, "status": "idle", "received": 0, "message": f"Servidor central consultado (HTTP {resp.status_code}). Sin registros pendientes de descarga."}
+                    return {"success": False, "status": "failed", "received": 0, "message": f"Servidor central respondió HTTP {resp.status_code}: {error_detail}"}
         except Exception as e:
             log = SyncLog(
                 sync_type="pull",
