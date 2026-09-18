@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from pathlib import Path
 from datetime import datetime
+from urllib.parse import urlencode
 import json
 
 from app.database import get_db
@@ -14,6 +15,10 @@ from app.services.sync_service import SyncService
 router = APIRouter(prefix="/sync", tags=["sync"])
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+
+def _sync_redirect(msg: str, msg_type: str = "info") -> RedirectResponse:
+    query = urlencode({"msg": msg or "", "type": msg_type or "info"})
+    return RedirectResponse(url=f"/sync?{query}", status_code=303)
 
 @router.get("/")
 async def sync_dashboard(
@@ -71,7 +76,7 @@ async def trigger_sync(
         msg = f"Modo Offline: No se pudo conectar al servidor central ({push_res.get('message')}). Los datos están protegidos en SQLite local."
         msg_type = "warning"
 
-    return RedirectResponse(url=f"/sync?msg={msg}&type={msg_type}", status_code=303)
+    return _sync_redirect(msg, msg_type)
 
 @router.post("/push")
 async def push_sync(
@@ -82,7 +87,7 @@ async def push_sync(
     setting = db.query(Setting).first()
     res = await SyncService.push_to_remote(db, remote_url, node_ip=setting.tailscale_ip if setting else None)
     msg_type = "success" if res.get("success") else "warning"
-    return RedirectResponse(url=f"/sync?msg={res.get('message')}&type={msg_type}", status_code=303)
+    return _sync_redirect(res.get("message", ""), msg_type)
 
 @router.post("/pull")
 async def pull_sync(
@@ -93,7 +98,7 @@ async def pull_sync(
     setting = db.query(Setting).first()
     res = await SyncService.pull_from_remote(db, remote_url, node_ip=setting.tailscale_ip if setting else None)
     msg_type = "success" if res.get("success") else "warning"
-    return RedirectResponse(url=f"/sync?msg={res.get('message')}&type={msg_type}", status_code=303)
+    return _sync_redirect(res.get("message", ""), msg_type)
 
 @router.get("/export")
 def export_sync_package(
@@ -127,4 +132,4 @@ async def import_sync_package(
         msg = f"Error al procesar archivo de importación: {str(e)}"
         msg_type = "danger"
 
-    return RedirectResponse(url=f"/sync?msg={msg}&type={msg_type}", status_code=303)
+    return _sync_redirect(msg, msg_type)

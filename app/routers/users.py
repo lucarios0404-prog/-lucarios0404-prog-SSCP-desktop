@@ -63,6 +63,7 @@ def list_users(
 @router.get("/create")
 def create_user_form(
     request: Request,
+    db: Session = Depends(get_db),
     current_user: User = Depends(require_admin)
 ):
     """Formulario de creación de un nuevo usuario."""
