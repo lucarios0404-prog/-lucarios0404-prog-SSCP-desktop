@@ -3,57 +3,84 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block body %}
-<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50">
+    <div class="max-w-md w-full space-y-6 bg-white p-8 sm:p-10 rounded-2xl shadow-xl border border-slate-200">
         <div class="text-center">
             <div class="flex justify-center mb-3">
                 <img src="/static/images/brand/logo-full-color.png" alt="SSCP" class="h-16 w-auto object-contain drop-shadow-sm">
             </div>
-            <h2 class="text-center text-2xl font-black text-gray-900 tracking-tight">
+            <h2 class="text-center text-2xl font-black text-slate-900 tracking-tight">
                 SSCP <span class="text-blue-600">Desktop</span>
             </h2>
-            <p class="mt-1 text-center text-xs text-gray-500 font-medium">
+            <p class="mt-1 text-center text-xs text-slate-500 font-medium">
                 Sistema de Seguimiento para Consultas de Pacientes
             </p>
         </div>
         
         {% if error %}
-        <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-exclamation-circle text-red-400"></i>
-                </div>
-                <div class="ml-3">
-                    <p class="text-sm text-red-700">{{ error }}</p>
-                </div>
+        <div class="bg-red-50 border-l-4 border-red-500 p-3.5 rounded-r-md">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-circle text-red-500 mr-2 text-sm"></i>
+                <p class="text-xs font-semibold text-red-700">{{ error }}</p>
             </div>
         </div>
         {% endif %}
 
-        <form class="mt-8 space-y-6" action="/login" method="POST">
-            <div class="rounded-md shadow-sm -space-y-px">
-                <div>
-                    <label for="username" class="sr-only">Correo electrónico</label>
-                    <input id="username" name="username" type="email" autocomplete="email" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Correo electrónico">
-                </div>
-                <div>
-                    <label for="password" class="sr-only">Contraseña</label>
-                    <input id="password" name="password" type="password" autocomplete="current-password" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Contraseña">
+        <form class="space-y-4" action="/login" method="POST" id="loginForm">
+            <div>
+                <label for="username" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Correo Electrónico
+                </label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
+                        <i class="fas fa-envelope"></i>
+                    </span>
+                    <input id="username" name="username" type="email" autocomplete="username" required
+                        class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm"
+                        placeholder="tu-correo@ejemplo.com">
                 </div>
             </div>
 
             <div>
-                <button type="submit" class="group relative w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-md shadow-blue-500/20 transition-all">
+                <label for="password" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Contraseña
+                </label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
+                        <i class="fas fa-lock"></i>
+                    </span>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required
+                        class="block w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm"
+                        placeholder="••••••••">
+                    <button type="button" onclick="togglePasswordVisibility('password', 'eyeIcon')"
+                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                        title="Mostrar u ocultar contraseña">
+                        <i id="eyeIcon" class="fas fa-eye text-sm"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="pt-1">
+                <label class="flex items-center gap-2.5 cursor-pointer select-none text-xs text-slate-700 hover:text-slate-900">
+                    <input id="remember_me" name="remember_me" type="checkbox"
+                        class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer transition-all">
+                    <span class="font-medium">Recordar usuario y contraseña en este equipo</span>
+                </label>
+            </div>
+
+            <div class="pt-2">
+                <button type="submit"
+                    class="group relative w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-md shadow-blue-500/20 transition-all">
                     <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-                        <i class="fas fa-sign-in-alt text-blue-300 group-hover:text-white"></i>
+                        <i class="fas fa-sign-in-alt text-blue-300 group-hover:text-white transition-colors"></i>
                     </span>
                     Iniciar Sesión
                 </button>
             </div>
         </form>
 
-        <div class="mt-6 pt-6 border-t border-gray-100 text-center space-y-2">
-            <p class="text-xs text-gray-500">
+        <div class="pt-5 border-t border-slate-100 text-center space-y-2">
+            <p class="text-xs text-slate-500">
                 ¿Es la primera vez en este equipo o necesitas otro perfil?
             </p>
             <a href="/setup" class="inline-flex items-center text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors">
@@ -62,4 +89,73 @@
         </div>
     </div>
 </div>
+
+<script>
+function togglePasswordVisibility(inputId, iconId) {
+    const input = document.getElementById(inputId);
+    const icon = document.getElementById(iconId);
+    if (!input || !icon) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+// UTF-8 safe Base64 encoder/decoder for localStorage
+function encodeCred(str) {
+    try {
+        return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
+            return String.fromCharCode('0x' + p1);
+        }));
+    } catch (e) {
+        return '';
+    }
+}
+
+function decodeCred(str) {
+    try {
+        return decodeURIComponent(Array.prototype.map.call(atob(str), function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+    } catch (e) {
+        return '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const userInp = document.getElementById('username');
+    const passInp = document.getElementById('password');
+    const remChk = document.getElementById('remember_me');
+    const form = document.getElementById('loginForm');
+
+    // Cargar credenciales guardadas si existe preferencia
+    const isRemembered = localStorage.getItem('sscp_remember_credentials') === 'true';
+    if (isRemembered) {
+        remChk.checked = true;
+        const savedUser = localStorage.getItem('sscp_saved_user');
+        const savedPass = localStorage.getItem('sscp_saved_pass');
+        if (savedUser) userInp.value = savedUser;
+        if (savedPass) passInp.value = decodeCred(savedPass);
+    }
+
+    if (form) {
+        form.addEventListener('submit', function() {
+            if (remChk.checked) {
+                localStorage.setItem('sscp_remember_credentials', 'true');
+                localStorage.setItem('sscp_saved_user', userInp.value.trim());
+                localStorage.setItem('sscp_saved_pass', encodeCred(passInp.value));
+            } else {
+                localStorage.removeItem('sscp_remember_credentials');
+                localStorage.removeItem('sscp_saved_user');
+                localStorage.removeItem('sscp_saved_pass');
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

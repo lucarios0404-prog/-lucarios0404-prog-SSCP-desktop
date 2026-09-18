@@ -110,8 +110,13 @@
                                 <i class="fas fa-lock"></i>
                             </span>
                             <input id="password" name="password" type="password" required minlength="6"
-                                class="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                class="block w-full pl-9 pr-9 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Mínimo 6 caracteres">
+                            <button type="button" onclick="togglePasswordVisibility('password', 'eyeIcon1')"
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                                title="Mostrar u ocultar contraseña">
+                                <i id="eyeIcon1" class="fas fa-eye text-xs"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -124,10 +129,23 @@
                                 <i class="fas fa-shield-alt"></i>
                             </span>
                             <input id="password_confirm" name="password_confirm" type="password" required minlength="6"
-                                class="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                class="block w-full pl-9 pr-9 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Repite la contraseña">
+                            <button type="button" onclick="togglePasswordVisibility('password_confirm', 'eyeIcon2')"
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                                title="Mostrar u ocultar contraseña">
+                                <i id="eyeIcon2" class="fas fa-eye text-xs"></i>
+                            </button>
                         </div>
                     </div>
+                </div>
+
+                <div class="pt-1">
+                    <label class="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700 hover:text-slate-900">
+                        <input id="remember_credentials" name="remember_credentials" type="checkbox" checked
+                            class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer">
+                        <span class="font-medium">Recordar mis credenciales en este equipo (inicio automático)</span>
+                    </label>
                 </div>
             </div>
 
@@ -169,5 +187,48 @@ function onRoleChange(role) {
         nameInput.placeholder = 'Ej. Ana López (Recepción)';
     }
 }
+
+function togglePasswordVisibility(inputId, iconId) {
+    const input = document.getElementById(inputId);
+    const icon = document.getElementById(iconId);
+    if (!input || !icon) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+// UTF-8 safe Base64 encoder for localStorage
+function encodeCred(str) {
+    try {
+        return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
+            return String.fromCharCode('0x' + p1);
+        }));
+    } catch (e) {
+        return '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('setupForm');
+    const emailInp = document.getElementById('email');
+    const passInp = document.getElementById('password');
+    const remChk = document.getElementById('remember_credentials');
+
+    if (form) {
+        form.addEventListener('submit', function() {
+            if (remChk && remChk.checked) {
+                localStorage.setItem('sscp_remember_credentials', 'true');
+                localStorage.setItem('sscp_saved_user', emailInp.value.trim().toLowerCase());
+                localStorage.setItem('sscp_saved_pass', encodeCred(passInp.value));
+            }
+        });
+    }
+});
 </script>
 {% endblock %}

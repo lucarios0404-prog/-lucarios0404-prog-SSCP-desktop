@@ -55,7 +55,7 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/login")
-def login(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def login(request: Request, response: Response, db: Session = Depends(get_db)):
     client_ip = request.client.host if request.client else "unknown"
 
     # Brute-force gate
@@ -67,9 +67,13 @@ def login(request: Request, response: Response, form_data: OAuth2PasswordRequest
             status_code=429,
         )
 
-    user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not security.verify_password(form_data.password, user.hashed_password):
-        # Para UI, devolver error
+    form = await request.form()
+    username = str(form.get("username") or "").strip()
+    password = str(form.get("password") or "")
+    remember_me = form.get("remember_me")
+
+    user = db.query(User).filter(User.email == username).first()
+    if not user or not security.verify_password(password, user.hashed_password):
         return templates.TemplateResponse(
             request=request,
             name="auth/login.html",
@@ -79,7 +83,18 @@ def login(request: Request, response: Response, form_data: OAuth2PasswordRequest
     # Successful login — clear attempt counter
     _clear_attempts(client_ip)
 
-    access_token = security.create_access_token(data={"email": user.email, "role": user.role})
+    # Extended session duration if remember_me is checked (30 days vs 7 days)
+    if remember_me:
+        session_delta = timedelta(days=30)
+        cookie_max_age = 60 * 60 * 24 * 30
+    else:
+        session_delta = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
+        cookie_max_age = security.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+
+    access_token = security.create_access_token(
+        data={"email": user.email, "role": user.role},
+        expires_delta=session_delta,
+    )
     
     # Conditional secure flag: only set on HTTPS connections
     is_https = request.url.scheme == "https"
@@ -90,7 +105,7 @@ def login(request: Request, response: Response, form_data: OAuth2PasswordRequest
         key="access_token", 
         value=f"Bearer {access_token}", 
         httponly=True, 
-        max_age=security.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        max_age=cookie_max_age,
         samesite="lax",
         secure=is_https,
     )
@@ -131,6 +146,7 @@ def setup_account(
     email: str = Form(...),
     password: str = Form(...),
     password_confirm: str = Form(...),
+    remember_credentials: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     name = name.strip()
@@ -214,7 +230,13 @@ def setup_account(
     db.refresh(user)
 
     # Iniciar sesión automáticamente
-    access_token = security.create_access_token(data={"email": user.email, "role": user.role})
+    session_delta = timedelta(days=30) if remember_credentials else timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
+    cookie_max_age = 60 * 60 * 24 * 30 if remember_credentials else security.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+
+    access_token = security.create_access_token(
+        data={"email": user.email, "role": user.role},
+        expires_delta=session_delta,
+    )
     is_https = request.url.scheme == "https"
 
     response = RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
@@ -222,7 +244,7 @@ def setup_account(
         key="access_token",
         value=f"Bearer {access_token}",
         httponly=True,
-        max_age=security.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        max_age=cookie_max_age,
         samesite="lax",
         secure=is_https,
     )
