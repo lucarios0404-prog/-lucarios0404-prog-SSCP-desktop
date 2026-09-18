@@ -86,6 +86,12 @@ hidden_imports = [
     'app.models.license_config',
     'app.services.license_service',
     'app.routers.activation',
+    'webview',
+    'webview.platforms.winforms',
+    'webview.platforms.edgechromium',
+    'clr',
+    'pythonnet',
+    'clr_loader',
 ]
 
 import os
@@ -127,7 +133,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

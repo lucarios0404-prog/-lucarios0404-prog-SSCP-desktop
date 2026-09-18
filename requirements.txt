@@ -19,3 +19,6 @@ openpyxl
 cryptography
 wmi
 pyarmor
+# === Interfaz Nativa de Escritorio ===
+pywebview
+pythonnet

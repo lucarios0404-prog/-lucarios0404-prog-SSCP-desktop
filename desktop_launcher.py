@@ -1,8 +1,9 @@
 import sys
 import os
 import time
-import webbrowser
+import socket
 import threading
+import webbrowser
 from pathlib import Path
 
 # Configurar encoding UTF-8 en Windows
@@ -24,34 +25,88 @@ else:
 data_dir = APP_DIR / "data"
 data_dir.mkdir(parents=True, exist_ok=True)
 
-def open_browser_delayed():
-    """Abre el navegador automáticamente una vez que el servidor esté activo."""
-    time.sleep(1.8)
+SERVER_HOST = "127.0.0.1"
+SERVER_PORT = 8080
+SERVER_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
+
+def wait_for_server(host, port, timeout=12.0):
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                return True
+        except (OSError, ConnectionRefusedError):
+            time.sleep(0.15)
+    return False
+
+def run_server(server):
     try:
-        webbrowser.open("http://127.0.0.1:8080")
-    except Exception as e:
-        print(f"Aviso: No se pudo abrir automáticamente el navegador ({e}). Ingrese a http://127.0.0.1:8080")
+        server.run()
+    except Exception:
+        pass
 
 def run():
-    print("==================================================================")
-    print(" 🏥  SSCP Desktop - Sistema de Seguimiento Clínico para Pacientes")
-    print("     Servidor local activo en: http://127.0.0.1:8080")
-    print("     Presione Ctrl+C en esta ventana para cerrar la aplicación.")
-    print("==================================================================")
-
-    # Iniciar navegador en segundo plano
-    threading.Thread(target=open_browser_delayed, daemon=True).start()
-
     import uvicorn
     from main import app
 
-    uvicorn.run(
+    config = uvicorn.Config(
         app,
-        host="127.0.0.1",
-        port=8080,
-        log_level="info",
+        host=SERVER_HOST,
+        port=SERVER_PORT,
+        log_level="warning",
         access_log=False
     )
+    server = uvicorn.Server(config)
+
+    # Iniciar servidor Uvicorn en hilo secundario daemon
+    server_thread = threading.Thread(target=run_server, args=(server,), daemon=True)
+    server_thread.start()
+
+    # Esperar a que el servidor esté activo
+    wait_for_server(SERVER_HOST, SERVER_PORT, timeout=10.0)
+
+    # Intentar abrir con ventana nativa de escritorio (PyWebView)
+    opened_native = False
+    try:
+        import webview
+
+        icon_path = str(BASE_DIR / "static" / "app_icon.ico")
+        if not os.path.exists(icon_path):
+            icon_path = None
+
+        window = webview.create_window(
+            title="SSCP Desktop - Sistema de Seguimiento Clínico para Pacientes",
+            url=SERVER_URL,
+            width=1280,
+            height=820,
+            min_size=(1000, 680),
+            text_select=True,
+            confirm_close=False,
+        )
+
+        opened_native = True
+        # Iniciar loop GUI nativo de Windows (bloqueante en hilo principal)
+        webview.start(private_mode=False, icon=icon_path)
+
+    except Exception:
+        opened_native = False
+
+    if not opened_native:
+        # Fallback a navegador predeterminado si pywebview no inicia
+        try:
+            webbrowser.open(SERVER_URL)
+        except Exception:
+            pass
+
+        try:
+            while server_thread.is_alive():
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+
+    server.should_exit = True
+    sys.exit(0)
 
 if __name__ == "__main__":
     run()
+
