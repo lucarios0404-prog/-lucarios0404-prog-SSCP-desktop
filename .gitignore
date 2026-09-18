@@ -71,6 +71,8 @@ data/license_cache.json
 data/sscp.db
 data/*.db
 data/*.json
+data/.secret_key
+data/.*
 !data/.gitkeep
 
 # Scratch and test files

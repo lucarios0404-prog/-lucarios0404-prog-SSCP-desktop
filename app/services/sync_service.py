@@ -15,6 +15,20 @@ from app.models.sync_log import SyncLog
 
 class SyncService:
     @staticmethod
+    def _should_verify_ssl(url: str) -> bool:
+        """
+        Determina si debe validarse estrictamente el certificado SSL:
+        - True para dominios HTTPS en producción (https://sscp.laxarusdevs.com).
+        - False para servidores locales HTTP (localhost, 127.0.0.1) o si SSCP_INSECURE_SSL=1.
+        """
+        if not url:
+            return False
+        if url.lower().startswith("https://"):
+            import os
+            return os.environ.get("SSCP_INSECURE_SSL") != "1"
+        return False
+
+    @staticmethod
     async def check_connection(url: str, timeout: float = 3.0) -> dict:
         """
         Verifica la conectividad con el servidor central remoto.
@@ -23,7 +37,8 @@ class SyncService:
             return {"online": False, "status_code": 0, "message": "URL de servidor no configurada."}
             
         try:
-            async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
+            verify_ssl = SyncService._should_verify_ssl(url)
+            async with httpx.AsyncClient(timeout=timeout, verify=verify_ssl) as client:
                 r = await client.get(url)
                 return {
                     "online": r.status_code < 500,
@@ -305,7 +320,8 @@ class SyncService:
         headers = SyncService._get_auth_headers(db)
         
         try:
-            async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+            verify_ssl = SyncService._should_verify_ssl(remote_url)
+            async with httpx.AsyncClient(timeout=15.0, verify=verify_ssl) as client:
                 resp = await client.post(endpoint, json=package, headers=headers)
                 status_code = resp.status_code
                 if 200 <= status_code < 300:
@@ -361,7 +377,8 @@ class SyncService:
         endpoint = f"{remote_url.rstrip('/')}/api/sync/pull"
         headers = SyncService._get_auth_headers(db)
         try:
-            async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+            verify_ssl = SyncService._should_verify_ssl(remote_url)
+            async with httpx.AsyncClient(timeout=15.0, verify=verify_ssl) as client:
                 resp = await client.get(endpoint, headers=headers)
                 if 200 <= resp.status_code < 300:
                     data = resp.json()

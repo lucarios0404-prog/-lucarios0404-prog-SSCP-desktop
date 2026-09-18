@@ -129,35 +129,60 @@ def _verify_offline_license(license_key, machine_id):
 DESKTOP_LICENSE_API_KEY = "sscp-license-api-sec-2026-laxarus"
 
 
+import hmac
+
+
+def _compute_cache_signature(cache_data: dict, machine_id: str) -> str:
+    """Genera una firma HMAC de 256 bits vinculada al Machine ID para garantizar la integridad de la caché."""
+    key = hashlib.sha256(f"{machine_id}::SSCP_CACHE_INTEGRITY_SALT_2026".encode()).digest()
+    canonical = (
+        f"{cache_data.get('valid')}|{cache_data.get('machine_id')}|"
+        f"{cache_data.get('license_token')}|{cache_data.get('doctor_name')}|"
+        f"{cache_data.get('plan')}|{cache_data.get('expires_at')}|"
+        f"{cache_data.get('cached_at')}"
+    )
+    return hmac.new(key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _verify_cache_integrity(cache_data: dict, machine_id: str) -> bool:
+    """Verifica si la caché de licencia ha sido modificada manualmente o transferida de otra PC."""
+    sig = cache_data.get("signature")
+    if not sig:
+        return False
+    expected = _compute_cache_signature(cache_data, machine_id)
+    return hmac.compare_digest(sig, expected)
+
+
 def _verify_online_license(license_key, machine_id, force_remote=False):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     headers = {"X-License-Key": DESKTOP_LICENSE_API_KEY}
 
-    # 1. Chequeo de cache local reciente para no penalizar cada peticion web con latencia HTTP
+    # 1. Chequeo de cache local reciente con verificación de firma criptográfica HMAC
     if not force_remote and LICENSE_CACHE_FILE.exists():
         try:
             cache = json.loads(LICENSE_CACHE_FILE.read_text(encoding="utf-8"))
-            cached_at = datetime.fromisoformat(cache.get("cached_at", ""))
-            if cached_at.tzinfo is None:
-                cached_at = cached_at.replace(tzinfo=timezone.utc)
-            elapsed_hours = (datetime.now(timezone.utc) - cached_at).total_seconds() / 3600.0
+            if _verify_cache_integrity(cache, machine_id):
+                cached_at = datetime.fromisoformat(cache.get("cached_at", ""))
+                if cached_at.tzinfo is None:
+                    cached_at = cached_at.replace(tzinfo=timezone.utc)
+                elapsed_hours = (datetime.now(timezone.utc) - cached_at).total_seconds() / 3600.0
 
-            if (elapsed_hours < 4.0 and cache.get("valid") and
-                cache.get("machine_id") == machine_id and cache.get("license_token") == license_key):
-                expires_str = cache.get("expires_at")
-                expires_at = datetime.fromisoformat(expires_str) if expires_str else None
-                days_remaining = 99999
-                if expires_at:
-                    if expires_at.tzinfo is None:
-                        expires_at = expires_at.replace(tzinfo=timezone.utc)
-                    days_remaining = max(0, (expires_at - datetime.now(timezone.utc)).days)
-                    if days_remaining < 0:
-                        return LicenseInfo(LicenseStatus.EXPIRED, machine_id=machine_id)
-                return LicenseInfo(LicenseStatus.ACTIVE, machine_id=machine_id,
-                                   doctor_name=cache.get("doctor_name", "Doctor"),
-                                   plan=cache.get("plan", "Standard"),
-                                   expires_at=expires_at, mode="online_cached",
-                                   days_remaining=days_remaining)
+                if (elapsed_hours < 4.0 and cache.get("valid") and
+                    cache.get("machine_id") == machine_id and cache.get("license_token") == license_key):
+                    expires_str = cache.get("expires_at")
+                    expires_at = datetime.fromisoformat(expires_str) if expires_str else None
+                    days_remaining = 99999
+                    if expires_at:
+                        if expires_at.tzinfo is None:
+                            expires_at = expires_at.replace(tzinfo=timezone.utc)
+                        days_remaining = max(0, (expires_at - datetime.now(timezone.utc)).days)
+                        if days_remaining < 0:
+                            return LicenseInfo(LicenseStatus.EXPIRED, machine_id=machine_id)
+                    return LicenseInfo(LicenseStatus.ACTIVE, machine_id=machine_id,
+                                       doctor_name=cache.get("doctor_name", "Doctor"),
+                                       plan=cache.get("plan", "Standard"),
+                                       expires_at=expires_at, mode="online_cached",
+                                       days_remaining=days_remaining)
         except Exception:
             pass
 
@@ -168,6 +193,7 @@ def _verify_online_license(license_key, machine_id, force_remote=False):
             json={"machine_id": machine_id, "license_token": license_key},
             headers=headers,
             timeout=8.0,
+            verify=True,
         )
         if response.status_code == 200:
             data = response.json()
@@ -184,11 +210,17 @@ def _verify_online_license(license_key, machine_id, force_remote=False):
                                      plan=data.get("plan", "Standard"),
                                      expires_at=expires_at, mode="online",
                                      days_remaining=days_remaining)
-                cache = {"valid": True, "machine_id": machine_id, "license_token": license_key,
-                         "doctor_name": result.doctor_name, "plan": result.plan,
-                         "expires_at": expires_str,
-                         "cached_at": datetime.now(timezone.utc).isoformat()}
-                LICENSE_CACHE_FILE.write_text(json.dumps(cache), encoding="utf-8")
+                cache = {
+                    "valid": True,
+                    "machine_id": machine_id,
+                    "license_token": license_key,
+                    "doctor_name": result.doctor_name,
+                    "plan": result.plan,
+                    "expires_at": expires_str,
+                    "cached_at": datetime.now(timezone.utc).isoformat(),
+                }
+                cache["signature"] = _compute_cache_signature(cache, machine_id)
+                LICENSE_CACHE_FILE.write_text(json.dumps(cache, indent=2), encoding="utf-8")
                 return result
             else:
                 reason = data.get("reason", "")
@@ -200,30 +232,31 @@ def _verify_online_license(license_key, machine_id, force_remote=False):
     except Exception:
         pass
 
-    # 3. Periodo de gracia offline (7 dias) si el servidor no responde
+    # 3. Periodo de gracia offline (7 dias) si el servidor no responde (requiere HMAC válido)
     if LICENSE_CACHE_FILE.exists():
         try:
             cache = json.loads(LICENSE_CACHE_FILE.read_text(encoding="utf-8"))
-            cached_at = datetime.fromisoformat(cache.get("cached_at", ""))
-            if cached_at.tzinfo is None:
-                cached_at = cached_at.replace(tzinfo=timezone.utc)
-            age_days = (datetime.now(timezone.utc) - cached_at).days
-            if (age_days <= CACHE_TTL_DAYS and cache.get("valid") and
-                cache.get("machine_id") == machine_id and cache.get("license_token") == license_key):
-                expires_str = cache.get("expires_at")
-                expires_at = datetime.fromisoformat(expires_str) if expires_str else None
-                days_remaining = 99999
-                if expires_at:
-                    if expires_at.tzinfo is None:
-                        expires_at = expires_at.replace(tzinfo=timezone.utc)
-                    days_remaining = max(0, (expires_at - datetime.now(timezone.utc)).days)
-                    if days_remaining < 0:
-                        return LicenseInfo(LicenseStatus.EXPIRED, machine_id=machine_id)
-                return LicenseInfo(LicenseStatus.ACTIVE, machine_id=machine_id,
-                                   doctor_name=cache.get("doctor_name", "Doctor"),
-                                   plan=cache.get("plan", "Standard"),
-                                   expires_at=expires_at, mode="online_cached",
-                                   days_remaining=days_remaining)
+            if _verify_cache_integrity(cache, machine_id):
+                cached_at = datetime.fromisoformat(cache.get("cached_at", ""))
+                if cached_at.tzinfo is None:
+                    cached_at = cached_at.replace(tzinfo=timezone.utc)
+                age_days = (datetime.now(timezone.utc) - cached_at).days
+                if (age_days <= CACHE_TTL_DAYS and cache.get("valid") and
+                    cache.get("machine_id") == machine_id and cache.get("license_token") == license_key):
+                    expires_str = cache.get("expires_at")
+                    expires_at = datetime.fromisoformat(expires_str) if expires_str else None
+                    days_remaining = 99999
+                    if expires_at:
+                        if expires_at.tzinfo is None:
+                            expires_at = expires_at.replace(tzinfo=timezone.utc)
+                        days_remaining = max(0, (expires_at - datetime.now(timezone.utc)).days)
+                        if days_remaining < 0:
+                            return LicenseInfo(LicenseStatus.EXPIRED, machine_id=machine_id)
+                    return LicenseInfo(LicenseStatus.ACTIVE, machine_id=machine_id,
+                                       doctor_name=cache.get("doctor_name", "Doctor"),
+                                       plan=cache.get("plan", "Standard"),
+                                       expires_at=expires_at, mode="online_grace",
+                                       days_remaining=days_remaining)
         except Exception:
             pass
     return LicenseInfo(LicenseStatus.SERVER_UNREACHABLE, machine_id=machine_id)

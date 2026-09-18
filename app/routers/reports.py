@@ -17,6 +17,7 @@ from app.models.vital_sign import VitalSign
 from app.models.appointment import Appointment
 from app.models.template import ClinicalTemplate
 from app.models.setting import Setting
+from app.routers.settings import get_or_create_settings
 from app.core.deps import require_current_user
 from app.services.pdf_service import generate_executive_report_pdf, generate_secretary_daily_report_pdf
 
@@ -117,7 +118,7 @@ def export_executive_pdf(
     """
     Exportación del Reporte Ejecutivo Clínico completo a PDF con membrete y logo del doctor.
     """
-    setting = db.query(Setting).first()
+    setting = get_or_create_settings(db)
     total_patients = db.query(Patient).count()
     total_consultations = db.query(Consultation).count()
     total_payments = db.query(Payment).count()
@@ -194,7 +195,7 @@ def export_secretary_daily_pdf(
     end_dt = datetime.combine(target_date, datetime.max.time())
     date_str = target_date.strftime("%d/%m/%Y")
 
-    setting = db.query(Setting).first()
+    setting = get_or_create_settings(db)
     currency = getattr(setting, "currency", "RD$") if setting else "RD$"
 
     # 1. Citas del día
