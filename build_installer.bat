@@ -11,13 +11,13 @@ if not defined MAKENSIS_BIN where makensis >nul 2>nul && set MAKENSIS_BIN=makens
 
 if defined MAKENSIS_BIN (
     echo [OK] Compilador NSIS detectado: %MAKENSIS_BIN%
-    echo Generando dist\SSCP_Desktop_Setup_v1.0.0.exe...
+    echo Generando instalador NSIS...
     %MAKENSIS_BIN% installer.nsi
     if %ERRORLEVEL% EQU 0 (
         echo.
         echo =======================================================
-        echo [EXITO] Instalador creado en:
-        echo dist\SSCP_Desktop_Setup_v1.0.0.exe
+        echo [EXITO] Instalador creado en dist\
+        dir /b dist\SSCP_Desktop_Setup_v*.exe 2>nul
         echo =======================================================
     ) else (
         echo [ERROR] Error durante la compilacion de NSIS.

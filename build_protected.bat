@@ -59,8 +59,10 @@ if exist "tools\nsis-3.10\makensis.exe" (
 echo.
 echo ================================================================
 echo   BUILD COMPLETADO
-if exist "dist\SSCP_Desktop_Setup_v1.0.0.exe" (
-    echo   Instalador: dist\SSCP_Desktop_Setup_v1.0.0.exe
+set "FOUND_INSTALLER="
+for %%f in (dist\SSCP_Desktop_Setup_v*.exe) do set "FOUND_INSTALLER=%%f"
+if defined FOUND_INSTALLER (
+    echo   Instalador: !FOUND_INSTALLER!
 ) else (
     echo   Ejecutable: dist\SSCP-Desktop\SSCP-Desktop.exe
 )
