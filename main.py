@@ -247,12 +247,19 @@ async def license_gate_middleware(request: Request, call_next):
     return await call_next(request)
 
 @app.get("/")
-async def root(request: Request, current_user = Depends(get_current_user)):
+async def root(request: Request, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     if current_user:
         return RedirectResponse(url="/dashboard")
-    return templates.TemplateResponse(
-        request=request, name="auth/login.html", context={"title": "Iniciar Sesion - SSCP Desktop"}
-    )
+
+    # Si es una instalación limpia o sin usuario personalizado, redirigir al setup inicial
+    from app.models.user import User
+    demo_emails = ["admin@sscp.com", "doctor@sscp.com", "secretaria@sscp.com"]
+    has_custom_user = db.query(User).filter(~User.email.in_(demo_emails)).first() is not None
+
+    if not has_custom_user:
+        return RedirectResponse(url="/setup")
+
+    return RedirectResponse(url="/login")
 
 @app.get("/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db), current_user = Depends(get_current_user)):

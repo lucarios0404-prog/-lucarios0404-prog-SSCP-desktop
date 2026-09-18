@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
@@ -90,6 +90,138 @@ def login(request: Request, response: Response, form_data: OAuth2PasswordRequest
         key="access_token", 
         value=f"Bearer {access_token}", 
         httponly=True, 
+        max_age=security.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="lax",
+        secure=is_https,
+    )
+    return response
+
+@router.get("/login", response_class=HTMLResponse)
+def login_page(request: Request, current_user = Depends(deps.get_current_user)):
+    if current_user:
+        return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+    return templates.TemplateResponse(
+        request=request,
+        name="auth/login.html",
+        context={"title": "Iniciar Sesión - SSCP Desktop", "error": None}
+    )
+
+@router.get("/setup", response_class=HTMLResponse)
+def setup_page(request: Request, db: Session = Depends(get_db)):
+    from app.services.license_service import check_license
+    lic = check_license()
+
+    license_doctor_name = lic.doctor_name if lic and lic.doctor_name else ""
+
+    return templates.TemplateResponse(
+        request=request,
+        name="auth/setup.html",
+        context={
+            "license_doctor_name": license_doctor_name,
+            "default_email": "",
+            "error": None,
+        }
+    )
+
+@router.post("/setup")
+def setup_account(
+    request: Request,
+    role: str = Form("doctor"),
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    password_confirm: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    name = name.strip()
+    email = email.strip().lower()
+
+    if not name or not email:
+        return templates.TemplateResponse(
+            request=request,
+            name="auth/setup.html",
+            context={
+                "error": "Por favor completa todos los campos requeridos.",
+                "license_doctor_name": name,
+                "default_email": email,
+            },
+            status_code=400,
+        )
+
+    if password != password_confirm:
+        return templates.TemplateResponse(
+            request=request,
+            name="auth/setup.html",
+            context={
+                "error": "Las contraseñas no coinciden. Intenta de nuevo.",
+                "license_doctor_name": name,
+                "default_email": email,
+            },
+            status_code=400,
+        )
+
+    if len(password) < 6:
+        return templates.TemplateResponse(
+            request=request,
+            name="auth/setup.html",
+            context={
+                "error": "La contraseña debe tener al menos 6 caracteres.",
+                "license_doctor_name": name,
+                "default_email": email,
+            },
+            status_code=400,
+        )
+
+    if role not in ("doctor", "secretaria"):
+        role = "doctor"
+
+    # Verificar si el usuario ya existe o crear uno nuevo
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        user.name = name
+        user.role = role
+        user.hashed_password = security.get_password_hash(password)
+        user.is_active = True
+    else:
+        user = User(
+            name=name,
+            email=email,
+            hashed_password=security.get_password_hash(password),
+            role=role,
+            is_active=True,
+        )
+        db.add(user)
+
+    # Si es perfil médico, sincronizar los datos de la clínica local
+    if role == "doctor":
+        from app.models.setting import Setting
+        setting = db.query(Setting).first()
+        if setting:
+            setting.doctor_name = name
+            if not setting.email or "local" in setting.email or "example" in setting.email:
+                setting.email = email
+        else:
+            setting = Setting(
+                clinic_name=f"Consultorio {name}",
+                doctor_name=name,
+                email=email,
+                specialty="Medicina General",
+                currency="RD$",
+            )
+            db.add(setting)
+
+    db.commit()
+    db.refresh(user)
+
+    # Iniciar sesión automáticamente
+    access_token = security.create_access_token(data={"email": user.email, "role": user.role})
+    is_https = request.url.scheme == "https"
+
+    response = RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {access_token}",
+        httponly=True,
         max_age=security.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         samesite="lax",
         secure=is_https,

@@ -1,0 +1,173 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Configuración de Perfil - SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="min-h-screen flex items-center justify-center py-10 px-4 sm:px-6 lg:px-8 bg-slate-100">
+    <div class="max-w-lg w-full space-y-6 bg-white p-8 sm:p-10 rounded-2xl shadow-xl border border-slate-200">
+        <div class="text-center">
+            <div class="flex justify-center mb-3">
+                <img src="/static/images/brand/logo-full-color.png" alt="SSCP" class="h-14 w-auto object-contain drop-shadow-sm">
+            </div>
+            <h2 class="text-2xl font-black text-slate-900 tracking-tight">
+                Configuración Inicial de este Equipo
+            </h2>
+            <p class="mt-1 text-xs text-slate-500 font-medium">
+                Selecciona quién utilizará esta computadora y crea tu perfil de acceso seguro.
+            </p>
+            {% if license_doctor_name %}
+            <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                <i class="fas fa-certificate text-[11px]"></i> Licencia activa para: {{ license_doctor_name }}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if error %}
+        <div class="bg-red-50 border-l-4 border-red-500 p-3.5 rounded-r-md">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-circle text-red-500 mr-2 text-sm"></i>
+                <p class="text-xs font-semibold text-red-700">{{ error }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <form action="/setup" method="POST" class="space-y-6" id="setupForm">
+            <!-- Selector de Perfil -->
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                    1. ¿Quién utilizará este equipo?
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- Opción Doctor -->
+                    <label class="cursor-pointer">
+                        <input type="radio" name="role" value="doctor" class="sr-only peer" checked onchange="onRoleChange('doctor')">
+                        <div class="p-4 rounded-xl border-2 border-slate-200 peer-checked:border-blue-600 peer-checked:bg-blue-50/40 hover:border-slate-300 transition-all text-center h-full flex flex-col items-center justify-center group">
+                            <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl mb-2 group-hover:scale-105 transition-transform">
+                                <i class="fas fa-user-md"></i>
+                            </div>
+                            <span class="font-bold text-sm text-slate-900 peer-checked:text-blue-700">Médico / Doctor</span>
+                            <span class="text-[11px] text-slate-500 mt-1 leading-tight">Consultas, recetas, historial y diagnósticos</span>
+                        </div>
+                    </label>
+
+                    <!-- Opción Secretaria -->
+                    <label class="cursor-pointer">
+                        <input type="radio" name="role" value="secretaria" class="sr-only peer" onchange="onRoleChange('secretaria')">
+                        <div class="p-4 rounded-xl border-2 border-slate-200 peer-checked:border-amber-600 peer-checked:bg-amber-50/40 hover:border-slate-300 transition-all text-center h-full flex flex-col items-center justify-center group">
+                            <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xl mb-2 group-hover:scale-105 transition-transform">
+                                <i class="fas fa-headset"></i>
+                            </div>
+                            <span class="font-bold text-sm text-slate-900 peer-checked:text-amber-700">Secretaría</span>
+                            <span class="text-[11px] text-slate-500 mt-1 leading-tight">Agenda de citas, recepción, pagos y sala de espera</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Datos de Cuenta -->
+            <div class="space-y-4 pt-2 border-t border-slate-100">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    2. Credenciales de Inicio de Sesión
+                </label>
+
+                <div>
+                    <label for="name" id="nameLabel" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Nombre Completo del Médico
+                    </label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                            <i class="fas fa-user"></i>
+                        </span>
+                        <input id="name" name="name" type="text" required
+                            value="{{ license_doctor_name or '' }}"
+                            class="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Ej. Dr. Cristian García">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="email" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Correo Electrónico (Usuario de acceso)
+                    </label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                            <i class="fas fa-envelope"></i>
+                        </span>
+                        <input id="email" name="email" type="email" required
+                            value="{{ default_email or '' }}"
+                            class="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="tu-correo@ejemplo.com">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="password" class="block text-xs font-semibold text-slate-700 mb-1">
+                            Contraseña
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                                <i class="fas fa-lock"></i>
+                            </span>
+                            <input id="password" name="password" type="password" required minlength="6"
+                                class="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Mínimo 6 caracteres">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="password_confirm" class="block text-xs font-semibold text-slate-700 mb-1">
+                            Confirmar Contraseña
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                                <i class="fas fa-shield-alt"></i>
+                            </span>
+                            <input id="password_confirm" name="password_confirm" type="password" required minlength="6"
+                                class="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Repite la contraseña">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <button type="submit"
+                    class="w-full flex items-center justify-center py-2.5 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-md shadow-blue-500/20 transition-all">
+                    <span>Guardar y Comenzar a Usar SSCP</span>
+                    <i class="fas fa-arrow-right ml-2 text-xs"></i>
+                </button>
+            </div>
+        </form>
+
+        <div class="pt-4 border-t border-slate-100 text-center">
+            <a href="/login" class="text-xs text-slate-500 hover:text-slate-700 font-medium transition-colors">
+                ¿Ya tienes un usuario configurado? <span class="text-blue-600 font-bold">Iniciar sesión aquí</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+const defaultDoctorName = {{ (license_doctor_name or '') | tojson }};
+
+function onRoleChange(role) {
+    const nameLabel = document.getElementById('nameLabel');
+    const nameInput = document.getElementById('name');
+    
+    if (role === 'doctor') {
+        nameLabel.innerText = 'Nombre Completo del Médico';
+        if (!nameInput.value || nameInput.value.toLowerCase().includes('recep') || nameInput.value.toLowerCase().includes('secretar')) {
+            nameInput.value = defaultDoctorName || '';
+        }
+        nameInput.placeholder = 'Ej. Dr. Cristian García';
+    } else {
+        nameLabel.innerText = 'Nombre del Asistente o Secretaria';
+        if (nameInput.value === defaultDoctorName) {
+            nameInput.value = '';
+        }
+        nameInput.placeholder = 'Ej. Ana López (Recepción)';
+    }
+}
+</script>
+{% endblock %}
