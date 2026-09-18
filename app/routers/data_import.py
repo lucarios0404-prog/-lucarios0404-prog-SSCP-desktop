@@ -22,7 +22,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
 # Temporary in-memory session cache for large import payloads during preview
-_import_preview_cache = {}
+# Each value is (created_at_epoch, records) — expires after 30 minutes
+_import_preview_cache: dict[str, tuple[float, list]] = {}
+_CACHE_TTL_SECONDS = 30 * 60  # 30 minutes
+
+
+def _cache_cleanup():
+    """Remove entries older than TTL."""
+    cutoff = time.time() - _CACHE_TTL_SECONDS
+    expired = [k for k, (ts, _) in _import_preview_cache.items() if ts < cutoff]
+    for k in expired:
+        _import_preview_cache.pop(k, None)
+
 
 @router.get("", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
@@ -96,9 +107,10 @@ async def preview_import_file(
         preview_result["source_type"] = source_type
         preview_result["filename"] = file.filename
 
-        # Cache key for confirmation
+        # Cache key for confirmation — includes TTL timestamp
         cache_token = f"import_{current_user.id}_{int(time.time())}"
-        _import_preview_cache[cache_token] = preview_result["all_records"]
+        _cache_cleanup()  # Clean stale entries on each new upload
+        _import_preview_cache[cache_token] = (time.time(), preview_result["all_records"])
         preview_result["cache_token"] = cache_token
         
         # Omit all_records from preview JSON to keep payload lightweight
@@ -125,11 +137,23 @@ async def confirm_import(
     """
     Executes the database import from the cached preview token.
     """
-    records = _import_preview_cache.get(cache_token)
-    if not records:
+    _cache_cleanup()
+    cached = _import_preview_cache.get(cache_token)
+
+    if not cached:
         raise HTTPException(
             status_code=400,
             detail="La sesión de importación ha expirado o no es válida. Por favor vuelva a cargar el archivo."
+        )
+
+    created_at, records = cached
+
+    # Explicit TTL check
+    if time.time() - created_at > _CACHE_TTL_SECONDS:
+        _import_preview_cache.pop(cache_token, None)
+        raise HTTPException(
+            status_code=400,
+            detail="La sesión de importación ha expirado (30 minutos). Por favor vuelva a cargar el archivo."
         )
 
     result = DataImporterService.execute_import(

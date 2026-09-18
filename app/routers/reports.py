@@ -18,7 +18,7 @@ from app.models.appointment import Appointment
 from app.models.template import ClinicalTemplate
 from app.models.setting import Setting
 from app.routers.settings import get_or_create_settings
-from app.core.deps import require_current_user
+from app.core.deps import require_current_user, require_permission
 from app.services.pdf_service import generate_executive_report_pdf, generate_secretary_daily_report_pdf
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -388,7 +388,7 @@ def export_secretary_daily_pdf(
 @router.get("/export/patients")
 def export_patients_csv(
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('reports'))
 ):
     """
     Exportación de base de datos de pacientes a CSV compatible con Excel.
@@ -431,7 +431,7 @@ def export_patients_csv(
 @router.get("/export/consultations")
 def export_consultations_csv(
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('reports'))
 ):
     """
     Exportación de consultas e historias clínicas a CSV compatible con Excel.
@@ -469,7 +469,7 @@ def export_consultations_csv(
 @router.get("/export/financial")
 def export_financial_csv(
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('reports'))
 ):
     """
     Exportación de ingresos y estado de facturación a CSV compatible con Excel.

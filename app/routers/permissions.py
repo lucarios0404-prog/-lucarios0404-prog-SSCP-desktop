@@ -251,7 +251,7 @@ def delete_permission(
 
     if in_use:
         return RedirectResponse(
-            url=f"/permissions?error=en_uso_{record.key}",
+            url=f"/permissions?error=en_uso",
             status_code=status.HTTP_303_SEE_OTHER,
         )
 

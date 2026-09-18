@@ -146,8 +146,9 @@ def mark_payment_paid(
     current_user = Depends(require_current_user)
 ):
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    if payment:
-        payment.status = "paid"
-        payment.updated_at = datetime.utcnow()
-        db.commit()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Pago no encontrado.")
+    payment.status = "paid"
+    payment.updated_at = datetime.utcnow()
+    db.commit()
     return RedirectResponse(url="/payments", status_code=303)

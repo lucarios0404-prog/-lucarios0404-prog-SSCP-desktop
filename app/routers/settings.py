@@ -141,6 +141,25 @@ UPLOAD_DIR = BASE_DIR / "static" / "uploads"
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_SIZE_MB = 5
 
+# Magic bytes for allowed image formats
+_MAGIC_SIGNATURES = {
+    b"\x89PNG\r\n\x1a\n": ".png",
+    b"\xff\xd8\xff": ".jpg",
+    b"RIFF": ".webp",  # WebP starts with RIFF....WEBP
+}
+
+
+def _detect_image_type(content: bytes) -> str | None:
+    """Returns extension if content matches a known image magic signature, else None."""
+    for magic, ext in _MAGIC_SIGNATURES.items():
+        if content.startswith(magic):
+            # Extra check for WebP: bytes 8-12 must be 'WEBP'
+            if ext == ".webp" and content[8:12] != b"WEBP":
+                continue
+            return ext
+    return None
+
+
 @router.post("/upload-logo")
 async def upload_doctor_logo(
     request: Request,
@@ -160,8 +179,16 @@ async def upload_doctor_logo(
     if len(contents) > MAX_SIZE_MB * 1024 * 1024:
         raise HTTPException(status_code=400, detail=f"El archivo supera el límite de {MAX_SIZE_MB} MB.")
 
+    # Validate actual file content via magic bytes (prevent extension spoofing)
+    detected_ext = _detect_image_type(contents)
+    if not detected_ext:
+        raise HTTPException(
+            status_code=400,
+            detail="El archivo no es una imagen válida. Por favor sube un PNG, JPG o WEBP real."
+        )
+
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    dest_path = UPLOAD_DIR / f"doctor_logo{ext}"
+    dest_path = UPLOAD_DIR / f"doctor_logo{detected_ext}"
 
     with open(dest_path, "wb") as f:
         f.write(contents)
