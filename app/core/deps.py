@@ -61,3 +61,13 @@ def require_permission(permission_key: str):
             )
         return current_user
     return dependency
+
+def require_active_license():
+    from app.services.license_service import check_license, LicenseStatus
+    lic = check_license()
+    if lic.status != LicenseStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Licencia no activa ({lic.status.value}). Por favor active el sistema en /activate."
+        )
+    return lic

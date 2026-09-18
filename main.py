@@ -37,6 +37,7 @@ from app.routers import (
     data_import,
     permissions,
 )
+from app.routers.activation import router as activation_router
 from app.core.deps import get_current_user
 
 async def run_periodic_sync():
@@ -194,7 +195,11 @@ BASE_DIR = Path(sys._MEIPASS).resolve() if getattr(sys, 'frozen', False) else Pa
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
-# Incluir todos los módulos Core, Clínicos y de Productividad (Fase 4 y Fase 6)
+# === GATE DE LICENCIA (Middleware Global) ===
+# El router de activacion siempre esta disponible
+app.include_router(activation_router)
+
+# Todos los routers de la aplicacion se registran normalmente
 app.include_router(auth.router)
 app.include_router(data_import.router)
 app.include_router(patients.router)
@@ -216,12 +221,35 @@ app.include_router(reports.router)
 app.include_router(users.router)
 app.include_router(permissions.router)
 
+from fastapi.responses import JSONResponse
+from app.services.license_service import check_license, LicenseStatus
+
+@app.middleware("http")
+async def license_gate_middleware(request: Request, call_next):
+    # Rutas publicas exentas de validacion de licencia
+    exempt_prefixes = ("/activate", "/static", "/favicon.ico", "/docs", "/openapi.json")
+    if any(request.url.path.startswith(p) for p in exempt_prefixes):
+        return await call_next(request)
+
+    lic = check_license()
+    if lic.status != LicenseStatus.ACTIVE:
+        accept = request.headers.get("accept", "")
+        # Si la peticion es de API pura (solicita json explicitamente sin html/*/*)
+        if "application/json" in accept and "text/html" not in accept and "*/*" not in accept:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Licencia no activa", "status": lic.status.value}
+            )
+        return RedirectResponse(url="/activate", status_code=303)
+
+    return await call_next(request)
+
 @app.get("/")
 async def root(request: Request, current_user = Depends(get_current_user)):
     if current_user:
         return RedirectResponse(url="/dashboard")
     return templates.TemplateResponse(
-        request=request, name="auth/login.html", context={"title": "Iniciar Sesión - SSCP Desktop"}
+        request=request, name="auth/login.html", context={"title": "Iniciar Sesion - SSCP Desktop"}
     )
 
 @app.get("/dashboard")

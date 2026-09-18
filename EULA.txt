@@ -1,0 +1,38 @@
+﻿ACUERDO DE LICENCIA DE USO DE SOFTWARE
+SSCP Desktop - Sistema de Seguimiento para Consultas de Pacientes
+Copyright (c) 2024-2026 Laxarusdevs. Todos los derechos reservados.
+
+IMPORTANTE - LEA DETENIDAMENTE ANTES DE INSTALAR O USAR ESTE SOFTWARE.
+
+1. CONCESION DE LICENCIA
+   Laxarusdevs le concede una licencia no exclusiva, intransferible y
+   revocable para instalar y usar este software en el equipo autorizado
+   indicado por el Machine ID de la licencia adquirida.
+
+2. RESTRICCIONES
+   Usted NO puede:
+   - Copiar, distribuir, sublicenciar ni vender el software a terceros.
+   - Realizar ingenieria inversa, descompilar o desensamblar el software.
+   - Instalar el software en un equipo distinto al autorizado sin permiso.
+   - Remover o alterar avisos de propiedad intelectual del software.
+
+3. PROPIEDAD INTELECTUAL
+   El software, incluyendo su codigo fuente, interfaces, documentacion y
+   datos, es propiedad exclusiva de Laxarusdevs y esta protegido por las
+   leyes de derechos de autor de la Republica Dominicana e internacionales.
+
+4. SUSPENSION Y REVOCACION
+   Laxarusdevs se reserva el derecho de suspender o revocar la licencia en
+   caso de incumplimiento de este acuerdo, sin previo aviso y sin reembolso.
+
+5. SIN GARANTIA
+   El software se provee "tal cual" sin garantias expresas ni implicitas.
+   Laxarusdevs no sera responsable por danos directos, indirectos o
+   consecuentes derivados del uso del software.
+
+6. CONTACTO Y SOPORTE
+   Email: info@laxarusdevs.com
+   Web:   https://sscp.laxarusdevs.com
+
+Al hacer clic en "Acepto", confirma que ha leido y acepta los terminos
+de este Acuerdo de Licencia de Uso.

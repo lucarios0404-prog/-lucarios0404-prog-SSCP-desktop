@@ -78,11 +78,30 @@ hidden_imports = [
     'qrcode.image.pil',
     'PIL',
     'PIL.Image',
+    'cryptography',
+    'cryptography.hazmat.primitives',
+    'cryptography.hazmat.primitives.serialization',
+    'cryptography.hazmat.primitives.asymmetric.ed25519',
+    'wmi',
+    'app.models.license_config',
+    'app.services.license_service',
+    'app.routers.activation',
 ]
+
+import os
+use_obfuscated = os.path.exists("app_obfuscated")
+if use_obfuscated:
+    pathex_dirs = ['app_obfuscated', '.']
+    for item in os.listdir('app_obfuscated'):
+        if item.startswith('pyarmor_runtime'):
+            hidden_imports.append(item)
+            added_files.append((os.path.join('app_obfuscated', item), item))
+else:
+    pathex_dirs = ['.']
 
 a = Analysis(
     ['desktop_launcher.py'],
-    pathex=['.'],
+    pathex=pathex_dirs,
     binaries=[],
     datas=added_files,
     hiddenimports=hidden_imports,

@@ -1,0 +1,127 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activar SSCP Desktop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+    .logo{display:flex;align-items:center;gap:10px;margin-bottom:32px}
+    .logo-icon{width:44px;height:44px;background:linear-gradient(135deg,#10b981,#059669);border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#fff}
+    .logo-text{font-size:22px;font-weight:700;color:#f1f5f9;letter-spacing:.5px}
+    .logo-sub{font-size:11px;color:#64748b;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+    .card{background:#111827;border:1px solid #1e293b;border-radius:20px;padding:36px 40px;width:100%;max-width:480px;box-shadow:0 25px 60px rgba(0,0,0,.5)}
+    h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:6px}
+    .subtitle{font-size:13px;color:#64748b;margin-bottom:28px;line-height:1.5}
+    .machine-box{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:14px 18px;margin-bottom:24px}
+    .machine-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#475569;margin-bottom:6px}
+    .machine-id-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .machine-id{font-family:'Courier New',monospace;font-size:18px;font-weight:700;color:#10b981;letter-spacing:2px}
+    .copy-btn{background:none;border:1px solid #1e293b;color:#64748b;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;transition:all .2s}
+    .copy-btn:hover{background:#1e293b;color:#e2e8f0}
+    label{display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;font-weight:500}
+    input[type="text"],textarea{width:100%;background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:12px 14px;color:#e2e8f0;font-size:14px;outline:none;transition:border-color .2s;font-family:'Courier New',monospace}
+    input[type="text"]:focus,textarea:focus{border-color:#10b981}
+    .mode-selector{display:flex;gap:10px;margin-bottom:20px}
+    .mode-option{flex:1;position:relative}
+    .mode-option input[type="radio"]{position:absolute;opacity:0}
+    .mode-option label{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px;border:1px solid #1e293b;border-radius:12px;cursor:pointer;transition:all .2s;text-align:center}
+    .mode-option label:hover{border-color:#334155}
+    .mode-option input[type="radio"]:checked + label{border-color:#10b981;background:rgba(16,185,129,.06)}
+    .mode-icon{font-size:22px}
+    .mode-name{font-size:12px;font-weight:600;color:#cbd5e1}
+    .mode-desc{font-size:10px;color:#475569;line-height:1.4}
+    .field-group{margin-bottom:20px}
+    .btn{width:100%;background:linear-gradient(135deg,#10b981,#059669);border:none;border-radius:12px;padding:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.3px}
+    .btn:hover{opacity:.9;transform:translateY(-1px)}
+    .btn:active{transform:translateY(0)}
+    .error-box{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#fca5a5;display:flex;gap:8px;align-items:flex-start}
+    .divider{border-top:1px solid #1e293b;margin:24px 0}
+    .help-link{text-align:center;font-size:12px;color:#475569}
+    .help-link a{color:#10b981;text-decoration:none}
+    .help-link a:hover{text-decoration:underline}
+    .toast{position:fixed;top:20px;right:20px;background:#10b981;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none}
+    .toast.show{opacity:1}
+  </style>
+</head>
+<body>
+  <div class="logo">
+    <div class="logo-icon">S</div>
+    <div>
+      <div class="logo-text">SSCP Desktop</div>
+      <div class="logo-sub">Sistema de Seguimiento Clinico</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h1>🔐 Activar Licencia</h1>
+    <p class="subtitle">Esta copia del sistema requiere activacion. Ingresa tu ID de equipo al soporte para recibir tu clave de activacion.</p>
+
+    {% if error %}
+    <div class="error-box">⚠️ {{ error }}</div>
+    {% endif %}
+
+    <div class="machine-box">
+      <div class="machine-label">ID de Equipo (Machine ID)</div>
+      <div class="machine-id-row">
+        <div class="machine-id" id="machine-id">{{ machine_id }}</div>
+        <button class="copy-btn" onclick="copyMachineId()">📋 Copiar</button>
+      </div>
+    </div>
+
+    <form method="post" action="/activate">
+      <div style="margin-bottom:20px">
+        <label>Modalidad de Licencia</label>
+        <div class="mode-selector">
+          <div class="mode-option">
+            <input type="radio" name="mode" id="mode-offline" value="offline" {% if default_mode != 'online' %}checked{% endif %}>
+            <label for="mode-offline">
+              <span class="mode-icon">🔒</span>
+              <span class="mode-name">Offline</span>
+              <span class="mode-desc">Clave criptografica. No requiere internet.</span>
+            </label>
+          </div>
+          <div class="mode-option">
+            <input type="radio" name="mode" id="mode-online" value="online" {% if default_mode == 'online' %}checked{% endif %}>
+            <label for="mode-online">
+              <span class="mode-icon">🌐</span>
+              <span class="mode-name">Online</span>
+              <span class="mode-desc">Token verificado en servidor Laxarusdevs.</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label for="license_key">Clave de Activacion</label>
+        <textarea name="license_key" id="license_key" rows="3" placeholder="Pega aqui tu clave de licencia..." style="resize:vertical">{% if submitted_key %}{{ submitted_key }}{% endif %}</textarea>
+      </div>
+
+      <button type="submit" class="btn">✅ Activar SSCP Desktop</button>
+    </form>
+
+    <div class="divider"></div>
+    <div class="help-link">
+      ¿Necesitas tu clave? Contacta a
+      <a href="mailto:info@laxarusdevs.com?subject=Activacion SSCP Desktop - {{ machine_id }}">info@laxarusdevs.com</a>
+      con tu ID de equipo.
+    </div>
+  </div>
+
+  <div class="toast" id="toast">✅ ID copiado al portapapeles</div>
+
+  <script>
+    function copyMachineId() {
+      const id = document.getElementById('machine-id').textContent;
+      navigator.clipboard.writeText(id).then(() => {
+        const toast = document.getElementById('toast');
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2500);
+      });
+    }
+  </script>
+</body>
+</html>

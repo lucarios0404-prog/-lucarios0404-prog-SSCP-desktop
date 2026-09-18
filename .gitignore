@@ -61,3 +61,18 @@ $RECYCLE.BIN/
 # Tools & Archives
 tools/
 *.zip
+
+# Llave privada de licencias (NUNCA al repo)
+tools/private.key
+app_obfuscated/
+data/license_cache.json
+
+# Base de datos local con datos clínicos (NUNCA al repo — datos de pacientes)
+data/sscp.db
+data/*.db
+data/*.json
+!data/.gitkeep
+
+# Scratch and test files
+scratch/
+scratch_*.py

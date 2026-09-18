@@ -28,7 +28,15 @@ RequestExecutionLevel admin
 
 ; Páginas del Asistente de Instalación
 !insertmacro MUI_PAGE_WELCOME
+
+; Pagina EULA (Acuerdo de Licencia de Uso)
+!insertmacro MUI_PAGE_LICENSE "EULA.txt"
+
 !insertmacro MUI_PAGE_DIRECTORY
+
+; Pagina custom: Seleccion de Modalidad de Licencia
+Page custom LicenseModePageCreate LicenseModePageLeave
+
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${PRODUCT_EXE}"
 !define MUI_FINISHPAGE_RUN_TEXT "Ejecutar ${PRODUCT_NAME} ahora"
@@ -52,6 +60,11 @@ Section "MainSection" SEC01
 
   ; Crear directorio local para base de datos SQLite persistente
   CreateDirectory "$INSTDIR\data"
+
+  ; Escribir la modalidad de licencia seleccionada por el usuario
+  FileOpen $0 "$INSTDIR\data\license_mode.txt" w
+  FileWrite $0 $R9
+  FileClose $0
 
   ; Crear Accesos Directos
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
@@ -93,3 +106,41 @@ Section Uninstall
   ; Limpiar registro de Windows
   DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
 SectionEnd
+; ==============================================================================
+; Pagina Custom: Seleccion de Modalidad de Licencia
+; ==============================================================================
+Var LicModeDialog
+Var LicModeOfflineRadio
+Var LicModeOnlineRadio
+
+Function LicenseModePageCreate
+  nsDialogs::Create 1018
+  Pop $LicModeDialog
+  ${If} $LicModeDialog == error
+    Abort
+  ${EndIf}
+
+  ${NSD_CreateLabel} 0 0 100% 30u "Seleccione la modalidad de licencia para esta instalacion:"
+
+  ${NSD_CreateRadioButton} 10u 35u 280u 16u "🔒  Licencia Offline (sin internet requerido)"
+  Pop $LicModeOfflineRadio
+  ${NSD_Check} $LicModeOfflineRadio
+
+  ${NSD_CreateLabel} 30u 53u 280u 20u "La aplicacion se activa con una clave criptografica que le proporcionara Laxarusdevs."
+
+  ${NSD_CreateRadioButton} 10u 78u 280u 16u "🌐  Licencia Online (verificacion remota con servidor)"
+  Pop $LicModeOnlineRadio
+
+  ${NSD_CreateLabel} 30u 96u 280u 20u "Requiere internet. Permite suspension y control remoto desde el panel de administracion."
+
+  nsDialogs::Show
+FunctionEnd
+
+Function LicenseModePageLeave
+  ${NSD_GetState} $LicModeOnlineRadio $0
+  ${If} $0 == ${BST_CHECKED}
+    StrCpy $R9 "online"
+  ${Else}
+    StrCpy $R9 "offline"
+  ${EndIf}
+FunctionEnd

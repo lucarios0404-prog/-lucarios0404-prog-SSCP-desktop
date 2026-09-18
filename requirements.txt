@@ -15,3 +15,7 @@ reportlab
 qrcode[pil]
 access-parser
 openpyxl
+# === Sistema de Licenciamiento ===
+cryptography
+wmi
+pyarmor
