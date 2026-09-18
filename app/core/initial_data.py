@@ -13,6 +13,12 @@ def seed_initial_data_if_empty(db: Session) -> None:
     if db.query(User).count() == 0:
         default_users = [
             {
+                "name": "Administrador Principal",
+                "email": "admin@sscp.com",
+                "password": "password123",
+                "role": "admin",
+            },
+            {
                 "name": "Dr. Carlos Mendoza",
                 "email": "doctor@sscp.com",
                 "password": "password123",
@@ -36,6 +42,25 @@ def seed_initial_data_if_empty(db: Session) -> None:
             db.add(new_user)
         db.commit()
         print("[Initial Seed] Usuarios iniciales sembrados con éxito.")
+
+    # 1b. Asegurar que siempre exista el usuario maestro Administrador
+    admin_exists = db.query(User).filter(User.role == "admin").first()
+    if not admin_exists:
+        existing_admin_email = db.query(User).filter(User.email == "admin@sscp.com").first()
+        if existing_admin_email:
+            existing_admin_email.role = "admin"
+            existing_admin_email.is_active = True
+        else:
+            admin_user = User(
+                name="Administrador Principal",
+                email="admin@sscp.com",
+                hashed_password=get_password_hash("password123"),
+                role="admin",
+                is_active=True,
+            )
+            db.add(admin_user)
+        db.commit()
+        print("[Initial Seed] Usuario Administrador maestro asegurado con éxito.")
 
     # 2. Sembrar settings si la tabla está vacía
     if db.query(Setting).count() == 0:
