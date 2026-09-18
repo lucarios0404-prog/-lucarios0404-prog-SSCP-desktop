@@ -3,6 +3,8 @@
 ; Genera el instalador oficial autocontenido para Windows 10/11 x64
 ; ==============================================================================
 
+Unicode true
+
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
 
@@ -122,13 +124,13 @@ Function LicenseModePageCreate
 
   ${NSD_CreateLabel} 0 0 100% 30u "Seleccione la modalidad de licencia para esta instalacion:"
 
-  ${NSD_CreateRadioButton} 10u 35u 280u 16u "🔒  Licencia Offline (sin internet requerido)"
+  ${NSD_CreateRadioButton} 10u 35u 280u 16u "Licencia Offline (sin internet requerido)"
   Pop $LicModeOfflineRadio
   ${NSD_Check} $LicModeOfflineRadio
 
-  ${NSD_CreateLabel} 30u 53u 280u 20u "La aplicacion se activa con una clave criptografica que le proporcionara Laxarusdevs."
+  ${NSD_CreateLabel} 30u 53u 280u 20u "La aplicacion se activa con una clave criptografica que le proporcionara el administrador."
 
-  ${NSD_CreateRadioButton} 10u 78u 280u 16u "🌐  Licencia Online (verificacion remota con servidor)"
+  ${NSD_CreateRadioButton} 10u 78u 280u 16u "Licencia Online (verificacion remota con servidor)"
   Pop $LicModeOnlineRadio
 
   ${NSD_CreateLabel} 30u 96u 280u 20u "Requiere internet. Permite suspension y control remoto desde el panel de administracion."
