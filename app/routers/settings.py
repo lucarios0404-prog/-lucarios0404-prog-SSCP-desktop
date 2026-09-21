@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request, Form, UploadFile, File, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from pathlib import Path
@@ -7,7 +7,7 @@ from datetime import datetime
 import shutil
 import os
 
-from app.database import get_db
+from app.database import get_db, DB_PATH
 from app.models.setting import Setting
 from app.core.deps import require_admin
 from app.services.whatsapp_gateway import gateway_manager
@@ -270,3 +270,57 @@ def send_whatsapp_test_message(
     """Prueba el envío de un mensaje de WhatsApp (vía gateway o wa.me)."""
     result = WhatsAppService.dispatch_message(phone=phone, message=message)
     return JSONResponse(content=result)
+
+@router.get("/backup/export")
+def export_backup(
+    current_user = Depends(require_admin)
+):
+    """Genera y descarga una copia de seguridad exacta de la base de datos SQLite."""
+    if not DB_PATH.exists():
+        raise HTTPException(status_code=404, detail="Archivo de base de datos no encontrado.")
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_filename = f"SSCP_Backup_{timestamp}.db"
+    return FileResponse(
+        path=str(DB_PATH),
+        filename=backup_filename,
+        media_type="application/x-sqlite3"
+    )
+
+@router.post("/backup/restore")
+async def restore_backup(
+    request: Request,
+    backup_file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_admin)
+):
+    """Restaura una copia de seguridad SQLite previa verificación de integridad."""
+    content = await backup_file.read()
+    if len(content) < 16 or not content.startswith(b"SQLite format 3\x00"):
+        setting = get_or_create_settings(db)
+        return templates.TemplateResponse(
+            request=request,
+            name="settings/index.html",
+            context={
+                "user": current_user,
+                "setting": setting,
+                "gateway_status": gateway_manager.get_status(),
+                "error": "El archivo proporcionado no es una base de datos SQLite válida de SSCP."
+            },
+            status_code=400
+        )
+
+    # 1. Crear copia de seguridad preventiva del estado actual
+    if DB_PATH.exists():
+        pre_restore_bak = DB_PATH.with_suffix(".pre_restore.bak")
+        try:
+            shutil.copy2(DB_PATH, pre_restore_bak)
+        except Exception:
+            pass
+
+    # 2. Escribir el nuevo contenido en DB_PATH
+    with open(DB_PATH, "wb") as f:
+        f.write(content)
+
+    return RedirectResponse(url="/settings?backup_restored=1", status_code=303)
+
