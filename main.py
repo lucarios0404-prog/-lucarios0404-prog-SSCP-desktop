@@ -191,6 +191,19 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="SSCP Desktop", lifespan=lifespan)
 
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, FileResponse
+from app.routers import mobile_api
+
+# Habilitar CORS para permitir solicitudes desde aplicaciones móviles Android y tablets
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Soporte para PyInstaller (empaquetado .exe) y desarrollo local
 BASE_DIR = Path(sys._MEIPASS).resolve() if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
 
@@ -222,14 +235,32 @@ app.include_router(medical_references.router)
 app.include_router(reports.router)
 app.include_router(users.router)
 app.include_router(permissions.router)
+app.include_router(mobile_api.router)
 
-from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from app.services.license_service import check_license, LicenseStatus
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    if request.url.path == "/activate":
+        from app.services.license_service import get_machine_id, get_license_mode
+        return templates.TemplateResponse(
+            request=request,
+            name="activation/index.html",
+            context={
+                "machine_id": get_machine_id(),
+                "default_mode": get_license_mode(),
+                "error": "Por favor ingresa la clave de licencia antes de activar.",
+                "submitted_key": "",
+            },
+            status_code=200,
+        )
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 @app.middleware("http")
 async def license_gate_middleware(request: Request, call_next):
     # Rutas publicas exentas de validacion de licencia
-    exempt_prefixes = ("/activate", "/static", "/favicon.ico", "/docs", "/openapi.json")
+    exempt_prefixes = ("/activate", "/static", "/favicon.ico", "/docs", "/openapi.json", "/api/mobile/ping", "/download/apk", "/mobile")
     if any(request.url.path.startswith(p) for p in exempt_prefixes):
         return await call_next(request)
 
@@ -245,6 +276,36 @@ async def license_gate_middleware(request: Request, call_next):
         return RedirectResponse(url="/activate", status_code=303)
 
     return await call_next(request)
+
+@app.get("/download/apk")
+def download_mobile_apk():
+    """Descarga directa del paquete APK compilado para Android."""
+    apk_candidates = [
+        BASE_DIR / "static" / "downloads" / "SSCP-Mobile.apk",
+        BASE_DIR.parent / "sscp-mobile" / "SSCP-Mobile.apk",
+        Path(__file__).resolve().parent.parent / "sscp-mobile" / "SSCP-Mobile.apk",
+        Path(__file__).resolve().parent / "static" / "downloads" / "SSCP-Mobile.apk",
+    ]
+    for candidate in apk_candidates:
+        if candidate.exists():
+            return FileResponse(
+                path=str(candidate),
+                filename="SSCP-Mobile.apk",
+                media_type="application/vnd.android.package-archive"
+            )
+    return JSONResponse(
+        status_code=404,
+        content={"error": "El instalador APK de Android se encuentra en proceso de compilación o empaquetado."}
+    )
+
+@app.get("/mobile")
+def mobile_web_view(request: Request):
+    """Interfaz web móvil optimizada para teléfonos y tablets (Doctor y Secretaria)."""
+    return templates.TemplateResponse(
+        request=request,
+        name="mobile/index.html",
+        context={"request": request}
+    )
 
 @app.get("/")
 async def root(request: Request, db: Session = Depends(get_db), current_user = Depends(get_current_user)):

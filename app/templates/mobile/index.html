@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>SSCP Móvil — Doctor &amp; Secretaria</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        },
+                        clinical: {
+                            doctor: '#2563eb',
+                            secretary: '#0d9488',
+                            waiting: '#16a34a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        .safe-pb {
+            padding-bottom: env(safe-area-inset-bottom, 16px);
+        }
+        .safe-pt {
+            padding-top: env(safe-area-inset-top, 16px);
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .pulse-waiting {
+            animation: pulse-ring 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-slate-50 text-slate-800 antialiased select-none">
+
+    <!-- PANTALLA: CONFIGURACIÓN DE SERVIDOR (Si se requiere cambiar IP) -->
+    <div id="screen-config" class="hidden fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                        <i class="fas fa-network-wired text-sm"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-900 text-base">Servidor SSCP</h3>
+                </div>
+                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+            </div>
+            <p class="text-xs text-slate-500 mb-4 leading-relaxed">
+                Ingresa la dirección IP de la computadora de la clínica (visible en <em>Ajustes</em> de la versión Desktop):
+            </p>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">URL o IP del Servidor</label>
+                    <input type="text" id="config-server-url" placeholder="http://192.168.1.50:8080" 
+                           class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-slate-800">
+                </div>
+                <div id="ping-result" class="text-xs font-semibold py-1"></div>
+                <div class="flex space-x-2 pt-2">
+                    <button onclick="testConnection()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
+                        <i class="fas fa-satellite-dish mr-1"></i> Probar Conexión
+                    </button>
+                    <button onclick="saveServerConfig()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-600/30 transition">
+                        <i class="fas fa-save mr-1"></i> Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA 1: LOGIN -->
+    <div id="screen-login" class="flex-1 flex flex-col justify-between p-6 safe-pt safe-pb max-w-md mx-auto w-full">
+        <!-- Top: Logo & Branding -->
+        <div class="pt-8 text-center">
+            <div class="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-xl shadow-indigo-500/25 mb-4">
+                <i class="fas fa-heart-pulse text-3xl"></i>
+            </div>
+            <h1 class="text-2xl font-black text-slate-900 tracking-tight">SSCP Móvil</h1>
+            <p class="text-xs font-medium text-slate-500 mt-1">Terminal de Consulta y Recepción Clínica</p>
+            <div id="login-clinic-banner" class="mt-2 inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-700 text-[11px] font-bold rounded-full">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span> Conectado a Estación Local
+            </div>
+            <div class="mt-2.5">
+                <a href="/download/apk" class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-200 shadow-sm transition active:scale-95">
+                    <i class="fab fa-android text-emerald-600 text-sm"></i>
+                    <span>Descargar App Android (.APK)</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Formulario Login -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xl shadow-slate-200/40 my-6">
+            <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100">
+                Iniciar Sesión
+            </h2>
+
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Correo Electrónico</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <i class="fas fa-envelope text-xs"></i>
+                        </span>
+                        <input type="email" id="login-email" required placeholder="doctor@sscp.com" 
+                               class="w-full pl-9 pr-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Contraseña</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <i class="fas fa-lock text-xs"></i>
+                        </span>
+                        <input type="password" id="login-password" required placeholder="••••••••" 
+                               class="w-full pl-9 pr-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <div id="login-error" class="hidden text-xs font-bold text-red-600 bg-red-50 p-3 rounded-xl border border-red-200"></div>
+
+                <button type="submit" id="btn-login-submit" 
+                        class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/30 text-sm flex items-center justify-center space-x-2 transition active:scale-[0.98]">
+                    <span>Ingresar al Sistema</span>
+                    <i class="fas fa-arrow-right text-xs"></i>
+                </button>
+            </form>
+
+            <!-- Acceso Rápido para Pruebas / Demostración -->
+            <div class="mt-5 pt-4 border-t border-slate-100">
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block text-center mb-2.5">
+                    Acceso Rápido por Rol
+                </span>
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" onclick="fillQuickLogin('doctor@sscp.com', 'password123')" 
+                            class="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition">
+                        <i class="fas fa-user-md"></i>
+                        <span>Doctor</span>
+                    </button>
+                    <button type="button" onclick="fillQuickLogin('secretaria@sscp.com', 'password123')" 
+                            class="px-3 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition">
+                        <i class="fas fa-user-nurse"></i>
+                        <span>Secretaria</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom: Configurar Servidor -->
+        <div class="text-center pb-2">
+            <button onclick="openConfigModal()" class="text-xs font-semibold text-slate-500 hover:text-slate-800 transition flex items-center justify-center space-x-1 mx-auto">
+                <i class="fas fa-cog text-slate-400"></i>
+                <span>Configurar Servidor o IP</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- PANTALLA 2: APLICACIÓN PRINCIPAL (DOCTOR O SECRETARIA) -->
+    <div id="screen-app" class="hidden flex-1 flex flex-col h-full overflow-hidden">
+        <!-- Top App Bar -->
+        <header class="bg-white border-b border-slate-200 safe-pt px-4 py-3 shrink-0 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div id="role-avatar" class="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black text-sm shadow-md">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <h2 id="header-user-name" class="font-bold text-slate-900 text-sm leading-tight">Usuario</h2>
+                        <div class="flex items-center space-x-1.5 mt-0.5">
+                            <span id="header-user-role" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide"></span>
+                            <span id="header-clinic-name" class="text-[11px] text-slate-400 truncate max-w-[140px]"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button onclick="loadDashboardData()" title="Actualizar" 
+                            class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition active:rotate-180">
+                        <i class="fas fa-sync-alt text-xs"></i>
+                    </button>
+                    <button onclick="handleLogout()" title="Cerrar Sesión" 
+                            class="w-9 h-9 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center transition">
+                        <i class="fas fa-sign-out-alt text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+        </header>
+
+        <!-- Main Scrollable Area -->
+        <main class="flex-1 overflow-y-auto p-4 space-y-4 pb-28" id="main-content">
+            
+            <!-- VISTA 1: ATENCIÓN HOY (SALA DE ESPERA Y AGENDA) -->
+            <div id="view-today" class="space-y-4">
+                <!-- Resumen de Contadores Diarios -->
+                <div class="grid grid-cols-4 gap-2 text-center">
+                    <div class="bg-slate-50 p-2 rounded-xl border border-slate-100 shadow-sm">
+                        <span class="block text-[10px] font-bold text-slate-400 uppercase">Citas</span>
+                        <span id="stat-total" class="text-base font-black text-slate-800">0</span>
+                    </div>
+                    <div class="bg-emerald-50 p-2 rounded-xl border border-emerald-100 pulse-waiting shadow-sm">
+                        <span class="block text-[10px] font-bold text-emerald-700 uppercase">En Espera</span>
+                        <span id="stat-waiting" class="text-base font-black text-emerald-700">0</span>
+                    </div>
+                    <div class="bg-blue-50 p-2 rounded-xl border border-blue-100 shadow-sm">
+                        <span class="block text-[10px] font-bold text-blue-700 uppercase">Consulta</span>
+                        <span id="stat-consulting" class="text-base font-black text-blue-700">0</span>
+                    </div>
+                    <div class="bg-violet-50 p-2 rounded-xl border border-violet-100 shadow-sm">
+                        <span class="block text-[10px] font-bold text-violet-700 uppercase">Listos</span>
+                        <span id="stat-completed" class="text-base font-black text-violet-700">0</span>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 1: SALA DE ESPERA (PRIORITARIA PARA DOCTOR Y SECRETARIA) -->
+                <div id="waiting-room-section" class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2 pulse-waiting"></span>
+                            Sala de Espera (Atención Inmediata)
+                        </h3>
+                        <span id="waiting-badge" class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">0 Pacientes</span>
+                    </div>
+                    <div id="waiting-list-container" class="space-y-2">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 2: AGENDA COMPLETA DEL DÍA -->
+                <div class="space-y-2 pt-1">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center">
+                            <i class="fas fa-calendar-day text-indigo-600 mr-2"></i>
+                            Todas las Citas de Hoy
+                        </h3>
+                        <span id="today-date-str" class="text-[11px] font-bold text-slate-400"></span>
+                    </div>
+                    <div id="appointments-list-container" class="space-y-2.5">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA 2: REPORTES Y CUADRE (PAGOS, VISTOS, CITAS PREVIAS Y PDF) -->
+            <div id="view-reports" class="hidden space-y-4">
+                
+                <!-- Selector de Fecha de Reporte -->
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-sm space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center">
+                            <i class="fas fa-calendar-alt text-indigo-600 mr-1.5"></i> Fecha de Consulta
+                        </span>
+                        <div class="flex items-center space-x-1.5">
+                            <button type="button" onclick="setReportDateQuick('today')" 
+                                    class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition active:scale-95">
+                                Hoy
+                            </button>
+                            <button type="button" onclick="setReportDateQuick('yesterday')" 
+                                    class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition active:scale-95">
+                                Ayer
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="date" id="report-selected-date" onchange="loadReportsData(this.value)" 
+                               class="flex-1 px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-800">
+                        <button type="button" onclick="loadReportsData()" title="Refrescar reporte" 
+                                class="w-9 h-9 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold transition active:rotate-180">
+                            <i class="fas fa-sync-alt text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Botón de Acción Principal: Exportar PDF Oficial -->
+                <button type="button" onclick="downloadDailyPdf()" 
+                        class="w-full py-3.5 px-4 bg-gradient-to-r from-red-600 via-rose-600 to-indigo-600 hover:from-red-700 hover:to-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-rose-600/25 flex items-center justify-between transition active:scale-[0.98]">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white">
+                            <i class="fas fa-file-pdf text-sm"></i>
+                        </div>
+                        <div class="text-left">
+                            <span class="block text-xs font-black uppercase tracking-wider">Descargar Reporte Oficial (PDF)</span>
+                            <span class="block text-[10px] text-white/80" id="rep-pdf-subtitle">Con membrete, signos vitales y cuadre de caja</span>
+                        </div>
+                    </div>
+                    <i class="fas fa-download text-sm"></i>
+                </button>
+
+                <!-- Sub-Pestañas de Reportes Rápidos -->
+                <div class="flex bg-slate-200/80 p-1 rounded-2xl text-xs font-bold text-slate-600">
+                    <button id="subtab-btn-payments" onclick="switchReportsSubTab('payments')" 
+                            class="flex-1 py-2 rounded-xl bg-white text-indigo-700 shadow-sm transition flex items-center justify-center space-x-1">
+                        <i class="fas fa-cash-register text-xs"></i>
+                        <span>Pagos</span>
+                    </button>
+                    <button id="subtab-btn-attended" onclick="switchReportsSubTab('attended')" 
+                            class="flex-1 py-2 rounded-xl text-slate-600 transition flex items-center justify-center space-x-1">
+                        <i class="fas fa-user-check text-xs"></i>
+                        <span>Vistos</span>
+                    </button>
+                    <button id="subtab-btn-history" onclick="switchReportsSubTab('history')" 
+                            class="flex-1 py-2 rounded-xl text-slate-600 transition flex items-center justify-center space-x-1">
+                        <i class="fas fa-history text-xs"></i>
+                        <span>Citas Previas</span>
+                    </button>
+                </div>
+
+                <!-- SUB-SECCIÓN 1: CUADRE DE PAGOS -->
+                <div id="subtab-payments" class="space-y-3">
+                    <!-- Tarjeta Hero de Pagos -->
+                    <div class="bg-gradient-to-br from-emerald-600 to-teal-700 p-4 rounded-3xl text-white shadow-xl shadow-teal-700/20">
+                        <div class="flex items-center justify-between opacity-80 text-xs font-bold uppercase tracking-wider">
+                            <span>Total Recaudado</span>
+                            <span id="rep-payments-count-badge" class="px-2 py-0.5 bg-white/20 rounded-full text-[10px]">0 Cobros</span>
+                        </div>
+                        <div class="mt-2 text-3xl font-black tracking-tight" id="rep-payments-total">
+                            RD$ 0.00
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] text-white/80 mt-1">
+                            <span id="rep-payments-date-label">Fecha actual</span>
+                            <span id="rep-payments-pending-badge" class="hidden text-amber-200 font-bold"></span>
+                        </div>
+                    </div>
+
+                    <!-- Desglose por Método -->
+                    <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
+                        <h4 class="text-[11px] font-black uppercase text-slate-400 tracking-wider mb-2.5">Desglose por Método de Pago</h4>
+                        <div class="grid grid-cols-2 gap-2 text-xs" id="rep-methods-container">
+                            <!-- Llenado dinámicamente -->
+                        </div>
+                    </div>
+
+                    <!-- Lista Detallada de Cobros -->
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-black uppercase text-slate-700 tracking-wider">Detalle de Cobros Realizados</h4>
+                            <span class="text-[10px] text-slate-400 font-bold" id="rep-payments-list-count"></span>
+                        </div>
+                        <div id="rep-payments-list" class="space-y-2">
+                            <!-- Llenado dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB-SECCIÓN 2: PACIENTES VISTOS (ATENDIDOS) -->
+                <div id="subtab-attended" class="hidden space-y-3">
+                    <!-- Tarjeta Hero Vistos -->
+                    <div class="bg-gradient-to-br from-blue-600 to-indigo-700 p-4 rounded-3xl text-white shadow-xl shadow-indigo-700/20">
+                        <div class="flex items-center justify-between opacity-80 text-xs font-bold uppercase tracking-wider">
+                            <span>Pacientes Vistos / Consultas</span>
+                            <span class="px-2 py-0.5 bg-white/20 rounded-full text-[10px]"><i class="fas fa-stethoscope mr-1"></i>Atención Finalizada</span>
+                        </div>
+                        <div class="mt-2 text-3xl font-black tracking-tight" id="rep-attended-count">
+                            0
+                        </div>
+                        <p class="text-[11px] text-white/80 mt-1" id="rep-attended-date-label">Consultas médicas registradas</p>
+                    </div>
+
+                    <!-- Lista de Consultas Realizadas -->
+                    <div class="space-y-2">
+                        <h4 class="text-xs font-black uppercase text-slate-700 tracking-wider">Detalle de Diagnósticos y Pacientes</h4>
+                        <div id="rep-attended-list" class="space-y-2">
+                            <!-- Llenado dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB-SECCIÓN 3: CITAS PREVIAS / HISTORIAL DE LA FECHA -->
+                <div id="subtab-history" class="hidden space-y-3">
+                    <!-- Resumen de Estados de la Fecha -->
+                    <div class="grid grid-cols-4 gap-2 text-center">
+                        <div class="bg-white p-2 rounded-xl border border-slate-200">
+                            <span class="block text-[10px] font-bold text-slate-400 uppercase">Citas</span>
+                            <span id="rep-hist-total" class="text-sm font-black text-slate-800">0</span>
+                        </div>
+                        <div class="bg-violet-50 p-2 rounded-xl border border-violet-100">
+                            <span class="block text-[10px] font-bold text-violet-700 uppercase">Vistos</span>
+                            <span id="rep-hist-attended" class="text-sm font-black text-violet-700">0</span>
+                        </div>
+                        <div class="bg-emerald-50 p-2 rounded-xl border border-emerald-100">
+                            <span class="block text-[10px] font-bold text-emerald-700 uppercase">Espera</span>
+                            <span id="rep-hist-waiting" class="text-sm font-black text-emerald-700">0</span>
+                        </div>
+                        <div class="bg-rose-50 p-2 rounded-xl border border-rose-100">
+                            <span class="block text-[10px] font-bold text-rose-700 uppercase">Cancel.</span>
+                            <span id="rep-hist-cancelled" class="text-sm font-black text-rose-700">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Citas de la Fecha -->
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-black uppercase text-slate-700 tracking-wider">Agenda y Citas Registradas</h4>
+                            <span class="text-[10px] text-slate-400 font-bold" id="rep-hist-date-str"></span>
+                        </div>
+                        <div id="rep-history-list" class="space-y-2">
+                            <!-- Llenado dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- BOTÓN FLOTANTE PARA SECRETARIA: NUEVA CITA / COBRO (UBICADO ARRIBA DEL NAV INFERIOR) -->
+        <div id="secretary-floating-bar" class="hidden fixed bottom-16 inset-x-4 max-w-md mx-auto z-20">
+            <div class="flex space-x-2">
+                <button onclick="openQuickApptModal()" 
+                        class="flex-1 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-xl shadow-teal-600/30 flex items-center justify-center space-x-2 text-xs transition active:scale-95">
+                    <i class="fas fa-calendar-plus"></i>
+                    <span>Agendar Cita Rápida</span>
+                </button>
+                <button onclick="openQuickPaymentModal()" 
+                        class="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/30 flex items-center justify-center space-x-2 text-xs transition active:scale-95">
+                    <i class="fas fa-cash-register"></i>
+                    <span>Cobro</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- BARRA DE NAVEGACIÓN INFERIOR (DOCTOR Y SECRETARIA) -->
+        <nav class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 safe-pb z-30 flex items-center justify-around py-1.5 shadow-lg max-w-md mx-auto">
+            <button id="nav-btn-today" onclick="switchMainTab('today')" 
+                    class="flex flex-col items-center justify-center flex-1 py-1 text-indigo-600 font-bold text-[11px] transition">
+                <i class="fas fa-clipboard-check text-base mb-0.5"></i>
+                <span>Atención Hoy</span>
+            </button>
+            <button id="nav-btn-reports" onclick="switchMainTab('reports')" 
+                    class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-600 font-medium text-[11px] transition">
+                <i class="fas fa-chart-pie text-base mb-0.5"></i>
+                <span>Reportes &amp; Cuadre</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- MODAL 1: FICHA RÁPIDA DEL PACIENTE (DOCTOR) -->
+    <div id="modal-patient-card" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[88vh] overflow-y-auto shadow-2xl animate-fade-in space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-base">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <h3 id="card-patient-name" class="font-bold text-slate-900 text-base">Cargando...</h3>
+                        <p id="card-patient-doc" class="text-xs text-slate-400"></p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-patient-card')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <!-- Alergias y Datos Críticos -->
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="bg-red-50 p-3 rounded-2xl border border-red-100">
+                    <span class="block font-bold text-red-700 uppercase text-[10px] mb-0.5">⚠️ Alergias</span>
+                    <p id="card-allergies" class="font-semibold text-red-900">Ninguna</p>
+                </div>
+                <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                    <span class="block font-bold text-slate-500 uppercase text-[10px] mb-0.5">🩸 Tipo de Sangre</span>
+                    <p id="card-blood" class="font-semibold text-slate-800">No especificado</p>
+                </div>
+            </div>
+
+            <!-- Antecedentes y Crónicas -->
+            <div class="bg-amber-50/70 p-3 rounded-2xl border border-amber-100 text-xs">
+                <span class="block font-bold text-amber-800 uppercase text-[10px] mb-0.5">Condiciones Crónicas</span>
+                <p id="card-conditions" class="text-amber-950 font-medium">Ninguna registrada</p>
+            </div>
+
+            <!-- Consultas Previas -->
+            <div>
+                <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Últimas Consultas</h4>
+                <div id="card-past-consultations" class="space-y-2 text-xs">
+                    <!-- Dinámico -->
+                </div>
+            </div>
+
+            <div class="pt-2">
+                <button id="card-btn-action" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/30 text-sm">
+                    Atender Paciente Ahora
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: NOTA MÉDICA RÁPIDA / FINALIZAR CONSULTA (DOCTOR) -->
+    <div id="modal-quick-consultation" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-base flex items-center">
+                        <i class="fas fa-stethoscope text-blue-600 mr-2"></i> Evolución de Consulta
+                    </h3>
+                    <p id="qc-patient-name" class="text-xs text-slate-500 mt-0.5">Paciente</p>
+                </div>
+                <button onclick="closeModal('modal-quick-consultation')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <form onsubmit="handleSaveConsultation(event)" class="space-y-3">
+                <input type="hidden" id="qc-patient-id">
+                <input type="hidden" id="qc-appointment-id">
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Diagnóstico Principal <span class="text-red-500">*</span></label>
+                    <input type="text" id="qc-diagnosis" required placeholder="Ej: Faringitis aguda, Cefalea tensional"
+                           class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tratamiento / Indicaciones</label>
+                    <textarea id="qc-treatment" rows="2" placeholder="Medicamentos, dosis y duración..."
+                              class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Notas de Evolución</label>
+                    <textarea id="qc-notes" rows="2" placeholder="Observaciones clínicas, próximos pasos o citas..."
+                              class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+                </div>
+
+                <button type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/30 text-sm flex items-center justify-center space-x-2">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Guardar y Finalizar Consulta</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: AGENDAR CITA RÁPIDA (SECRETARIA) -->
+    <div id="modal-quick-appt" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-900 text-base flex items-center">
+                    <i class="fas fa-calendar-plus text-teal-600 mr-2"></i> Agendar Cita Express
+                </h3>
+                <button onclick="closeModal('modal-quick-appt')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <form onsubmit="handleSaveQuickAppt(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre Completo del Paciente <span class="text-red-500">*</span></label>
+                    <input type="text" id="qa-patient-name" required placeholder="Ej: Juan Pérez"
+                           class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Teléfono Móvil (WhatsApp)</label>
+                    <input type="tel" id="qa-patient-phone" placeholder="809-555-0123"
+                           class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Fecha</label>
+                        <input type="date" id="qa-date" required
+                               class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Hora</label>
+                        <input type="time" id="qa-time" required value="09:00"
+                               class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo de Consulta</label>
+                    <input type="text" id="qa-reason" placeholder="Consulta General, Chequeo, Control..."
+                           class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                </div>
+
+                <button type="submit" class="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-lg shadow-teal-600/30 text-sm flex items-center justify-center space-x-2">
+                    <i class="fas fa-save"></i>
+                    <span>Crear Cita</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 4: COBRO RÁPIDO (SECRETARIA) -->
+    <div id="modal-quick-payment" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-900 text-base flex items-center">
+                    <i class="fas fa-cash-register text-emerald-600 mr-2"></i> Registrar Cobro de Consulta
+                </h3>
+                <button onclick="closeModal('modal-quick-payment')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <form onsubmit="handleSaveQuickPayment(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Buscar Paciente</label>
+                    <input type="text" id="qp-patient-search" placeholder="Escriba nombre o cédula..."
+                           oninput="debouncePatientSearch(this.value)"
+                           class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    <input type="hidden" id="qp-patient-id" required>
+                    <div id="qp-search-results" class="mt-1 bg-white border border-slate-200 rounded-xl max-h-36 overflow-y-auto shadow-lg hidden"></div>
+                </div>
+
+                <div id="qp-selected-patient-box" class="hidden bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs flex items-center justify-between">
+                    <div>
+                        <span class="font-bold text-emerald-900 block" id="qp-selected-name">Paciente</span>
+                        <span class="text-emerald-700 text-[11px]" id="qp-selected-doc">Doc</span>
+                    </div>
+                    <button type="button" onclick="clearSelectedPatient()" class="text-red-500 font-bold">&times; Cambiar</button>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Monto a Cobrar <span class="text-red-500">*</span></label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 font-bold text-sm" id="qp-currency-symbol">RD$</span>
+                        <input type="number" step="0.01" id="qp-amount" required placeholder="1500"
+                               class="w-full pl-14 pr-3.5 py-2.5 text-base font-bold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Método de Pago</label>
+                    <select id="qp-method" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Tarjeta">Tarjeta de Débito / Crédito</option>
+                        <option value="Transferencia">Transferencia Bancaria</option>
+                        <option value="Seguro Médico">Seguro Médico / ARS</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-lg shadow-emerald-600/30 text-sm flex items-center justify-center space-x-2">
+                    <i class="fas fa-check"></i>
+                    <span>Confirmar y Guardar Pago</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT: LÓGICA MÓVIL Y CLIENTE API -->
+    <script>
+        // Configuración de servidor por defecto
+        const defaultHost = window.location.origin.includes('http') ? window.location.origin : 'http://127.0.0.1:8080';
+        let serverUrl = localStorage.getItem('sscp_mobile_server_url') || defaultHost;
+        let authToken = localStorage.getItem('sscp_mobile_token') || null;
+        let currentUser = JSON.parse(localStorage.getItem('sscp_mobile_user') || 'null');
+        let currentClinic = JSON.parse(localStorage.getItem('sscp_mobile_clinic') || 'null');
+
+        // Inicialización al cargar la página
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('config-server-url').value = serverUrl;
+            document.getElementById('qa-date').value = new Date().toISOString().split('T')[0];
+
+            if (authToken && currentUser) {
+                showAppScreen();
+            } else {
+                showLoginScreen();
+            }
+        });
+
+        function getApiUrl(path) {
+            return `${serverUrl.replace(/\/+$/, '')}${path}`;
+        }
+
+        // Pantalla de Configuración
+        function openConfigModal() {
+            document.getElementById('screen-config').classList.remove('hidden');
+        }
+        function closeConfigModal() {
+            document.getElementById('screen-config').classList.add('hidden');
+        }
+        async function testConnection() {
+            const inputUrl = document.getElementById('config-server-url').value.trim();
+            const resElem = document.getElementById('ping-result');
+            resElem.innerHTML = '<span class="text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i>Conectando...</span>';
+            try {
+                const res = await fetch(`${inputUrl.replace(/\/+$/, '')}/api/mobile/ping`);
+                const data = await res.json();
+                if (data.status === 'online') {
+                    resElem.innerHTML = `<span class="text-emerald-600"><i class="fas fa-check-circle mr-1"></i>¡Conectado! Clínica: ${data.clinic_name}</span>`;
+                } else {
+                    resElem.innerHTML = `<span class="text-amber-600">Respuesta inesperada del servidor.</span>`;
+                }
+            } catch (e) {
+                resElem.innerHTML = `<span class="text-red-500"><i class="fas fa-times-circle mr-1"></i>No se pudo conectar a ${inputUrl}. Verifique que el equipo esté encendido y en la misma red Wi-Fi.</span>`;
+            }
+        }
+        function saveServerConfig() {
+            const inputUrl = document.getElementById('config-server-url').value.trim();
+            if (!inputUrl) return;
+            serverUrl = inputUrl;
+            localStorage.setItem('sscp_mobile_server_url', serverUrl);
+            closeConfigModal();
+            alert('Servidor guardado correctamente.');
+        }
+
+        // Autenticación
+        function fillQuickLogin(email, pass) {
+            document.getElementById('login-email').value = email;
+            document.getElementById('login-password').value = pass;
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+            const errBox = document.getElementById('login-error');
+            const submitBtn = document.getElementById('btn-login-submit');
+
+            errBox.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Iniciando sesión...</span>';
+
+            try {
+                const res = await fetch(getApiUrl('/api/mobile/login'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || 'Error al iniciar sesión');
+                }
+
+                authToken = data.access_token;
+                currentUser = data.user;
+                currentClinic = data.clinic;
+
+                localStorage.setItem('sscp_mobile_token', authToken);
+                localStorage.setItem('sscp_mobile_user', JSON.stringify(currentUser));
+                localStorage.setItem('sscp_mobile_clinic', JSON.stringify(currentClinic));
+
+                showAppScreen();
+            } catch (err) {
+                errBox.textContent = err.message;
+                errBox.classList.remove('hidden');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span>Ingresar al Sistema</span><i class="fas fa-arrow-right text-xs"></i>';
+            }
+        }
+
+        function handleLogout() {
+            if (!confirm('¿Desea cerrar la sesión actual?')) return;
+            localStorage.removeItem('sscp_mobile_token');
+            localStorage.removeItem('sscp_mobile_user');
+            authToken = null;
+            currentUser = null;
+            showLoginScreen();
+        }
+
+        function showLoginScreen() {
+            document.getElementById('screen-login').classList.remove('hidden');
+            document.getElementById('screen-app').classList.add('hidden');
+        }
+
+        function showAppScreen() {
+            document.getElementById('screen-login').classList.add('hidden');
+            document.getElementById('screen-app').classList.remove('hidden');
+
+            // Configurar perfil en header
+            document.getElementById('header-user-name').textContent = currentUser.name;
+            document.getElementById('header-clinic-name').textContent = currentClinic?.name || 'SSCP';
+
+            const roleElem = document.getElementById('header-user-role');
+            const avatarElem = document.getElementById('role-avatar');
+            const secFloating = document.getElementById('secretary-floating-bar');
+
+            if (currentUser.role === 'doctor') {
+                roleElem.textContent = 'Médico';
+                roleElem.className = 'px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-blue-100 text-blue-700';
+                avatarElem.className = 'w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black text-sm shadow-md bg-blue-600';
+                avatarElem.innerHTML = '<i class="fas fa-user-md"></i>';
+                secFloating.classList.add('hidden');
+            } else {
+                roleElem.textContent = 'Secretaría';
+                roleElem.className = 'px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-teal-100 text-teal-700';
+                avatarElem.className = 'w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black text-sm shadow-md bg-teal-600';
+                avatarElem.innerHTML = '<i class="fas fa-user-nurse"></i>';
+                secFloating.classList.remove('hidden');
+            }
+
+            const repDateInput = document.getElementById('report-selected-date');
+            if (repDateInput) repDateInput.value = currentReportDate;
+
+            switchMainTab('today');
+        }
+
+        // Cargar Datos del Dashboard Móvil
+        async function loadDashboardData() {
+            try {
+                const res = await fetch(getApiUrl('/api/mobile/dashboard'), {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (res.status === 401) {
+                    handleLogout();
+                    return;
+                }
+
+                const data = await res.json();
+                renderDashboard(data);
+            } catch (e) {
+                console.error('Error cargando datos del dashboard:', e);
+            }
+        }
+
+        function renderDashboard(data) {
+            document.getElementById('today-date-str').textContent = data.date;
+            document.getElementById('stat-total').textContent = data.stats.total;
+            document.getElementById('stat-waiting').textContent = data.stats.waiting;
+            document.getElementById('stat-consulting').textContent = data.stats.in_consultation;
+            document.getElementById('stat-completed').textContent = data.stats.completed;
+            document.getElementById('waiting-badge').textContent = `${data.stats.waiting} Pacientes`;
+
+            const waitingContainer = document.getElementById('waiting-list-container');
+            const allContainer = document.getElementById('appointments-list-container');
+
+            waitingContainer.innerHTML = '';
+            allContainer.innerHTML = '';
+
+            const waitingAppts = data.appointments.filter(a => a.status === 'En Espera');
+            const otherAppts = data.appointments;
+
+            // Renderizar Sala de Espera
+            if (waitingAppts.length === 0) {
+                waitingContainer.innerHTML = `
+                    <div class="bg-white p-4 rounded-2xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+                        <i class="fas fa-mug-hot text-lg mb-1 block text-slate-300"></i>
+                        No hay pacientes esperando en recepción actualmente.
+                    </div>
+                `;
+            } else {
+                waitingAppts.forEach(a => {
+                    const card = createAppointmentCard(a, true);
+                    waitingContainer.appendChild(card);
+                });
+            }
+
+            // Renderizar Todas las Citas
+            if (otherAppts.length === 0) {
+                allContainer.innerHTML = `
+                    <div class="bg-white p-6 rounded-2xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+                        No hay citas programadas para el día de hoy.
+                    </div>
+                `;
+            } else {
+                otherAppts.forEach(a => {
+                    const card = createAppointmentCard(a, false);
+                    allContainer.appendChild(card);
+                });
+            }
+        }
+
+        function createAppointmentCard(a, isWaitingRoom) {
+            const div = document.createElement('div');
+            const isDoctor = currentUser.role === 'doctor';
+
+            let statusBadge = '';
+            if (a.status === 'En Espera') {
+                statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">En Sala de Espera</span>';
+            } else if (a.status === 'En Consulta') {
+                statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">En Consulta</span>';
+            } else if (a.status === 'Atendida') {
+                statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">Atendida</span>';
+            } else {
+                statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Pendiente</span>';
+            }
+
+            div.className = `bg-white p-4 rounded-2xl border ${a.status === 'En Espera' ? 'border-emerald-300 shadow-md shadow-emerald-500/10' : 'border-slate-200'} shadow-sm space-y-2.5`;
+            
+            let actionsHtml = '';
+            if (isDoctor) {
+                if (a.status === 'En Espera') {
+                    actionsHtml = `
+                        <div class="flex space-x-2 pt-1">
+                            <button onclick="openPatientQuickCard(${a.patient_id}, ${a.id})" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
+                                <i class="fas fa-notes-medical mr-1"></i> Ver Ficha
+                            </button>
+                            <button onclick="startConsultation(${a.id}, ${a.patient_id}, '${a.patient_name}')" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-600/20 transition">
+                                <i class="fas fa-stethoscope mr-1"></i> Llamar / Atender
+                            </button>
+                        </div>
+                    `;
+                } else if (a.status === 'En Consulta') {
+                    actionsHtml = `
+                        <div class="flex space-x-2 pt-1">
+                            <button onclick="openQuickConsultationModal(${a.patient_id}, ${a.id}, '${a.patient_name}')" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-600/20 transition">
+                                <i class="fas fa-file-signature mr-1"></i> Finalizar y Guardar Nota
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    actionsHtml = `
+                        <button onclick="openPatientQuickCard(${a.patient_id}, ${a.id})" class="w-full py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 font-semibold rounded-xl text-xs transition">
+                            <i class="fas fa-eye mr-1"></i> Ver Expediente
+                        </button>
+                    `;
+                }
+            } else {
+                // Vista Secretaria
+                if (a.status !== 'En Espera' && a.status !== 'Atendida' && a.status !== 'En Consulta') {
+                    actionsHtml = `
+                        <div class="flex space-x-2 pt-1">
+                            <button onclick="markWaitingRoom(${a.id})" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-600/20 transition flex items-center justify-center space-x-1.5">
+                                <i class="fas fa-bell"></i>
+                                <span>Llegó (Avisar Doctor)</span>
+                            </button>
+                            ${a.patient_phone ? `
+                            <button onclick="sendWhatsAppReminder('${a.patient_phone}', '${a.patient_name}', '${a.start_time}')" class="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-xl text-xs transition">
+                                <i class="fab fa-whatsapp text-sm"></i>
+                            </button>` : ''}
+                        </div>
+                    `;
+                } else if (a.status === 'En Espera') {
+                    actionsHtml = `
+                        <div class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 p-2 rounded-xl flex items-center justify-between">
+                            <span><i class="fas fa-check mr-1"></i>Notificado al doctor</span>
+                            <button onclick="updateAppointmentStatus(${a.id}, 'Pendiente')" class="text-slate-400 hover:text-slate-600 text-[10px] font-bold">Deshacer</button>
+                        </div>
+                    `;
+                }
+            }
+
+            div.innerHTML = `
+                <div class="flex items-start justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg">${a.start_time || '00:00'}</span>
+                            <h4 class="font-bold text-slate-900 text-sm">${a.patient_name}</h4>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-0.5">${a.reason || 'Consulta General'}</p>
+                    </div>
+                    ${statusBadge}
+                </div>
+                ${actionsHtml}
+            `;
+
+            return div;
+        }
+
+        // Acciones Doctor
+        async function openPatientQuickCard(patientId, apptId) {
+            try {
+                const res = await fetch(getApiUrl(`/api/mobile/patients/${patientId}/quick-card`), {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+
+                document.getElementById('card-patient-name').textContent = data.name;
+                document.getElementById('card-patient-doc').textContent = `Cédula/Doc: ${data.document_id} • Tel: ${data.phone}`;
+                document.getElementById('card-allergies').textContent = data.allergies || 'Ninguna conocida';
+                document.getElementById('card-blood').textContent = data.blood_type || 'No especificado';
+                document.getElementById('card-conditions').textContent = data.chronic_conditions || 'Ninguna';
+
+                const pastContainer = document.getElementById('card-past-consultations');
+                pastContainer.innerHTML = '';
+                if (!data.recent_consultations || data.recent_consultations.length === 0) {
+                    pastContainer.innerHTML = '<p class="text-slate-400 italic">Primera consulta registrada en el sistema.</p>';
+                } else {
+                    data.recent_consultations.forEach(c => {
+                        const row = document.createElement('div');
+                        row.className = 'p-2 bg-slate-50 rounded-xl border border-slate-100';
+                        row.innerHTML = `
+                            <div class="flex justify-between font-bold text-slate-700">
+                                <span>${c.diagnosis}</span>
+                                <span class="text-[10px] text-slate-400">${c.date}</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-0.5">${c.treatment || c.notes || 'Sin detalles'}</p>
+                        `;
+                        pastContainer.appendChild(row);
+                    });
+                }
+
+                const actionBtn = document.getElementById('card-btn-action');
+                actionBtn.onclick = () => {
+                    closeModal('modal-patient-card');
+                    openQuickConsultationModal(patientId, apptId, data.name);
+                };
+
+                document.getElementById('modal-patient-card').classList.remove('hidden');
+            } catch (e) {
+                alert('Error al cargar ficha del paciente: ' + e);
+            }
+        }
+
+        async function startConsultation(apptId, patientId, patientName) {
+            await updateAppointmentStatus(apptId, 'En Consulta');
+            openQuickConsultationModal(patientId, apptId, patientName);
+        }
+
+        function openQuickConsultationModal(patientId, apptId, patientName) {
+            document.getElementById('qc-patient-id').value = patientId;
+            document.getElementById('qc-appointment-id').value = apptId || '';
+            document.getElementById('qc-patient-name').textContent = patientName || 'Consulta Médica';
+            document.getElementById('qc-diagnosis').value = '';
+            document.getElementById('qc-treatment').value = '';
+            document.getElementById('qc-notes').value = '';
+            document.getElementById('modal-quick-consultation').classList.remove('hidden');
+        }
+
+        async function handleSaveConsultation(e) {
+            e.preventDefault();
+            const patientId = parseInt(document.getElementById('qc-patient-id').value);
+            const apptId = document.getElementById('qc-appointment-id').value ? parseInt(document.getElementById('qc-appointment-id').value) : null;
+            const diagnosis = document.getElementById('qc-diagnosis').value.trim();
+            const treatment = document.getElementById('qc-treatment').value.trim();
+            const notes = document.getElementById('qc-notes').value.trim();
+
+            try {
+                const res = await fetch(getApiUrl('/api/mobile/consultations/quick'), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        patient_id: patientId,
+                        appointment_id: apptId,
+                        diagnosis,
+                        treatment,
+                        notes
+                    })
+                });
+
+                if (!res.ok) throw new Error('Error al registrar consulta');
+
+                closeModal('modal-quick-consultation');
+                alert('¡Consulta registrada con éxito!');
+                loadDashboardData();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        // Acciones Secretaria
+        async function markWaitingRoom(apptId) {
+            await updateAppointmentStatus(apptId, 'En Espera');
+        }
+
+        async function updateAppointmentStatus(apptId, newStatus) {
+            try {
+                const res = await fetch(getApiUrl(`/api/mobile/appointments/${apptId}/status`), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                if (!res.ok) throw new Error('Error al actualizar estado');
+                loadDashboardData();
+            } catch (e) {
+                alert('Error al actualizar estado: ' + e);
+            }
+        }
+
+        function openQuickApptModal() {
+            document.getElementById('qa-patient-name').value = '';
+            document.getElementById('qa-patient-phone').value = '';
+            document.getElementById('modal-quick-appt').classList.remove('hidden');
+        }
+
+        async function handleSaveQuickAppt(e) {
+            e.preventDefault();
+            const name = document.getElementById('qa-patient-name').value.trim();
+            const phone = document.getElementById('qa-patient-phone').value.trim();
+            const dateStr = document.getElementById('qa-date').value;
+            const timeStr = document.getElementById('qa-time').value;
+            const reason = document.getElementById('qa-reason').value.trim() || 'Consulta General';
+
+            try {
+                const res = await fetch(getApiUrl('/api/mobile/appointments/quick-create'), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        patient_name: name,
+                        patient_phone: phone,
+                        date: dateStr,
+                        start_time: timeStr,
+                        reason: reason
+                    })
+                });
+
+                if (!res.ok) throw new Error('Error al agendar cita');
+                closeModal('modal-quick-appt');
+                alert('Cita programada con éxito.');
+                loadDashboardData();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        function sendWhatsAppReminder(phone, name, hour) {
+            const cleanPhone = phone.replace(/[^0-9]/g, '');
+            const msg = encodeURIComponent(`Hola ${name}, le recordamos su cita médica en ${currentClinic?.name || 'la clínica'} hoy a las ${hour}. Por favor responda para confirmar su asistencia.`);
+            window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
+        }
+
+        // Cobro Rápido
+        function openQuickPaymentModal() {
+            document.getElementById('qp-patient-id').value = '';
+            document.getElementById('qp-patient-search').value = '';
+            document.getElementById('qp-amount').value = '';
+            document.getElementById('qp-selected-patient-box').classList.add('hidden');
+            document.getElementById('qp-patient-search').classList.remove('hidden');
+            document.getElementById('modal-quick-payment').classList.remove('hidden');
+        }
+
+        let searchDebounceTimeout = null;
+        function debouncePatientSearch(val) {
+            clearTimeout(searchDebounceTimeout);
+            if (val.trim().length < 2) {
+                document.getElementById('qp-search-results').classList.add('hidden');
+                return;
+            }
+            searchDebounceTimeout = setTimeout(() => searchPatients(val), 300);
+        }
+
+        async function searchPatients(query) {
+            try {
+                const res = await fetch(getApiUrl(`/api/mobile/patients/search?q=${encodeURIComponent(query)}`), {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                const container = document.getElementById('qp-search-results');
+                container.innerHTML = '';
+                if (data.results.length === 0) {
+                    container.innerHTML = '<div class="p-3 text-xs text-slate-400">No se encontraron pacientes.</div>';
+                } else {
+                    data.results.forEach(p => {
+                        const opt = document.createElement('div');
+                        opt.className = 'p-2.5 hover:bg-slate-50 cursor-pointer border-b border-slate-100 text-xs';
+                        opt.innerHTML = `<span class="font-bold text-slate-800 block">${p.name}</span><span class="text-slate-400 text-[10px]">Doc: ${p.document_id || 'N/A'} • Tel: ${p.phone}</span>`;
+                        opt.onclick = () => selectPatientForPayment(p);
+                        container.appendChild(opt);
+                    });
+                }
+                container.classList.remove('hidden');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function selectPatientForPayment(p) {
+            document.getElementById('qp-patient-id').value = p.id;
+            document.getElementById('qp-selected-name').textContent = p.name;
+            document.getElementById('qp-selected-doc').textContent = `Doc: ${p.document_id} • Tel: ${p.phone}`;
+            document.getElementById('qp-search-results').classList.add('hidden');
+            document.getElementById('qp-patient-search').classList.add('hidden');
+            document.getElementById('qp-selected-patient-box').classList.remove('hidden');
+        }
+
+        function clearSelectedPatient() {
+            document.getElementById('qp-patient-id').value = '';
+            document.getElementById('qp-selected-patient-box').classList.add('hidden');
+            document.getElementById('qp-patient-search').classList.remove('hidden');
+            document.getElementById('qp-patient-search').value = '';
+        }
+
+        async function handleSaveQuickPayment(e) {
+            e.preventDefault();
+            const patientId = parseInt(document.getElementById('qp-patient-id').value);
+            const amount = parseFloat(document.getElementById('qp-amount').value);
+            const method = document.getElementById('qp-method').value;
+
+            if (!patientId) {
+                alert('Debe seleccionar un paciente de la lista.');
+                return;
+            }
+
+            try {
+                const res = await fetch(getApiUrl('/api/mobile/payments/quick'), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        patient_id: patientId,
+                        amount: amount,
+                        payment_method: method
+                    })
+                });
+
+                if (!res.ok) throw new Error('Error al registrar pago');
+                closeModal('modal-quick-payment');
+                alert(`¡Pago de ${amount} registrado correctamente!`);
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        // --- GESTIÓN DE PESTAÑAS PRINCIPALES Y REPORTES CONSOLIDADOS ---
+        let currentMainTab = 'today';
+        let currentReportsSubTab = 'payments';
+        let currentReportDate = new Date().toISOString().split('T')[0];
+
+        function switchMainTab(tab) {
+            currentMainTab = tab;
+            const viewToday = document.getElementById('view-today');
+            const viewReports = document.getElementById('view-reports');
+            const btnToday = document.getElementById('nav-btn-today');
+            const btnReports = document.getElementById('nav-btn-reports');
+            const secFloating = document.getElementById('secretary-floating-bar');
+
+            if (tab === 'today') {
+                viewToday.classList.remove('hidden');
+                viewReports.classList.add('hidden');
+
+                btnToday.className = 'flex flex-col items-center justify-center flex-1 py-1 text-indigo-600 font-bold text-[11px] transition';
+                btnReports.className = 'flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-600 font-medium text-[11px] transition';
+
+                if (currentUser && currentUser.role !== 'doctor') {
+                    secFloating.classList.remove('hidden');
+                } else {
+                    secFloating.classList.add('hidden');
+                }
+                loadDashboardData();
+            } else {
+                viewToday.classList.add('hidden');
+                viewReports.classList.remove('hidden');
+
+                btnToday.className = 'flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-600 font-medium text-[11px] transition';
+                btnReports.className = 'flex flex-col items-center justify-center flex-1 py-1 text-indigo-600 font-bold text-[11px] transition';
+
+                secFloating.classList.add('hidden');
+
+                const dateInput = document.getElementById('report-selected-date');
+                if (!dateInput.value) {
+                    dateInput.value = currentReportDate;
+                }
+                loadReportsData(dateInput.value);
+            }
+        }
+
+        function switchReportsSubTab(sub) {
+            currentReportsSubTab = sub;
+            const tabs = ['payments', 'attended', 'history'];
+            tabs.forEach(t => {
+                const elem = document.getElementById(`subtab-${t}`);
+                const btn = document.getElementById(`subtab-btn-${t}`);
+                if (elem && btn) {
+                    if (t === sub) {
+                        elem.classList.remove('hidden');
+                        btn.className = 'flex-1 py-2 rounded-xl bg-white text-indigo-700 shadow-sm transition flex items-center justify-center space-x-1';
+                    } else {
+                        elem.classList.add('hidden');
+                        btn.className = 'flex-1 py-2 rounded-xl text-slate-600 transition flex items-center justify-center space-x-1';
+                    }
+                }
+            });
+        }
+
+        function setReportDateQuick(mode) {
+            const dateInput = document.getElementById('report-selected-date');
+            const d = new Date();
+            if (mode === 'yesterday') {
+                d.setDate(d.getDate() - 1);
+            }
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const dateStr = `${yyyy}-${mm}-${dd}`;
+            dateInput.value = dateStr;
+            currentReportDate = dateStr;
+            loadReportsData(dateStr);
+        }
+
+        async function loadReportsData(optDate) {
+            const dateVal = optDate || document.getElementById('report-selected-date').value || currentReportDate;
+            currentReportDate = dateVal;
+
+            try {
+                const res = await fetch(getApiUrl(`/api/mobile/reports/summary?report_date=${dateVal}`), {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (res.status === 401) {
+                    handleLogout();
+                    return;
+                }
+
+                const data = await res.json();
+                renderReports(data);
+            } catch (err) {
+                console.error('Error cargando reportes móviles:', err);
+            }
+        }
+
+        function renderReports(data) {
+            const curr = data.currency || 'RD$';
+            const dateFmt = data.date_formatted || data.date;
+
+            // Encabezados
+            document.getElementById('rep-pdf-subtitle').textContent = `Reporte diario al ${dateFmt} (con membrete y firmas)`;
+            document.getElementById('rep-payments-date-label').textContent = `Reporte de cuadre al ${dateFmt}`;
+            document.getElementById('rep-attended-date-label').textContent = `Consultas finalizadas al ${dateFmt}`;
+            document.getElementById('rep-hist-date-str').textContent = dateFmt;
+
+            // 1. Render Pagos y Cuadre
+            const pTotal = data.payments.total_collected || 0;
+            document.getElementById('rep-payments-total').textContent = `${curr} ${pTotal.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            document.getElementById('rep-payments-count-badge').textContent = `${data.payments.count || 0} Cobros`;
+
+            const pendingBadge = document.getElementById('rep-payments-pending-badge');
+            if (data.payments.total_pending && data.payments.total_pending > 0) {
+                pendingBadge.textContent = `Pendiente: ${curr} ${data.payments.total_pending.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`;
+                pendingBadge.classList.remove('hidden');
+            } else {
+                pendingBadge.classList.add('hidden');
+            }
+
+            // Desglose de métodos
+            const methodsContainer = document.getElementById('rep-methods-container');
+            methodsContainer.innerHTML = '';
+            const byMethod = data.payments.by_method || {};
+            const methodKeys = Object.keys(byMethod);
+
+            if (methodKeys.length === 0) {
+                methodsContainer.innerHTML = '<div class="col-span-2 text-slate-400 text-[11px] italic py-1">No hay cobros registrados en esta fecha.</div>';
+            } else {
+                methodKeys.forEach(m => {
+                    const val = byMethod[m];
+                    let icon = 'fas fa-money-bill-wave text-emerald-600';
+                    if (m.toLowerCase().includes('tarjeta') || m.toLowerCase().includes('card')) icon = 'fas fa-credit-card text-blue-600';
+                    else if (m.toLowerCase().includes('transf')) icon = 'fas fa-exchange-alt text-indigo-600';
+                    else if (m.toLowerCase().includes('seguro')) icon = 'fas fa-shield-alt text-amber-600';
+
+                    const item = document.createElement('div');
+                    item.className = 'p-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between';
+                    item.innerHTML = `
+                        <div class="flex items-center space-x-1.5 truncate">
+                            <i class="${icon} text-xs"></i>
+                            <span class="font-bold text-slate-700 truncate">${m}</span>
+                        </div>
+                        <span class="font-black text-slate-900">${curr} ${val.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
+                    `;
+                    methodsContainer.appendChild(item);
+                });
+            }
+
+            // Lista detallada de cobros
+            const paysListContainer = document.getElementById('rep-payments-list');
+            paysListContainer.innerHTML = '';
+            document.getElementById('rep-payments-list-count').textContent = `${(data.payments.items || []).length} registros`;
+
+            if (!data.payments.items || data.payments.items.length === 0) {
+                paysListContainer.innerHTML = `
+                    <div class="bg-white p-4 rounded-2xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+                        No hay cobros registrados en esta fecha.
+                    </div>
+                `;
+            } else {
+                data.payments.items.forEach(p => {
+                    const row = document.createElement('div');
+                    row.className = 'bg-white p-3 rounded-2xl border border-slate-200/90 shadow-sm flex items-center justify-between text-xs';
+                    row.innerHTML = `
+                        <div>
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-bold text-slate-900">${p.patient_name}</span>
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500">${p.receipt_number}</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 mt-0.5">
+                                <span>${p.payment_method}</span> • <span>${p.time || '--:--'}</span>
+                                ${p.notes ? ` • <span class="italic text-slate-500">${p.notes}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-black text-emerald-700 text-sm block">${curr} ${p.amount.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
+                            <span class="text-[10px] font-bold ${p.status === 'Pagado' ? 'text-emerald-600' : 'text-amber-600'}">${p.status}</span>
+                        </div>
+                    `;
+                    paysListContainer.appendChild(row);
+                });
+            }
+
+            // 2. Render Vistos / Consultas
+            const attCount = data.attended.count || 0;
+            document.getElementById('rep-attended-count').textContent = `${attCount} ${attCount === 1 ? 'Paciente Atendido' : 'Pacientes Atendidos'}`;
+
+            const attListContainer = document.getElementById('rep-attended-list');
+            attListContainer.innerHTML = '';
+            if (!data.attended.items || data.attended.items.length === 0) {
+                attListContainer.innerHTML = `
+                    <div class="bg-white p-4 rounded-2xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+                        No hay consultas registradas para esta fecha.
+                    </div>
+                `;
+            } else {
+                data.attended.items.forEach(c => {
+                    const item = document.createElement('div');
+                    item.className = 'bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-1.5 text-xs';
+                    item.innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-slate-900 text-sm">${c.patient_name}</span>
+                            <span class="text-[10px] font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg">${c.time || '--:--'}</span>
+                        </div>
+                        <div class="bg-blue-50/60 p-2 rounded-xl border border-blue-100 text-slate-800">
+                            <span class="block text-[10px] font-bold text-blue-700 uppercase">Diagnóstico Principal:</span>
+                            <p class="font-semibold text-xs mt-0.5 text-blue-950">${c.diagnosis}</p>
+                        </div>
+                        ${c.treatment ? `
+                        <div class="text-[11px] text-slate-600">
+                            <span class="font-bold text-slate-700">Tratamiento:</span> ${c.treatment}
+                        </div>` : ''}
+                        <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-100">
+                            <span>Atendido por: ${c.doctor_name}</span>
+                            <span>Motivo: ${c.reason}</span>
+                        </div>
+                    `;
+                    attListContainer.appendChild(item);
+                });
+            }
+
+            // 3. Render Historial / Citas Previas
+            const histStats = data.appointments.stats || {};
+            document.getElementById('rep-hist-total').textContent = histStats.total || 0;
+            document.getElementById('rep-hist-attended').textContent = histStats.attended || 0;
+            document.getElementById('rep-hist-waiting').textContent = histStats.waiting || 0;
+            document.getElementById('rep-hist-cancelled').textContent = histStats.cancelled || 0;
+
+            const histListContainer = document.getElementById('rep-history-list');
+            histListContainer.innerHTML = '';
+            if (!data.appointments.items || data.appointments.items.length === 0) {
+                histListContainer.innerHTML = `
+                    <div class="bg-white p-4 rounded-2xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+                        No hay citas registradas en la agenda para esta fecha.
+                    </div>
+                `;
+            } else {
+                data.appointments.items.forEach(a => {
+                    let badgeClass = 'bg-slate-100 text-slate-600';
+                    if (a.status === 'Atendida') badgeClass = 'bg-violet-100 text-violet-800';
+                    else if (a.status === 'En Espera') badgeClass = 'bg-emerald-100 text-emerald-800';
+                    else if (a.status === 'En Consulta') badgeClass = 'bg-blue-100 text-blue-800';
+                    else if (a.status === 'Cancelada' || a.status === 'No Asistió') badgeClass = 'bg-rose-100 text-rose-800';
+                    else if (a.status === 'Pendiente') badgeClass = 'bg-amber-100 text-amber-800';
+
+                    const item = document.createElement('div');
+                    item.className = 'bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between text-xs';
+                    item.innerHTML = `
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="font-bold text-slate-900">${a.patient_name}</span>
+                                <span class="text-[10px] font-black text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">${a.start_time || '00:00'}</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-0.5">${a.reason || 'Consulta General'}</p>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${badgeClass}">${a.status}</span>
+                    `;
+                    histListContainer.appendChild(item);
+                });
+            }
+        }
+
+        // Descarga directa del PDF diario oficial con token
+        function downloadDailyPdf() {
+            const dateInput = document.getElementById('report-selected-date').value || currentReportDate || new Date().toISOString().split('T')[0];
+            const pdfUrl = getApiUrl(`/reports/export/secretary-daily-pdf?report_date=${dateInput}&token=${encodeURIComponent(authToken)}`);
+            window.open(pdfUrl, '_blank');
+        }
+    </script>
+</body>
+</html>

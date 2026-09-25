@@ -55,6 +55,7 @@ hidden_imports = [
     'app.routers.templates',
     'app.routers.medical_licenses',
     'app.routers.medical_references',
+    'app.routers.mobile_api',
     'app.models.template',
     'app.models.medical_license',
     'app.models.medical_reference',

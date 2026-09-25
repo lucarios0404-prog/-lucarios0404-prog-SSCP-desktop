@@ -41,34 +41,52 @@ else:
 data_dir = APP_DIR / "data"
 data_dir.mkdir(parents=True, exist_ok=True)
 
-SERVER_HOST = "127.0.0.1"
-SERVER_PORT = 8080
-SERVER_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
+SERVER_HOST = os.environ.get("SSCP_HOST", "0.0.0.0")
+CLIENT_HOST = "127.0.0.1"
 
-def wait_for_server(host, port, timeout=12.0):
+def find_available_port(host, start_port=8080, max_attempts=20):
+    """Encuentra un puerto disponible para prevenir colisiones de socket (Errno 10048)."""
+    for port in range(start_port, start_port + max_attempts):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind((host, port))
+                return port
+            except OSError:
+                continue
+    return start_port
+
+def wait_for_server(host, port, timeout=25.0):
     start = time.time()
     while time.time() - start < timeout:
         try:
             with socket.create_connection((host, port), timeout=0.5):
                 return True
         except (OSError, ConnectionRefusedError):
-            time.sleep(0.15)
+            time.sleep(0.2)
     return False
 
 def run_server(server):
     try:
         server.run()
-    except Exception:
-        pass
+    except Exception as e:
+        try:
+            log_path = data_dir / "server_error.log"
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {str(e)}\n")
+        except Exception:
+            pass
 
 def run():
     import uvicorn
     from main import app
 
+    server_port = find_available_port(SERVER_HOST, 8080)
+    server_url = f"http://{CLIENT_HOST}:{server_port}"
+
     config = uvicorn.Config(
         app,
         host=SERVER_HOST,
-        port=SERVER_PORT,
+        port=server_port,
         log_config=None,
         log_level="critical",
         access_log=False
@@ -79,8 +97,10 @@ def run():
     server_thread = threading.Thread(target=run_server, args=(server,), daemon=True)
     server_thread.start()
 
-    # Esperar a que el servidor esté activo
-    wait_for_server(SERVER_HOST, SERVER_PORT, timeout=10.0)
+    # Esperar hasta 25 segundos a que el servidor esté activo antes de mostrar la UI
+    server_ready = wait_for_server(CLIENT_HOST, server_port, timeout=25.0)
+    if not server_ready:
+        wait_for_server(CLIENT_HOST, server_port, timeout=5.0)
 
     # Intentar abrir con ventana nativa de escritorio (PyWebView)
     opened_native = False
@@ -93,7 +113,7 @@ def run():
 
         window = webview.create_window(
             title="SSCP Desktop - Sistema de Seguimiento Clínico para Pacientes",
-            url=SERVER_URL,
+            url=server_url,
             width=1280,
             height=820,
             min_size=(1000, 680),
@@ -111,7 +131,7 @@ def run():
     if not opened_native:
         # Fallback a navegador predeterminado si pywebview no inicia
         try:
-            webbrowser.open(SERVER_URL)
+            webbrowser.open(server_url)
         except Exception:
             pass
 

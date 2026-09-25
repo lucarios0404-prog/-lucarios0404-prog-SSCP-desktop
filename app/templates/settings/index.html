@@ -365,6 +365,89 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Tarjeta: Conectividad Móvil y Descarga de APK (Doctor y Secretaria) -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                        <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center">
+                            <i class="fas fa-mobile-screen-button text-indigo-600 mr-2"></i> Conectividad Móvil y APK (Doctor y Secretaría)
+                        </h2>
+                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            Android .APK &amp; Web Móvil
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-5 leading-relaxed">
+                        Permite que el <strong>Doctor</strong> y la <strong>Secretaria</strong> operen la agenda, la recepción de pacientes y las notas clínicas desde sus teléfonos Android o tablets dentro del consultorio (vía Wi-Fi local) o de forma remota (vía Tailscale / Web).
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Descarga de APK -->
+                        <div class="p-5 rounded-xl border border-indigo-100 bg-indigo-50/30 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center space-x-2 text-slate-800 font-bold text-sm mb-1.5">
+                                    <i class="fab fa-android text-emerald-600 text-lg"></i>
+                                    <span>Instalador Android Oficial (.APK)</span>
+                                </div>
+                                <p class="text-xs text-slate-600 leading-relaxed mb-3">
+                                    Descarga el paquete de instalación directamente en tu teléfono Android. Compatible con celulares y tablets.
+                                </p>
+                                <div class="bg-white/80 p-3 rounded-lg border border-indigo-100 text-[11px] text-slate-600 space-y-1">
+                                    <div><strong>• Doctor:</strong> Agenda diaria, pacientes en espera, ficha clínica rápida y evolución.</div>
+                                    <div><strong>• Secretaria:</strong> Recepción 1-toque, citas express, cobros y WhatsApp directo.</div>
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-indigo-100 flex items-center justify-between">
+                                <a href="/mobile" target="_blank" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline">
+                                    <i class="fas fa-external-link-alt mr-1"></i> Abrir Web Móvil
+                                </a>
+                                <a href="/download/apk" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-emerald-600/20 transition-all">
+                                    <i class="fas fa-download mr-1.5"></i> Descargar APK
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Vinculación de Red y Código QR -->
+                        <div class="p-5 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center space-x-2 text-slate-800 font-bold text-sm mb-1.5">
+                                    <i class="fas fa-qrcode text-indigo-600"></i>
+                                    <span>Escanear con la Cámara del Celular</span>
+                                </div>
+                                <p class="text-xs text-slate-500 leading-relaxed mb-3">
+                                    Apunta la cámara del celular conectado al mismo Wi-Fi de la clínica. Puedes elegir qué acción deseas realizar:
+                                </p>
+                                
+                                <div class="flex items-center space-x-4">
+                                    <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm shrink-0 text-center">
+                                        <img id="qr-display-img" src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=http://{{ local_ip }}:8080/download/apk" 
+                                             alt="QR Descarga APK" class="w-24 h-24 rounded-lg object-contain mx-auto">
+                                        <span id="qr-label-txt" class="block text-[10px] font-bold text-emerald-700 mt-1">Descargar APK</span>
+                                    </div>
+                                    <div class="text-[11px] text-slate-600 space-y-2 flex-1">
+                                        <div class="flex space-x-1 bg-slate-200/70 p-1 rounded-lg">
+                                            <button type="button" onclick="switchQr('apk')" id="btn-qr-apk" class="flex-1 py-1 px-2 text-[10px] font-bold bg-white text-emerald-700 rounded shadow-sm transition">
+                                                <i class="fab fa-android mr-1"></i> Descargar APK
+                                            </button>
+                                            <button type="button" onclick="switchQr('web')" id="btn-qr-web" class="flex-1 py-1 px-2 text-[10px] font-bold text-slate-600 rounded transition">
+                                                <i class="fas fa-globe mr-1"></i> Abrir Web
+                                            </button>
+                                        </div>
+                                        <div>
+                                            <span class="text-slate-400 block font-medium">IP en Red Local (Wi-Fi):</span>
+                                            <code class="text-xs font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">http://{{ local_ip }}:8080</code>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between">
+                                <span class="text-[11px] text-slate-400 font-medium">Puerto de red: 8080</span>
+                                <span class="text-[11px] font-bold text-emerald-600 flex items-center">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span> Servidor Móvil Activo
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- MODAL: CÓDIGO QR DE WHATSAPP GATEWAY -->
@@ -507,6 +590,28 @@ async function sendTestWhatsApp() {
         }
     } catch(e) {
         resElem.innerHTML = '<span class="text-red-500 font-bold">Error de conexión</span>';
+    }
+}
+
+function switchQr(type) {
+    const img = document.getElementById('qr-display-img');
+    const label = document.getElementById('qr-label-txt');
+    const btnApk = document.getElementById('btn-qr-apk');
+    const btnWeb = document.getElementById('btn-qr-web');
+    const host = "http://{{ local_ip }}:8080";
+
+    if (type === 'apk') {
+        img.src = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(host + '/download/apk')}`;
+        label.textContent = "Descargar APK";
+        label.className = "block text-[10px] font-bold text-emerald-700 mt-1";
+        btnApk.className = "flex-1 py-1 px-2 text-[10px] font-bold bg-white text-emerald-700 rounded shadow-sm transition";
+        btnWeb.className = "flex-1 py-1 px-2 text-[10px] font-bold text-slate-600 rounded transition";
+    } else {
+        img.src = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(host + '/mobile')}`;
+        label.textContent = "Abrir Web Móvil";
+        label.className = "block text-[10px] font-bold text-indigo-700 mt-1";
+        btnWeb.className = "flex-1 py-1 px-2 text-[10px] font-bold bg-white text-indigo-700 rounded shadow-sm transition";
+        btnApk.className = "flex-1 py-1 px-2 text-[10px] font-bold text-slate-600 rounded transition";
     }
 }
 </script>

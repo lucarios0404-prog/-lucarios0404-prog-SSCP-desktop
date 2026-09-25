@@ -8,6 +8,8 @@ Soporta dos modalidades:
 """
 
 import base64
+import threading
+import time
 import hashlib
 import json
 import platform
@@ -56,10 +58,24 @@ class LicenseInfo:
         self.days_remaining = days_remaining
 
 
+_cached_machine_id = None
+
+
 def _run_wmic(query):
     try:
+        startupinfo = None
+        creationflags = 0
+        if platform.system() == "Windows":
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
         result = subprocess.check_output(
-            ["wmic"] + query.split(), stderr=subprocess.DEVNULL, timeout=5
+            ["wmic"] + query.split(),
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+            creationflags=creationflags,
+            startupinfo=startupinfo,
         )
         lines = result.decode(errors="ignore").strip().splitlines()
         for line in lines:
@@ -72,6 +88,10 @@ def _run_wmic(query):
 
 
 def get_machine_id():
+    global _cached_machine_id
+    if _cached_machine_id:
+        return _cached_machine_id
+
     parts = []
     if platform.system() == "Windows":
         parts.append(_run_wmic("baseboard get SerialNumber"))
@@ -82,7 +102,8 @@ def get_machine_id():
         parts.append(platform.node())
     raw = "|".join(filter(None, parts))
     digest = hashlib.sha256(raw.encode()).hexdigest().upper()
-    return f"SSCP-{digest[0:4]}-{digest[4:8]}-{digest[8:12]}"
+    _cached_machine_id = f"SSCP-{digest[0:4]}-{digest[4:8]}-{digest[8:12]}"
+    return _cached_machine_id
 
 
 def _load_public_key():
@@ -155,7 +176,10 @@ def _verify_cache_integrity(cache_data: dict, machine_id: str) -> bool:
 
 def _verify_online_license(license_key, machine_id, force_remote=False):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    headers = {"X-License-Key": DESKTOP_LICENSE_API_KEY}
+    headers = {
+        "User-Agent": "SSCP-Desktop/1.0",
+        "X-License-Key": DESKTOP_LICENSE_API_KEY,
+    }
 
     # 1. Chequeo de cache local reciente con verificación de firma criptográfica HMAC
     if not force_remote and LICENSE_CACHE_FILE.exists():
@@ -190,7 +214,12 @@ def _verify_online_license(license_key, machine_id, force_remote=False):
     try:
         response = httpx.post(
             f"{LICENSE_SERVER_URL}/verify",
-            json={"machine_id": machine_id, "license_token": license_key},
+            json={
+                "machine_id": machine_id,
+                "license_token": license_key,
+                "device_name": platform.node(),
+                "platform": f"{platform.system()} {platform.release()} ({platform.machine()})",
+            },
             headers=headers,
             timeout=8.0,
             verify=True,
@@ -268,6 +297,48 @@ def get_license_mode():
     return "offline"
 
 
+
+_last_heartbeat_timestamp = 0.0
+_HEARTBEAT_INTERVAL_SECONDS = 3600  # Máximo 1 reporte cada hora para no saturar
+
+
+def _send_telemetry_ping(license_key: str, machine_id: str):
+    """Reporte de telemetría en segundo plano. Nunca lanza excepciones ni bloquea la app."""
+    try:
+        device_name = platform.node() or "PC-SSCP"
+        os_platform = f"{platform.system()} {platform.release()} ({platform.machine()})"
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "SSCP-Desktop/1.0",
+            "X-License-Key": DESKTOP_LICENSE_API_KEY,
+        }
+        payload = {
+            "machine_id": machine_id,
+            "license_token": license_key,
+            "device_name": device_name,
+            "platform": os_platform,
+        }
+        with httpx.Client(timeout=5.0) as client:
+            client.post(f"{LICENSE_SERVER_URL}/verify", json=payload, headers=headers)
+    except Exception:
+        # Falla silenciosa esperada cuando la máquina no tiene acceso a internet
+        pass
+
+
+def _trigger_background_heartbeat(license_key: str, machine_id: str, force: bool = False):
+    global _last_heartbeat_timestamp
+    now_ts = time.time()
+    if force or (now_ts - _last_heartbeat_timestamp >= _HEARTBEAT_INTERVAL_SECONDS):
+        _last_heartbeat_timestamp = now_ts
+        thread = threading.Thread(
+            target=_send_telemetry_ping,
+            args=(license_key, machine_id),
+            daemon=True,
+            name="SSCP-Telemetry",
+        )
+        thread.start()
+
+
 def check_license():
     machine_id = get_machine_id()
     from app.database import SessionLocal
@@ -280,14 +351,19 @@ def check_license():
             mode = config.mode or get_license_mode()
             if mode == "online":
                 return _verify_online_license(config.license_key, machine_id)
-            return _verify_offline_license(config.license_key, machine_id)
+            info = _verify_offline_license(config.license_key, machine_id)
+            if info.status == LicenseStatus.ACTIVE:
+                _trigger_background_heartbeat(config.license_key, machine_id)
+            return info
     except Exception:
         return LicenseInfo(LicenseStatus.UNLICENSED, machine_id=machine_id)
 
 
 def activate(license_key, mode="offline"):
     machine_id = get_machine_id()
-    license_key = license_key.strip()
+    license_key = (license_key or "").strip()
+    if not license_key:
+        return LicenseInfo(LicenseStatus.UNLICENSED, machine_id=machine_id)
     if mode == "online":
         info = _verify_online_license(license_key, machine_id, force_remote=True)
     else:
@@ -309,13 +385,6 @@ def activate(license_key, mode="offline"):
             config.activated_at = datetime.now(timezone.utc)
             config.last_verified_at = datetime.now(timezone.utc)
             db.commit()
-        if mode == "online":
-            try:
-                httpx.post(f"{LICENSE_SERVER_URL}/register",
-                           json={"machine_id": machine_id, "license_token": license_key,
-                                 "platform": platform.node()},
-                           headers={"X-License-Key": DESKTOP_LICENSE_API_KEY},
-                           timeout=5.0)
-            except Exception:
-                pass
+        # Disparar telemetría silenciosa inmediatamente en segundo plano
+        _trigger_background_heartbeat(license_key, machine_id, force=True)
     return info

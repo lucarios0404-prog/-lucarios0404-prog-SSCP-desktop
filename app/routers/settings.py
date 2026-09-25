@@ -64,6 +64,19 @@ def view_settings(
         setting.whatsapp_connected_phone = gw_status["connected_phone"]
         db.commit()
 
+    import socket
+    local_ip = "127.0.0.1"
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        try:
+            local_ip = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            local_ip = "127.0.0.1"
+
     return templates.TemplateResponse(
         request=request,
         name="settings/index.html",
@@ -71,6 +84,7 @@ def view_settings(
             "user": current_user,
             "setting": setting,
             "gateway_status": gw_status,
+            "local_ip": local_ip,
             "saved": False
         }
     )

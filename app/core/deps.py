@@ -20,6 +20,15 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         if authorization and authorization.startswith("Bearer "):
             token = authorization.split(" ")[1]
             
+    # Si no hay header, intentar usar parámetro query 'token' (para descargas directas en móvil/PDF)
+    if not token:
+        query_token = request.query_params.get("token")
+        if query_token:
+            if query_token.startswith("Bearer "):
+                token = query_token.split(" ")[1]
+            else:
+                token = query_token
+
     if not token:
         return None
 

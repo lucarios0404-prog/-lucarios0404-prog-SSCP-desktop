@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -38,13 +38,16 @@
     .btn{width:100%;background:linear-gradient(135deg,#10b981,#059669);border:none;border-radius:12px;padding:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.3px}
     .btn:hover{opacity:.9;transform:translateY(-1px)}
     .btn:active{transform:translateY(0)}
-    .error-box{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#fca5a5;display:flex;gap:8px;align-items:flex-start}
+    .btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+    .error-box{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#fca5a5;display:flex;gap:8px;align-items:center;line-height:1.4}
     .divider{border-top:1px solid #1e293b;margin:24px 0}
     .help-link{text-align:center;font-size:12px;color:#475569}
     .help-link a{color:#10b981;text-decoration:none}
     .help-link a:hover{text-decoration:underline}
     .toast{position:fixed;top:20px;right:20px;background:#10b981;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none}
     .toast.show{opacity:1}
+    .field-error-text{color:#f87171;font-size:12px;margin-top:6px;display:none;font-weight:500}
+    .input-error{border-color:#ef4444 !important;box-shadow:0 0 0 1px #ef4444}
   </style>
 </head>
 <body>
@@ -58,21 +61,29 @@
 
   <div class="card">
     <h1>🔐 Activar Licencia</h1>
-    <p class="subtitle">Esta copia del sistema requiere activacion. Ingresa tu ID de equipo al soporte para recibir tu clave de activacion.</p>
+    <p class="subtitle">Esta copia del sistema requiere activación. Envía tu ID de equipo al soporte para recibir tu clave de activación.</p>
 
     {% if error %}
-    <div class="error-box">⚠️ {{ error }}</div>
+    <div class="error-box" id="server-error">
+      <span>⚠️</span>
+      <div>{{ error }}</div>
+    </div>
     {% endif %}
+
+    <div class="error-box" id="client-error" style="display:none">
+      <span>⚠️</span>
+      <div id="client-error-msg">Por favor ingresa la clave de activación antes de continuar.</div>
+    </div>
 
     <div class="machine-box">
       <div class="machine-label">ID de Equipo (Machine ID)</div>
       <div class="machine-id-row">
         <div class="machine-id" id="machine-id">{{ machine_id }}</div>
-        <button class="copy-btn" onclick="copyMachineId()">📋 Copiar</button>
+        <button class="copy-btn" type="button" onclick="copyMachineId()">📋 Copiar</button>
       </div>
     </div>
 
-    <form method="post" action="/activate">
+    <form method="post" action="/activate" id="activation-form" novalidate>
       <div style="margin-bottom:20px">
         <label>Modalidad de Licencia</label>
         <div class="mode-selector">
@@ -81,7 +92,7 @@
             <label for="mode-offline">
               <span class="mode-icon">🔒</span>
               <span class="mode-name">Offline</span>
-              <span class="mode-desc">Clave criptografica. No requiere internet.</span>
+              <span class="mode-desc">Clave criptográfica local. No requiere internet.</span>
             </label>
           </div>
           <div class="mode-option">
@@ -89,18 +100,19 @@
             <label for="mode-online">
               <span class="mode-icon">🌐</span>
               <span class="mode-name">Online</span>
-              <span class="mode-desc">Token verificado en servidor Laxarusdevs.</span>
+              <span class="mode-desc">Token verificado con servidor Laxarusdevs.</span>
             </label>
           </div>
         </div>
       </div>
 
       <div class="field-group">
-        <label for="license_key">Clave de Activacion</label>
-        <textarea name="license_key" id="license_key" rows="3" placeholder="Pega aqui tu clave de licencia..." style="resize:vertical">{% if submitted_key %}{{ submitted_key }}{% endif %}</textarea>
+        <label for="license_key">Clave de Activación</label>
+        <textarea name="license_key" id="license_key" rows="3" placeholder="Pega aquí tu clave de licencia..." style="resize:vertical" required>{% if submitted_key %}{{ submitted_key }}{% endif %}</textarea>
+        <div class="field-error-text" id="license_key_error">Debes ingresar una clave para continuar.</div>
       </div>
 
-      <button type="submit" class="btn">✅ Activar SSCP Desktop</button>
+      <button type="submit" class="btn" id="submit-btn">✅ Activar SSCP Desktop</button>
     </form>
 
     <div class="divider"></div>
@@ -122,6 +134,51 @@
         setTimeout(() => toast.classList.remove('show'), 2500);
       });
     }
+
+    const form = document.getElementById('activation-form');
+    const licenseInput = document.getElementById('license_key');
+    const clientError = document.getElementById('client-error');
+    const clientErrorMsg = document.getElementById('client-error-msg');
+    const submitBtn = document.getElementById('submit-btn');
+    const radioOffline = document.getElementById('mode-offline');
+    const radioOnline = document.getElementById('mode-online');
+
+    function updatePlaceholder() {
+      if (radioOnline && radioOnline.checked) {
+        licenseInput.placeholder = "Ingresa tu token de licencia en línea...";
+      } else {
+        licenseInput.placeholder = "Pega aquí tu clave de licencia criptográfica...";
+      }
+    }
+
+    if (radioOffline && radioOnline) {
+      radioOffline.addEventListener('change', updatePlaceholder);
+      radioOnline.addEventListener('change', updatePlaceholder);
+      updatePlaceholder();
+    }
+
+    licenseInput.addEventListener('input', function() {
+      licenseInput.classList.remove('input-error');
+      clientError.style.display = 'none';
+      const serverError = document.getElementById('server-error');
+      if (serverError) serverError.style.display = 'none';
+    });
+
+    form.addEventListener('submit', function(e) {
+      const keyVal = (licenseInput.value || '').trim();
+      if (!keyVal) {
+        e.preventDefault();
+        e.stopPropagation();
+        licenseInput.classList.add('input-error');
+        clientErrorMsg.textContent = "Por favor ingresa tu clave de activación antes de continuar.";
+        clientError.style.display = 'flex';
+        licenseInput.focus();
+        return false;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "⏳ Verificando licencia...";
+    });
   </script>
 </body>
 </html>
