@@ -4,6 +4,8 @@ from sqlalchemy import or_, func, desc
 from datetime import datetime, date, time
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr
+import random
+import string
 
 from app.database import get_db
 from app.models.user import User
@@ -11,6 +13,7 @@ from app.models.patient import Patient
 from app.models.appointment import Appointment
 from app.models.consultation import Consultation
 from app.models.payment import Payment
+from app.models.service import Service
 from app.models.setting import Setting
 from app.core import security
 from app.core.deps import require_current_user
@@ -753,6 +756,10 @@ def quick_save_consultation(
         "message": "Consulta médica registrada con éxito"
     }
 
+def generate_mobile_receipt_number():
+    random_chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    return f"REC-{random_chars}"
+
 # --- Secretary Quick Payment ---
 @router.post("/payments/quick")
 def quick_register_payment(
@@ -772,6 +779,9 @@ def quick_register_payment(
         if p and p.insurance_name:
             ins_name = p.insurance_name
 
+    notes_clean = f"{payload.notes} (por {current_user.name})" if payload.notes else f"Cobro registrado por {current_user.name}"
+    receipt_no = generate_mobile_receipt_number()
+
     payment = Payment(
         patient_id=payload.patient_id,
         service_id=payload.service_id,
@@ -780,7 +790,9 @@ def quick_register_payment(
         amount=payload.amount,
         total=payload.amount,
         payment_method=payload.payment_method,
-        notes=f"{payload.notes} (por {current_user.name})",
+        notes=notes_clean,
+        receipt_number=receipt_no,
+        created_by_id=current_user.id,
         status="paid",
         created_at=datetime.utcnow()
     )
@@ -791,12 +803,13 @@ def quick_register_payment(
     return {
         "success": True,
         "payment_id": payment.id,
+        "receipt_number": payment.receipt_number,
         "service_name": payment.service_name,
         "insurance_name": payment.insurance_name,
         "amount": payment.amount,
         "total": payment.total,
         "payment_method": payment.payment_method,
-        "message": f"Pago de {payment.amount} registrado exitosamente"
+        "message": f"Pago de RD$ {payment.total:,.2f} registrado exitosamente ({payment.receipt_number})"
     }
 
 # --- Mobile Consolidated Reports (Pagos, Vistos, Citas Previas y PDF) ---

@@ -105,16 +105,25 @@
 
                             <div class="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-between">
                                 <a href="/patients/{{ wp.patient_id }}" class="text-xs text-slate-400 hover:text-slate-700 font-medium">Ver Ficha</a>
-                                {% if user.has_permission('consultations') %}
-                                <a href="/consultations/create?patient_id={{ wp.patient_id }}&appointment_id={{ wp.id }}&walk_in=1" 
-                                   class="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all">
-                                    <i class="fas fa-bolt mr-1.5 text-[10px]"></i> Atender Ahora
-                                </a>
-                                {% else %}
-                                <span class="text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-                                    <i class="fas fa-clock mr-1 text-[10px]"></i> En espera
-                                </span>
-                                {% endif %}
+                                <div class="flex items-center gap-2">
+                                    {% if user.has_permission('payments') %}
+                                    <a href="/payments/create?patient_id={{ wp.patient_id }}&appointment_id={{ wp.id }}{% if wp.service_id %}&service_id={{ wp.service_id }}{% endif %}" 
+                                       class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-xs border border-emerald-200 transition-all"
+                                       title="Registrar cobro de consulta o servicio">
+                                        <i class="fas fa-cash-register mr-1.5 text-[10px]"></i> Cobrar
+                                    </a>
+                                    {% endif %}
+                                    {% if user.has_permission('consultations') %}
+                                    <a href="/consultations/create?patient_id={{ wp.patient_id }}&appointment_id={{ wp.id }}&walk_in=1" 
+                                       class="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all">
+                                        <i class="fas fa-bolt mr-1.5 text-[10px]"></i> Atender Ahora
+                                    </a>
+                                    {% else %}
+                                    <span class="text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                                        <i class="fas fa-clock mr-1 text-[10px]"></i> En espera
+                                    </span>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
                         {% endfor %}

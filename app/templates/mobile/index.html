@@ -2248,17 +2248,31 @@
 
         async function handleSaveQuickPayment(e) {
             e.preventDefault();
-            const patientId = parseInt(document.getElementById('qp-patient-id').value);
-            const amount = parseFloat(document.getElementById('qp-amount').value);
+            const patientIdVal = document.getElementById('qp-patient-id').value;
+            const patientId = parseInt(patientIdVal);
+            const amountVal = document.getElementById('qp-amount').value;
+            const amount = parseFloat(amountVal);
             const method = document.getElementById('qp-method').value;
 
             const serviceId = document.getElementById('qp-service-id') ? document.getElementById('qp-service-id').value : '';
             const serviceName = document.getElementById('qp-service-name') ? document.getElementById('qp-service-name').value : 'Consulta Médica General';
             const insurance = document.getElementById('qp-insurance-select') ? document.getElementById('qp-insurance-select').value : 'Privado / Particular';
 
-            if (!patientId) {
+            if (!patientId || isNaN(patientId)) {
                 alert('Debe seleccionar un paciente de la lista.');
                 return;
+            }
+
+            if (isNaN(amount) || amount <= 0) {
+                alert('Debe ingresar un monto válido a cobrar.');
+                return;
+            }
+
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const origBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i> Procesando cobro...';
             }
 
             try {
@@ -2278,11 +2292,25 @@
                     })
                 });
 
-                if (!res.ok) throw new Error('Error al registrar pago');
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    const detail = errData.detail || errData.message || `Error del servidor (${res.status})`;
+                    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+                }
+
+                const resData = await res.json().catch(() => ({}));
                 closeModal('modal-quick-payment');
-                alert(`¡Pago de RD$ ${amount.toLocaleString()} por ${serviceName} registrado correctamente!`);
+                alert(resData.message || `¡Pago de RD$ ${amount.toLocaleString()} por ${serviceName} registrado correctamente!`);
+
+                if (typeof loadMobileDashboard === 'function') loadMobileDashboard();
+                if (typeof loadReportsData === 'function') loadReportsData();
             } catch (err) {
-                alert(err.message);
+                alert(err.message || 'Error al registrar cobro');
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = origBtnHtml;
+                }
             }
         }
 

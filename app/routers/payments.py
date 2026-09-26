@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, Request, Form, Query
+from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 import random
 import string
 
@@ -80,12 +81,21 @@ def list_payments(
 @router.get("/create")
 def create_payment_form(
     request: Request,
-    patient_id: int = Query(None),
-    appointment_id: int = Query(None),
-    service_id: int = Query(None),
+    patient_id: Optional[int] = Query(None),
+    appointment_id: Optional[int] = Query(None),
+    service_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
+    # Si viene appointment_id pero no patient_id, obtener patient_id y posible service_id de la cita
+    if appointment_id:
+        selected_appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+        if selected_appt:
+            if not patient_id:
+                patient_id = selected_appt.patient_id
+            if not service_id and selected_appt.service_id:
+                service_id = selected_appt.service_id
+
     patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.last_name).all()
     services = db.query(Service).filter(Service.is_active == True).order_by(Service.category.asc(), Service.name.asc()).all()
     appointments = []
@@ -118,16 +128,16 @@ def create_payment_form(
 def create_payment(
     request: Request,
     patient_id: int = Form(...),
-    appointment_id: int = Form(None),
-    service_id: int = Form(None),
-    service_name: str = Form("Consulta Médica General"),
-    insurance_name: str = Form(None),
+    appointment_id: Optional[int] = Form(None),
+    service_id: Optional[int] = Form(None),
+    service_name: Optional[str] = Form("Consulta Médica General"),
+    insurance_name: Optional[str] = Form(None),
     amount: float = Form(...),
-    discount: float = Form(0.0),
+    discount: Optional[float] = Form(0.0),
     payment_method: str = Form("cash"),
     status: str = Form("paid"),
-    receipt_number: str = Form(None),
-    notes: str = Form(None),
+    receipt_number: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
@@ -146,16 +156,18 @@ def create_payment(
         if p and p.insurance_name:
             insurance_name = p.insurance_name
 
-    total = max(0.0, float(amount) - float(discount or 0.0))
+    disc = float(discount or 0.0)
+    base_amount = float(amount or 0.0)
+    total = max(0.0, base_amount - disc)
 
     new_payment = Payment(
         patient_id=patient_id,
         appointment_id=appointment_id if appointment_id and appointment_id > 0 else None,
         service_id=service_id if service_id and service_id > 0 else None,
-        service_name=service_name,
+        service_name=service_name or "Consulta Médica General",
         insurance_name=insurance_name or "Privado / Particular",
-        amount=amount,
-        discount=discount,
+        amount=base_amount,
+        discount=disc,
         total=total,
         payment_method=payment_method,
         status=status,
