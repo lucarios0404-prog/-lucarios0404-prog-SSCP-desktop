@@ -657,6 +657,7 @@
     <!-- JAVASCRIPT: LÓGICA MÓVIL Y CLIENTE API -->
     <script>
         // Configuración de servidor por defecto
+        const isNativeApp = window.location.protocol === 'file:' || !window.location.origin.includes('http');
         const defaultHost = window.location.origin.includes('http') ? window.location.origin : 'http://127.0.0.1:8080';
         let serverUrl = localStorage.getItem('sscp_mobile_server_url') || defaultHost;
         let authToken = localStorage.getItem('sscp_mobile_token') || null;
@@ -672,6 +673,10 @@
                 showAppScreen();
             } else {
                 showLoginScreen();
+                // Si la app está en el teléfono y nunca se ha configurado la IP de la clínica, guiar al usuario
+                if (isNativeApp && !localStorage.getItem('sscp_mobile_server_url')) {
+                    openConfigModal();
+                }
             }
         });
 
@@ -686,12 +691,19 @@
         function closeConfigModal() {
             document.getElementById('screen-config').classList.add('hidden');
         }
+        function setServerPreset(url) {
+            document.getElementById('config-server-url').value = url;
+            testConnection();
+        }
         async function testConnection() {
             const inputUrl = document.getElementById('config-server-url').value.trim();
             const resElem = document.getElementById('ping-result');
-            resElem.innerHTML = '<span class="text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i>Conectando...</span>';
+            resElem.innerHTML = '<span class="text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i>Probando conexión...</span>';
             try {
-                const res = await fetch(`${inputUrl.replace(/\/+$/, '')}/api/mobile/ping`);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                const res = await fetch(`${inputUrl.replace(/\/+$/, '')}/api/mobile/ping`, { signal: controller.signal });
+                clearTimeout(timeoutId);
                 const data = await res.json();
                 if (data.status === 'online') {
                     resElem.innerHTML = `<span class="text-emerald-600"><i class="fas fa-check-circle mr-1"></i>¡Conectado! Clínica: ${data.clinic_name}</span>`;
@@ -699,7 +711,7 @@
                     resElem.innerHTML = `<span class="text-amber-600">Respuesta inesperada del servidor.</span>`;
                 }
             } catch (e) {
-                resElem.innerHTML = `<span class="text-red-500"><i class="fas fa-times-circle mr-1"></i>No se pudo conectar a ${inputUrl}. Verifique que el equipo esté encendido y en la misma red Wi-Fi.</span>`;
+                resElem.innerHTML = `<span class="text-red-500"><i class="fas fa-times-circle mr-1"></i>No se pudo conectar a ${inputUrl}. Asegúrate de estar en el mismo Wi-Fi y verificar la IP de tu computadora (ej: http://192.168.1.50:8080).</span>`;
             }
         }
         function saveServerConfig() {
