@@ -77,6 +77,32 @@ def view_settings(
         except Exception:
             local_ip = "127.0.0.1"
 
+    # Detección inteligente de IP de Tailscale (IP estática para móviles y tablets)
+    tailscale_ip = (setting.tailscale_ip or "").strip()
+    if not tailscale_ip:
+        for cmd in ["tailscale", r"C:\Program Files\Tailscale\tailscale.exe"]:
+            try:
+                import subprocess
+                out = subprocess.run([cmd, "ip", "-4"], capture_output=True, text=True, timeout=2)
+                if out.returncode == 0 and out.stdout.strip().startswith("100."):
+                    tailscale_ip = out.stdout.strip()
+                    break
+            except Exception:
+                pass
+        if not tailscale_ip:
+            try:
+                import psutil
+                for iface, addrs in psutil.net_if_addrs().items():
+                    for addr in addrs:
+                        if addr.family == socket.AF_INET and addr.address.startswith("100."):
+                            tailscale_ip = addr.address
+                            break
+            except Exception:
+                pass
+        if tailscale_ip and setting:
+            setting.tailscale_ip = tailscale_ip
+            db.commit()
+
     return templates.TemplateResponse(
         request=request,
         name="settings/index.html",
@@ -85,6 +111,7 @@ def view_settings(
             "setting": setting,
             "gateway_status": gw_status,
             "local_ip": local_ip,
+            "tailscale_ip": tailscale_ip,
             "saved": False
         }
     )
