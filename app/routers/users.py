@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
-from app.core.deps import require_current_user, require_admin
+from app.core.deps import require_current_user, require_admin, require_permission
 from app.core.security import get_password_hash
 from app.core.permissions import AVAILABLE_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, ROLE_LABELS, get_available_permissions
 
@@ -21,7 +21,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 def list_users(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_permission("users"))
 ):
     """Listado de todos los usuarios registrados en el sistema."""
     users = db.query(User).order_by(User.id.asc()).all()
@@ -64,7 +64,7 @@ def list_users(
 def create_user_form(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_permission("users"))
 ):
     """Formulario de creación de un nuevo usuario."""
     return templates.TemplateResponse(
@@ -91,7 +91,7 @@ def create_user_submit(
     use_custom_perms: Optional[str] = Form(None),
     reset_to_defaults: Optional[str] = Form("0"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_permission("users"))
 ):
     """Procesar alta de nuevo usuario con rol y delimitación de permisos."""
     clean_email = email.strip().lower()
@@ -142,7 +142,7 @@ def edit_user_form(
     user_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_permission("users"))
 ):
     """Formulario de edición de usuario y permisos."""
     target_user = db.query(User).filter(User.id == user_id).first()
@@ -189,7 +189,7 @@ def edit_user_submit(
     use_custom_perms: Optional[str] = Form(None),
     reset_to_defaults: Optional[str] = Form("0"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_permission("users"))
 ):
     """Guardar modificaciones de usuario y permisos."""
     target_user = db.query(User).filter(User.id == user_id).first()
@@ -239,7 +239,7 @@ def edit_user_submit(
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_permission("users"))
 ):
     """Eliminar usuario del sistema."""
     if current_user.id == user_id:

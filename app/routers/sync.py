@@ -9,7 +9,7 @@ import json
 
 from app.database import get_db
 from app.models.setting import Setting
-from app.core.deps import require_admin
+from app.core.deps import require_admin, require_permission
 from app.services.sync_service import SyncService
 
 router = APIRouter(prefix="/sync", tags=["sync"])
@@ -24,7 +24,7 @@ def _sync_redirect(msg: str, msg_type: str = "info") -> RedirectResponse:
 async def sync_dashboard(
     request: Request,
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_permission("sync"))
 ):
     stats = SyncService.get_sync_stats(db)
     setting = db.query(Setting).first()
@@ -69,7 +69,7 @@ async def trigger_sync(
     request: Request,
     remote_url: str = Form("https://sscp.laxarusdevs.com"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_permission("sync"))
 ):
     if not remote_url or "100.111.106.27" in remote_url:
         remote_url = "https://sscp.laxarusdevs.com"
@@ -98,7 +98,7 @@ async def trigger_sync(
 async def push_sync(
     remote_url: str = Form("https://sscp.laxarusdevs.com"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_permission("sync"))
 ):
     if not remote_url or "100.111.106.27" in remote_url:
         remote_url = "https://sscp.laxarusdevs.com"
@@ -112,7 +112,7 @@ async def push_sync(
 async def pull_sync(
     remote_url: str = Form("https://sscp.laxarusdevs.com"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_permission("sync"))
 ):
     if not remote_url or "100.111.106.27" in remote_url:
         remote_url = "https://sscp.laxarusdevs.com"
@@ -125,7 +125,7 @@ async def pull_sync(
 @router.get("/export")
 def export_sync_package(
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_permission("sync"))
 ):
     package = SyncService.export_full_package(db)
     content = json.dumps(package, indent=2, ensure_ascii=False)
@@ -141,7 +141,7 @@ def export_sync_package(
 async def import_sync_package(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_permission("sync"))
 ):
     try:
         content = await file.read()

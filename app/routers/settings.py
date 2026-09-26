@@ -9,7 +9,7 @@ import os
 
 from app.database import get_db, DB_PATH
 from app.models.setting import Setting
-from app.core.deps import require_admin, require_current_user
+from app.core.deps import require_admin, require_current_user, require_permission
 from app.services.whatsapp_gateway import gateway_manager
 from app.services.whatsapp_service import (
     WhatsAppService,
@@ -53,7 +53,7 @@ def get_or_create_settings(db: Session) -> Setting:
 def view_settings(
     request: Request,
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_permission("settings"))
 ):
     setting = get_or_create_settings(db)
     gw_status = gateway_manager.get_status()
@@ -110,7 +110,7 @@ def update_settings(
     whatsapp_template_waiting: str = Form(None),
     whatsapp_template_followup: str = Form(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_permission("settings"))
 ):
     setting = get_or_create_settings(db)
     setting.clinic_name = clinic_name
@@ -179,7 +179,7 @@ async def upload_doctor_logo(
     request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_permission("settings"))
 ):
     """
     Carga del logo/membrete del doctor para incluir en recetas, licencias y reportes PDF.
@@ -287,7 +287,7 @@ def send_whatsapp_test_message(
 
 @router.get("/backup/export")
 def export_backup(
-    current_user = Depends(require_admin)
+    current_user = Depends(require_permission("settings"))
 ):
     """Genera y descarga una copia de seguridad exacta de la base de datos SQLite."""
     if not DB_PATH.exists():
@@ -306,7 +306,7 @@ async def restore_backup(
     request: Request,
     backup_file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_permission("settings"))
 ):
     """Restaura una copia de seguridad SQLite previa verificación de integridad."""
     content = await backup_file.read()

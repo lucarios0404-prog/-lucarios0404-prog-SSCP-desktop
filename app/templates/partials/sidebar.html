@@ -77,19 +77,19 @@
         {% endif %}
 
         <!-- Divisor — Productividad Médica -->
-        {% if user.has_permission('prescriptions') or user.has_permission('templates') or user.has_permission('licenses') or user.has_permission('references') %}
+        {% if user.has_permission('prescriptions') or user.has_permission('templates') or user.has_permission('licenses') or user.has_permission('references') or user.role == 'doctor' %}
         <div class="pt-4 pb-1.5 px-3">
             <span class="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Productividad</span>
         </div>
 
-            {% if user.has_permission('prescriptions') %}
+            {% if user.has_permission('prescriptions') or user.role == 'doctor' %}
             <a href="/prescriptions/quick" class="{% if active_menu == 'quick_prescriptions' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
                 <i class="fas fa-bolt w-4 mr-3 text-base {% if active_menu == 'quick_prescriptions' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
                 Receta Rápida
             </a>
             {% endif %}
 
-            {% if user.has_permission('templates') %}
+            {% if user.has_permission('templates') or user.role == 'doctor' %}
             <a href="/templates" class="{% if active_menu == 'templates' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
                 <i class="fas fa-clipboard-list w-4 mr-3 text-base {% if active_menu == 'templates' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
                 Plantillas

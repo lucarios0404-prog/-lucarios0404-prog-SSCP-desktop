@@ -24,8 +24,11 @@ class User(Base):
         if perm_key in get_inactive_permission_keys():
             return False
         # El rol secretaria nunca puede realizar actos médicos estrictos (consultas, recetas, licencias, referencias)
-        if self.role == "secretaria" and perm_key in ["consultations", "prescriptions", "licenses", "references"]:
+        if self.role == "secretaria" and perm_key in ["consultations", "prescriptions", "licenses", "references", "templates"]:
             return False
+        # Para el rol doctor, el acceso a sus plantillas clínicas es una herramienta médica esencial
+        if self.role == "doctor" and perm_key == "templates":
+            return True
         if self.permissions:
             try:
                 import json

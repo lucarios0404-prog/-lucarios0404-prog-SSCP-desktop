@@ -104,6 +104,7 @@ def run_tests():
 
         # 4. Test: Crear nuevo usuario desde el router /users/create
         print("\n[3/5] Probando creación de usuario nuevo con permisos personalizados...")
+        app.dependency_overrides[require_current_user] = lambda: admin_user
         app.dependency_overrides[require_admin] = lambda: admin_user
         uid = uuid.uuid4().hex[:5]
         new_email = f"asistente_{uid}@sscp.local"

@@ -111,11 +111,16 @@
                                             {% elif t.category == 'license' %}<i class="fas fa-file-signature mr-1"></i> Licencia
                                             {% else %}<i class="fas fa-share-nodes mr-1"></i> Referencia{% endif %}
                                         </span>
-                                        <form method="post" action="/templates/{{ t.id }}/delete" onsubmit="return confirm('¿Eliminar esta plantilla?');">
-                                            <button type="submit" class="text-slate-400 hover:text-red-600 text-xs">
-                                                <i class="fas fa-trash-can"></i>
+                                        <div class="flex items-center space-x-1.5">
+                                            <button type="button" onclick="openEditTemplateModal({{ t.id }}, '{{ t.title|escape }}', '{{ t.category }}', {{ t.content|tojson }})" class="text-slate-400 hover:text-blue-600 text-xs p-1" title="Editar plantilla">
+                                                <i class="fas fa-pen-to-square"></i>
                                             </button>
-                                        </form>
+                                            <form method="post" action="/templates/{{ t.id }}/delete" onsubmit="return confirm('¿Eliminar esta plantilla?');">
+                                                <button type="submit" class="text-slate-400 hover:text-rose-600 text-xs p-1" title="Eliminar plantilla">
+                                                    <i class="fas fa-trash-can"></i>
+                                                </button>
+                                            </form>
+                                        </div>
                                     </div>
                                     <h3 class="text-sm font-bold text-slate-800 mt-2">{{ t.title }}</h3>
                                     <p class="text-xs text-slate-600 mt-1 font-mono whitespace-pre-wrap bg-slate-50 p-2 rounded-lg border border-slate-100 max-h-32 overflow-y-auto">{{ t.content }}</p>
@@ -129,4 +134,52 @@
         </main>
     </div>
 </div>
+
+<!-- Modal Editar Plantilla -->
+<div id="modal-edit-template" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fas fa-pen-to-square text-blue-600 mr-2"></i> Editar Plantilla Clínica
+            </h3>
+            <button type="button" onclick="closeEditTemplateModal()" class="text-slate-400 hover:text-slate-600 text-lg leading-none">&times;</button>
+        </div>
+        <form id="editTemplateForm" method="post" action="" class="space-y-4">
+            <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Categoría</label>
+                <select id="edit_category" name="category" required class="w-full text-xs py-2 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                    <option value="prescription">Receta Médica</option>
+                    <option value="consultation">Nota de Consulta</option>
+                    <option value="license">Licencia / Reposo</option>
+                    <option value="reference">Carta de Referencia</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Título de la Plantilla</label>
+                <input type="text" id="edit_title" name="title" required class="w-full text-xs py-2 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+            </div>
+            <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Contenido de la Plantilla</label>
+                <textarea id="edit_content" name="content" rows="6" required class="w-full text-xs font-mono py-2 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"></textarea>
+            </div>
+            <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="closeEditTemplateModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all">Cancelar</button>
+                <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditTemplateModal(id, title, category, content) {
+    document.getElementById('editTemplateForm').action = '/templates/' + id + '/edit';
+    document.getElementById('edit_title').value = title;
+    document.getElementById('edit_category').value = category;
+    document.getElementById('edit_content').value = content;
+    document.getElementById('modal-edit-template').classList.remove('hidden');
+}
+function closeEditTemplateModal() {
+    document.getElementById('modal-edit-template').classList.add('hidden');
+}
+</script>
 {% endblock %}

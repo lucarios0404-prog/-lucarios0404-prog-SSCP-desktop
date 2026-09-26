@@ -11,7 +11,7 @@ from fastapi import status
 from app.database import get_db
 from app.models.user import User
 from app.models.permission_catalog import PermissionCatalog
-from app.core.deps import require_admin
+from app.core.deps import require_admin, require_permission
 from app.core.permissions import (
     get_all_permissions,
     get_permissions_by_category,
@@ -28,7 +28,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 def list_permissions(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("users")),
 ):
     """Panel de gestión de Áreas y Permisos del sistema."""
     grouped = get_permissions_by_category(db)
@@ -65,7 +65,7 @@ def list_permissions(
 def create_permission_form(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("users")),
 ):
     """Formulario para crear un nuevo permiso."""
     existing_categories = sorted(
@@ -91,7 +91,7 @@ def create_permission_submit(
     category: str = Form(...),
     new_category: Optional[str] = Form(""),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("users")),
 ):
     """Guardar nuevo permiso en la BD."""
     # Usar categoría nueva si se especificó
@@ -155,7 +155,7 @@ def edit_permission_form(
     perm_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("users")),
 ):
     """Formulario de edición de un permiso."""
     record = db.query(PermissionCatalog).filter(PermissionCatalog.id == perm_id).first()
@@ -194,7 +194,7 @@ def edit_permission_submit(
     category: str = Form(...),
     new_category: Optional[str] = Form(""),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("users")),
 ):
     """Guardar cambios del permiso."""
     record = db.query(PermissionCatalog).filter(PermissionCatalog.id == perm_id).first()
@@ -216,7 +216,7 @@ def edit_permission_submit(
 def toggle_permission(
     perm_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("users")),
 ):
     """Activar o desactivar un permiso sin eliminarlo."""
     record = db.query(PermissionCatalog).filter(PermissionCatalog.id == perm_id).first()
@@ -235,7 +235,7 @@ def toggle_permission(
 def delete_permission(
     perm_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("users")),
 ):
     """Eliminar permiso si no está en uso por ningún usuario personalizado."""
     record = db.query(PermissionCatalog).filter(PermissionCatalog.id == perm_id).first()

@@ -155,6 +155,7 @@ def run_tests():
         # FASE 4: Admin DESACTIVA un Permiso Globalmente en el Catalogo
         # -------------------------------------------------------------
         print("\n[FASE 4] Probando cuando el Administrador DESACTIVA un permiso en el Catalogo...")
+        app.dependency_overrides[require_current_user] = lambda: admin
         app.dependency_overrides[require_admin] = lambda: admin
         
         # Buscar el permiso 'vaccines' en la BD
@@ -196,6 +197,7 @@ def run_tests():
         print("  OK: Sidebar del Medico oculta automaticamente el modulo desactivado 'Vacunas'.")
 
         # Reactivar permiso 'vaccines' para dejar el sistema limpio
+        app.dependency_overrides[require_current_user] = lambda: admin
         app.dependency_overrides[require_admin] = lambda: admin
         toggle_back = client.post(f"/permissions/{vaccine_perm.id}/toggle", follow_redirects=False)
         assert toggle_back.status_code == 303

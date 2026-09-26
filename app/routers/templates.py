@@ -54,6 +54,24 @@ def create_template(
     db.commit()
     return RedirectResponse(url="/templates", status_code=303)
 
+@router.post("/{template_id}/edit")
+def edit_template(
+    template_id: int,
+    title: str = Form(...),
+    category: str = Form(...),
+    content: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    tpl = db.query(ClinicalTemplate).filter(ClinicalTemplate.id == template_id).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    tpl.title = title
+    tpl.category = category
+    tpl.content = content
+    db.commit()
+    return RedirectResponse(url="/templates", status_code=303)
+
 @router.post("/{template_id}/delete")
 def delete_template(
     template_id: int,
