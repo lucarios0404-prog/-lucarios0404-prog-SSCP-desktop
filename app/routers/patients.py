@@ -16,9 +16,10 @@ from app.core.deps import require_current_user
 from app.services.patient_service import PatientService
 from app.services.audit_service import AuditService
 
+from app.core.templates import templates
+from app.services.ars_service import get_all_ars, ARS_LIST
+
 router = APIRouter(prefix="/patients", tags=["patients"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
 @router.post("/check-duplicate")
 async def check_duplicate_patient(
@@ -145,6 +146,8 @@ def create_patient(
     allergies: str = Form(None),
     emergency_contact_name: str = Form(None),
     emergency_contact_phone: str = Form(None),
+    insurance_name: str = Form("Privado / Particular"),
+    insurance_number: str = Form(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
@@ -167,7 +170,9 @@ def create_patient(
         blood_type=blood_type,
         allergies=allergies,
         emergency_contact_name=emergency_contact_name,
-        emergency_contact_phone=emergency_contact_phone
+        emergency_contact_phone=emergency_contact_phone,
+        insurance_name=insurance_name or "Privado / Particular",
+        insurance_number=insurance_number
     )
     db.add(new_patient)
     db.commit()
@@ -285,6 +290,8 @@ def edit_patient(
     allergies: str = Form(None),
     emergency_contact_name: str = Form(None),
     emergency_contact_phone: str = Form(None),
+    insurance_name: str = Form("Privado / Particular"),
+    insurance_number: str = Form(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
@@ -303,7 +310,9 @@ def edit_patient(
         "name": f"{patient.first_name} {patient.last_name}",
         "phone": patient.phone,
         "allergies": patient.allergies,
-        "address": patient.address
+        "address": patient.address,
+        "insurance_name": patient.insurance_name,
+        "insurance_number": patient.insurance_number
     }
 
     patient.first_name = first_name
@@ -318,6 +327,8 @@ def edit_patient(
     patient.allergies = allergies
     patient.emergency_contact_name = emergency_contact_name
     patient.emergency_contact_phone = emergency_contact_phone
+    patient.insurance_name = insurance_name or "Privado / Particular"
+    patient.insurance_number = insurance_number
     patient.updated_at = datetime.utcnow()
 
     db.commit()

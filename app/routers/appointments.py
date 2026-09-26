@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func, case
 from pathlib import Path
 from datetime import datetime, date, time, timedelta
 
@@ -10,13 +9,19 @@ from app.database import get_db
 from app.models.appointment import Appointment
 from app.models.patient import Patient
 from app.models.user import User
+from app.models.service import Service
 from app.core.deps import require_current_user, require_permission
+from app.core.templates import templates
 from app.services.whatsapp_service import WhatsAppService
 from app.services.whatsapp_gateway import gateway_manager
+from app.services.ars_service import get_all_ars
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+
+def assign_next_queue_number(db: Session, target_date: date) -> int:
+    """Calcula y asigna el siguiente número correlativo de turno para la fecha dada."""
+    max_q = db.query(func.max(Appointment.queue_number)).filter(Appointment.date == target_date).scalar() or 0
+    return int(max_q) + 1
 
 @router.get("/")
 def list_appointments(
@@ -71,6 +76,7 @@ def list_appointments(
     ).count()
 
     gateway_status = gateway_manager.get_status()
+    services = db.query(Service).filter(Service.is_active == True).order_by(Service.category.asc(), Service.name.asc()).all()
 
     return templates.TemplateResponse(
         request=request,
@@ -79,6 +85,7 @@ def list_appointments(
             "user": current_user,
             "appointments": appointments,
             "all_patients": all_patients,
+            "services": services,
             "waiting_count": waiting_count,
             "waiting_success": request.query_params.get("waiting_success"),
             "view_mode": view,
@@ -101,6 +108,7 @@ def create_appointment_form(
     current_user = Depends(require_current_user)
 ):
     patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.last_name).all()
+    services = db.query(Service).filter(Service.is_active == True).order_by(Service.category.asc(), Service.name.asc()).all()
     today = date.today()
     
     # Atajos de fecha para F1
@@ -119,6 +127,7 @@ def create_appointment_form(
         context={
             "user": current_user,
             "patients": patients,
+            "services": services,
             "selected_patient_id": patient_id,
             "quick_dates": quick_dates,
             "initial_date": initial_date,
@@ -134,6 +143,8 @@ def create_appointment(
     end_time_str: str = Form(..., alias="end_time"),
     reason: str = Form(...),
     notes: str = Form(None),
+    service_id: int = Form(None),
+    price: float = Form(None),
     is_recurring: bool = Form(False),
     recurrence_count: int = Form(1), # Número de ocurrencias para F14
     recurrence_interval_days: int = Form(30), # Intervalo en días (30 = mensual)
@@ -143,6 +154,12 @@ def create_appointment(
     base_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     start_time_obj = datetime.strptime(start_time_str, "%H:%M").time()
     end_time_obj = datetime.strptime(end_time_str, "%H:%M").time()
+
+    # Si se seleccionó servicio y no se definió precio explícito, tomar el precio del servicio
+    if service_id and (price is None or price <= 0):
+        svc = db.query(Service).filter(Service.id == service_id).first()
+        if svc:
+            price = svc.price
     
     # Determinar cuántas citas crear (F14: citas recurrentes)
     count = max(1, min(12, recurrence_count if is_recurring else 1))
@@ -159,6 +176,8 @@ def create_appointment(
             end_time=end_time_obj,
             reason=reason_label,
             notes=notes,
+            service_id=service_id,
+            price=price,
             is_recurring=is_recurring,
             status="Pendiente"
         )
@@ -176,10 +195,37 @@ def update_appointment_status(
 ):
     appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if appt:
+        # Al marcar como En Espera (llegada del paciente), asignar Turno correlativo diario si aún no tiene
+        if new_status == "En Espera" and not appt.queue_number:
+            appt.queue_number = assign_next_queue_number(db, appt.date)
         appt.status = new_status
         appt.updated_at = datetime.utcnow()
         db.commit()
     return RedirectResponse(url="/appointments", status_code=303)
+
+@router.post("/{appointment_id}/check-in")
+def check_in_appointment(
+    appointment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    """Marca la llegada del paciente a la sala de espera y le asigna su Turno del día."""
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+    
+    appt.status = "En Espera"
+    if not appt.queue_number:
+        appt.queue_number = assign_next_queue_number(db, appt.date)
+    appt.updated_at = datetime.utcnow()
+    db.commit()
+
+    accept = request.headers.get("accept", "")
+    if "application/json" in accept and "text/html" not in accept:
+        return {"success": True, "queue_number": appt.queue_number, "status": appt.status}
+
+    return RedirectResponse(url="/appointments?status=En+Espera&waiting_success=1", status_code=303)
 
 @router.post("/check-in-walkin")
 def check_in_walkin(
@@ -202,14 +248,17 @@ def check_in_walkin(
     
     if existing:
         existing.status = "En Espera"
+        if not existing.queue_number:
+            existing.queue_number = assign_next_queue_number(db, today)
         if notes:
             existing.notes = f"{existing.notes} | {notes}" if existing.notes else notes
         existing.updated_at = datetime.utcnow()
         db.commit()
         appt = existing
     else:
-        # Crear cita espontánea / walk-in directa para hoy
+        # Crear cita espontánea / walk-in directa para hoy con su Turno correlativo
         end_time_val = (datetime.now() + timedelta(minutes=30)).time()
+        next_q = assign_next_queue_number(db, today)
         appt = Appointment(
             patient_id=patient_id,
             doctor_id=current_user.id if current_user.role == "doctor" else 1,
@@ -218,7 +267,8 @@ def check_in_walkin(
             end_time=end_time_val,
             reason="Llegada espontánea (Sin cita previa) - En Espera",
             notes=notes or "Paciente en sala de espera indicado por recepción",
-            status="En Espera"
+            status="En Espera",
+            queue_number=next_q
         )
         db.add(appt)
         db.commit()
@@ -251,11 +301,14 @@ def attend_now(
     
     if existing:
         existing.status = "En Espera"
+        if not existing.queue_number:
+            existing.queue_number = assign_next_queue_number(db, today)
         existing.updated_at = datetime.utcnow()
         db.commit()
         appt_id = existing.id
     else:
         end_time_val = (datetime.now() + timedelta(minutes=30)).time()
+        next_q = assign_next_queue_number(db, today)
         appt = Appointment(
             patient_id=patient_id,
             doctor_id=current_user.id,
@@ -264,7 +317,8 @@ def attend_now(
             end_time=end_time_val,
             reason="Atención Inmediata (Sin cita previa)",
             notes=notes or "Paciente entra de inmediato a consulta médica",
-            status="En Espera"
+            status="En Espera",
+            queue_number=next_q
         )
         db.add(appt)
         db.commit()

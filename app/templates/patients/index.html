@@ -126,6 +126,9 @@
                                                 {% else %}
                                                 <span class="block text-[11px] text-slate-400">Reg: {{ p.created_at.strftime("%d/%m/%Y") if p.created_at else "N/D" }}</span>
                                                 {% endif %}
+                                                <div class="mt-1">
+                                                    {{ p.insurance_name|ars_badge(p.insurance_number)|safe }}
+                                                </div>
                                             </div>
                                         </div>
                                     </td>

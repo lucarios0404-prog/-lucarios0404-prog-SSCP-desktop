@@ -20,6 +20,8 @@ class Payment(Base):
     
     # Métodos: "cash" (Efectivo), "card" (Tarjeta), "transfer" (Transferencia), "insurance" (Seguro Médico)
     payment_method = Column(String, default="cash")
+    insurance_name = Column(String, nullable=True, default="Privado") # ARS utilizada para cobertura/copago
+    service_id = Column(Integer, ForeignKey("services.id"), nullable=True) # Vínculo al talonario
     receipt_number = Column(String, nullable=True, index=True)
     notes = Column(Text, nullable=True)
     
@@ -31,4 +33,5 @@ class Payment(Base):
 
     patient = relationship("Patient", backref="payments")
     appointment = relationship("Appointment", backref="payments")
+    service = relationship("Service", backref="payments")
     created_by = relationship("User", foreign_keys=[created_by_id])

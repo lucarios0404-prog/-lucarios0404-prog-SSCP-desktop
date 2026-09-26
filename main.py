@@ -36,6 +36,7 @@ from app.routers import (
     users,
     data_import,
     permissions,
+    services,
 )
 from app.routers.activation import router as activation_router
 from app.core.deps import get_current_user
@@ -73,6 +74,10 @@ def ensure_schema_migrations(engine):
                 conn.execute(text("ALTER TABLE patients ADD COLUMN archived_reason TEXT"))
             if "archived_by_id" not in col_names:
                 conn.execute(text("ALTER TABLE patients ADD COLUMN archived_by_id INTEGER"))
+            if "insurance_name" not in col_names:
+                conn.execute(text("ALTER TABLE patients ADD COLUMN insurance_name TEXT DEFAULT 'Privado'"))
+            if "insurance_number" not in col_names:
+                conn.execute(text("ALTER TABLE patients ADD COLUMN insurance_number TEXT"))
 
             # 2. Migraciones en settings (WhatsApp)
             res_s = conn.execute(text("PRAGMA table_info(settings)")).fetchall()
@@ -94,13 +99,27 @@ def ensure_schema_migrations(engine):
             if "whatsapp_connected_phone" not in s_cols:
                 conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_connected_phone TEXT"))
 
-            # 3. Migraciones en appointments (WhatsApp)
+            # 3. Migraciones en appointments (Turnos, Servicios, WhatsApp)
             res_a = conn.execute(text("PRAGMA table_info(appointments)")).fetchall()
             a_cols = [r[1] for r in res_a]
+            if "queue_number" not in a_cols:
+                conn.execute(text("ALTER TABLE appointments ADD COLUMN queue_number INTEGER"))
+            if "service_id" not in a_cols:
+                conn.execute(text("ALTER TABLE appointments ADD COLUMN service_id INTEGER"))
+            if "price" not in a_cols:
+                conn.execute(text("ALTER TABLE appointments ADD COLUMN price FLOAT DEFAULT 0.0"))
             if "whatsapp_reminder_sent" not in a_cols:
                 conn.execute(text("ALTER TABLE appointments ADD COLUMN whatsapp_reminder_sent BOOLEAN DEFAULT 0"))
             if "whatsapp_reminder_sent_at" not in a_cols:
                 conn.execute(text("ALTER TABLE appointments ADD COLUMN whatsapp_reminder_sent_at DATETIME"))
+
+            # 4. Migraciones en payments (ARS y Talonario de Servicios)
+            res_p = conn.execute(text("PRAGMA table_info(payments)")).fetchall()
+            p_cols = [r[1] for r in res_p]
+            if "insurance_name" not in p_cols:
+                conn.execute(text("ALTER TABLE payments ADD COLUMN insurance_name TEXT DEFAULT 'Privado'"))
+            if "service_id" not in p_cols:
+                conn.execute(text("ALTER TABLE payments ADD COLUMN service_id INTEGER"))
 
             conn.commit()
     except Exception as e:
@@ -172,6 +191,8 @@ async def lifespan(app: FastAPI):
             seed_permissions_if_empty(db)
             from app.core.initial_data import seed_initial_data_if_empty
             seed_initial_data_if_empty(db)
+            from app.data.services_catalog import seed_services_if_empty
+            seed_services_if_empty(db)
     except Exception as e:
         print(f"[Startup Database] Aviso: {e}")
 
@@ -208,7 +229,7 @@ app.add_middleware(
 BASE_DIR = Path(sys._MEIPASS).resolve() if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 # === GATE DE LICENCIA (Middleware Global) ===
 # El router de activacion siempre esta disponible
@@ -236,6 +257,7 @@ app.include_router(reports.router)
 app.include_router(users.router)
 app.include_router(permissions.router)
 app.include_router(mobile_api.router)
+app.include_router(services.router)
 
 from fastapi.exceptions import RequestValidationError
 from app.services.license_service import check_license, LicenseStatus

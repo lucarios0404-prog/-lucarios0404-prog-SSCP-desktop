@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Talonario de Servicios y Tipos de Cita — SSCP{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Encabezado Principal -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+        <div>
+            <div class="flex items-center space-x-2">
+                <div class="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg">
+                    <i class="fas fa-receipt"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black text-slate-900 tracking-tight">Talonario de Servicios &amp; Tipos de Cita</h1>
+                    <p class="text-xs text-slate-500 mt-0.5">Catálogo de precios y servicios oficiales para agendar citas rápidas y registrar cobros automáticos.</p>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2.5">
+            <span class="px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold">
+                <i class="fas fa-check-circle text-emerald-600 mr-1"></i> {{ active_services }} Activos / {{ total_services }} Total
+            </span>
+            <button onclick="openCreateServiceModal()" 
+                    class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center space-x-1.5 active:scale-95">
+                <i class="fas fa-plus"></i>
+                <span>+ Nuevo Servicio</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Buscador y Filtro Rápido -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <div class="relative w-full sm:w-96">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                <i class="fas fa-search text-xs"></i>
+            </span>
+            <input type="text" id="serviceSearch" oninput="filterServices(this.value)" placeholder="Buscar por nombre o categoría..."
+                   class="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium">
+        </div>
+        <div class="flex items-center space-x-2 text-xs text-slate-500">
+            <span>Solo hacer clic en citas o cobros para aplicar el precio al instante.</span>
+        </div>
+    </div>
+
+    <!-- Lista de Servicios por Categoría (Estilo Tablet de la Clínica) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="servicesContainer">
+        {% for cat_name, cat_services in categories.items() %}
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden service-category-card" data-category="{{ cat_name|lower }}">
+            <div class="px-5 py-3.5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center space-x-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>
+                    <span>{{ cat_name }}</span>
+                </h3>
+                <span class="text-[11px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-lg border border-slate-200">
+                    {{ cat_services|length }} items
+                </span>
+            </div>
+            <div class="divide-y divide-slate-100">
+                {% for s in cat_services %}
+                <div class="p-3.5 hover:bg-slate-50/70 transition flex items-center justify-between service-row" data-name="{{ s.name|lower }}">
+                    <div class="flex items-center space-x-3">
+                        <!-- Punto de Color Oficial de la Tablet -->
+                        <span class="w-3.5 h-3.5 rounded-full shadow-xs shrink-0" style="background-color: {{ s.color }};"></span>
+                        <div>
+                            <span class="text-xs font-bold text-slate-900 block leading-snug">{{ s.name }}</span>
+                            <span class="text-[10px] text-slate-400 font-medium">{{ s.category }}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="text-xs font-black text-slate-800 font-mono bg-slate-100/80 px-2.5 py-1 rounded-lg">
+                            RD$ {{ "{:,.2f}".format(s.price) }}
+                        </span>
+                        <div class="flex items-center space-x-1">
+                            <button onclick="openEditServiceModal({{ s.id }}, '{{ s.name }}', {{ s.price }}, '{{ s.color }}', '{{ s.category }}')" 
+                                    class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Editar">
+                                <i class="fas fa-edit text-xs"></i>
+                            </button>
+                            <form action="/services/{{ s.id }}/toggle" method="POST" class="inline" onsubmit="return confirm('¿Desea cambiar el estado de este servicio?');">
+                                <button type="submit" class="p-1.5 {% if s.is_active %}text-slate-400 hover:text-red-500 hover:bg-red-50{% else %}text-emerald-500 hover:bg-emerald-50{% endif %} rounded-lg transition" title="{% if s.is_active %}Desactivar{% else %}Activar{% endif %}">
+                                    <i class="fas {% if s.is_active %}fa-times text-xs{% else %}fa-check text-xs{% endif %}"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- MODAL: CREAR / EDITAR SERVICIO -->
+<div id="serviceModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200 animate-fade-in space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 id="modalTitle" class="font-bold text-slate-900 text-base flex items-center space-x-2">
+                <i class="fas fa-receipt text-indigo-600"></i>
+                <span>Nuevo Tipo de Cita / Servicio</span>
+            </h3>
+            <button onclick="closeServiceModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+        </div>
+
+        <form id="serviceForm" action="/services/create" method="POST" class="space-y-3.5">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre del Servicio / Cita <span class="text-red-500">*</span></label>
+                <input type="text" name="name" id="modalServiceName" required placeholder="Ej: Vacuna VPH, Biopsia, Consulta..."
+                       class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-semibold">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Precio Oficial (RD$) <span class="text-red-500">*</span></label>
+                    <input type="number" step="0.01" min="0" name="price" id="modalServicePrice" required value="0.00"
+                           class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-bold text-slate-900 font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Categoría</label>
+                    <select name="category" id="modalServiceCategory"
+                            class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-semibold">
+                        <option value="Consultas">Consultas</option>
+                        <option value="Procedimientos">Procedimientos</option>
+                        <option value="Laboratorio / Patología">Laboratorio / Patología</option>
+                        <option value="Vacunas">Vacunas</option>
+                        <option value="Planificación Familiar">Planificación Familiar</option>
+                        <option value="Estudios Especiales">Estudios Especiales</option>
+                        <option value="Revisiones">Revisiones</option>
+                        <option value="General">General</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Selector de Color (Punto de Color como en la Tablet) -->
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">Color Identificador (Punto en Lista)</label>
+                <div class="flex items-center space-x-2">
+                    <input type="color" name="color" id="modalServiceColor" value="#9333ea" 
+                           class="w-10 h-10 rounded-xl cursor-pointer border border-slate-200 p-0.5 bg-white">
+                    <div class="flex flex-wrap gap-1.5 flex-1">
+                        <button type="button" onclick="setColor('#9333ea')" class="w-6 h-6 rounded-full bg-purple-600 border border-white shadow-xs"></button>
+                        <button type="button" onclick="setColor('#eab308')" class="w-6 h-6 rounded-full bg-yellow-500 border border-white shadow-xs"></button>
+                        <button type="button" onclick="setColor('#0ea5e9')" class="w-6 h-6 rounded-full bg-sky-500 border border-white shadow-xs"></button>
+                        <button type="button" onclick="setColor('#22c55e')" class="w-6 h-6 rounded-full bg-green-500 border border-white shadow-xs"></button>
+                        <button type="button" onclick="setColor('#dc2626')" class="w-6 h-6 rounded-full bg-red-600 border border-white shadow-xs"></button>
+                        <button type="button" onclick="setColor('#ea580c')" class="w-6 h-6 rounded-full bg-orange-600 border border-white shadow-xs"></button>
+                        <button type="button" onclick="setColor('#ec4899')" class="w-6 h-6 rounded-full bg-pink-500 border border-white shadow-xs"></button>
+                        <button type="button" onclick="setColor('#1e293b')" class="w-6 h-6 rounded-full bg-slate-800 border border-white shadow-xs"></button>
+                        <button type="button" onclick="setColor('#14b8a6')" class="w-6 h-6 rounded-full bg-teal-500 border border-white shadow-xs"></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 flex space-x-2">
+                <button type="button" onclick="closeServiceModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
+                    Cancelar
+                </button>
+                <button type="submit" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-600/30 transition">
+                    Guardar Servicio
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function filterServices(val) {
+    const clean = val.toLowerCase().trim();
+    const rows = document.querySelectorAll('.service-row');
+    rows.forEach(r => {
+        const name = r.getAttribute('data-name');
+        if (!clean || name.includes(clean)) {
+            r.classList.remove('hidden');
+        } else {
+            r.classList.add('hidden');
+        }
+    });
+
+    // Ocultar categorías vacías
+    document.querySelectorAll('.service-category-card').forEach(card => {
+        const visibleRows = card.querySelectorAll('.service-row:not(.hidden)');
+        if (visibleRows.length === 0) {
+            card.classList.add('hidden');
+        } else {
+            card.classList.remove('hidden');
+        }
+    });
+}
+
+function openCreateServiceModal() {
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-receipt text-indigo-600 mr-2"></i> Nuevo Tipo de Cita / Servicio';
+    document.getElementById('serviceForm').action = '/services/create';
+    document.getElementById('modalServiceName').value = '';
+    document.getElementById('modalServicePrice').value = '0.00';
+    document.getElementById('modalServiceColor').value = '#9333ea';
+    document.getElementById('modalServiceCategory').value = 'Consultas';
+    document.getElementById('serviceModal').classList.remove('hidden');
+}
+
+function openEditServiceModal(id, name, price, color, category) {
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit text-indigo-600 mr-2"></i> Editar Tipo de Cita / Servicio';
+    document.getElementById('serviceForm').action = `/services/${id}/edit`;
+    document.getElementById('modalServiceName').value = name;
+    document.getElementById('modalServicePrice').value = price;
+    document.getElementById('modalServiceColor').value = color || '#3b82f6';
+    document.getElementById('modalServiceCategory').value = category || 'Consultas';
+    document.getElementById('serviceModal').classList.remove('hidden');
+}
+
+function closeServiceModal() {
+    document.getElementById('serviceModal').classList.add('hidden');
+}
+
+function setColor(c) {
+    document.getElementById('modalServiceColor').value = c;
+}
+</script>
+{% endblock %}

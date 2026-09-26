@@ -96,9 +96,9 @@
                         <table class="w-full text-left text-sm text-slate-600">
                             <thead class="bg-slate-50 text-slate-700 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
                                 <tr>
-                                    <th class="py-3.5 px-5">Fecha y Hora</th>
-                                    <th class="py-3.5 px-5">Paciente</th>
-                                    <th class="py-3.5 px-5">Motivo / Tipo</th>
+                                    <th class="py-3.5 px-5">Turno / Fecha</th>
+                                    <th class="py-3.5 px-5">Paciente &amp; ARS</th>
+                                    <th class="py-3.5 px-5">Servicio / Motivo</th>
                                     <th class="py-3.5 px-5">Estado</th>
                                     <th class="py-3.5 px-5">WhatsApp</th>
                                     <th class="py-3.5 px-5 text-right">Acciones Rápidas</th>
@@ -108,30 +108,54 @@
                                 {% for a in appointments %}
                                 <tr class="hover:bg-slate-50/80 transition-colors {% if a.status == 'En Espera' %}bg-amber-50/30{% endif %}">
                                     <td class="py-4 px-5 whitespace-nowrap">
-                                        <div class="font-semibold text-slate-900">{{ a.date.strftime("%d/%m/%Y") }}</div>
-                                        <div class="text-xs text-blue-600 font-mono font-medium mt-0.5">
+                                        {% if a.queue_number %}
+                                        <div class="mb-1">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-black bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs tracking-wide">
+                                                <i class="fas fa-ticket-alt mr-1 text-[10px] text-blue-200"></i> Turno #{{ a.queue_number }}
+                                            </span>
+                                        </div>
+                                        {% elif a.status == 'En Espera' %}
+                                        <div class="mb-1">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                                                <i class="fas fa-clock mr-1"></i> Espera
+                                            </span>
+                                        </div>
+                                        {% endif %}
+                                        <div class="font-semibold text-slate-900 text-xs">{{ a.date.strftime("%d/%m/%Y") }}</div>
+                                        <div class="text-[11px] text-blue-600 font-mono font-medium mt-0.5">
                                             <i class="far fa-clock mr-1"></i>{{ a.start_time.strftime("%H:%M") }} - {{ a.end_time.strftime("%H:%M") }}
                                         </div>
                                     </td>
                                     <td class="py-4 px-5">
-                                        <div class="flex items-center space-x-2.5">
-                                            <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                        <div class="flex items-start space-x-2.5">
+                                            <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
                                                 {{ (a.patient.first_name[0] if a.patient else 'P') }}{{ (a.patient.last_name[0] if a.patient else '') }}
                                             </div>
                                             <div>
                                                 {% if a.patient %}
-                                                <a href="/patients/{{ a.patient.id }}" class="font-bold text-slate-900 hover:text-blue-600 transition-colors">
+                                                <a href="/patients/{{ a.patient.id }}" class="font-bold text-slate-900 hover:text-blue-600 transition-colors text-xs block">
                                                     {{ a.patient.first_name }} {{ a.patient.last_name }}
                                                 </a>
-                                                <span class="block text-[11px] text-slate-400">{{ a.patient.phone or 'Sin teléfono' }}</span>
+                                                <span class="block text-[11px] text-slate-400 mb-1">{{ a.patient.phone or 'Sin teléfono' }}</span>
+                                                <!-- Badge Oficial de la ARS con Logo -->
+                                                <div class="mt-0.5">
+                                                    {{ a.patient.insurance_name|ars_badge(a.patient.insurance_number)|safe }}
+                                                </div>
                                                 {% else %}
-                                                <span class="text-slate-400 italic">Paciente eliminado</span>
+                                                <span class="text-slate-400 italic text-xs">Paciente eliminado</span>
                                                 {% endif %}
                                             </div>
                                         </div>
                                     </td>
                                     <td class="py-4 px-5">
-                                        <div class="text-slate-900 font-medium">{{ a.reason }}</div>
+                                        {% if a.service %}
+                                        <div class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold border mb-1" style="background-color: {{ a.service.color }}12; border-color: {{ a.service.color }}40; color: {{ a.service.color }};">
+                                            <span class="w-2 h-2 rounded-full mr-1.5 shrink-0" style="background-color: {{ a.service.color }};"></span>
+                                            <span>{{ a.service.name }}</span>
+                                            <span class="ml-1.5 text-slate-700 font-bold">RD$ {{ "{:,.2f}".format(a.price or a.service.price) }}</span>
+                                        </div>
+                                        {% endif %}
+                                        <div class="text-slate-900 font-medium text-xs">{{ a.reason }}</div>
                                         {% if 'Sin cita' in a.reason or 'espontánea' in a.reason %}
                                         <span class="inline-flex items-center text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-bold mt-1 border border-amber-200">
                                             <i class="fas fa-walking mr-1"></i> Sin Cita Previa
@@ -155,7 +179,7 @@
                                             {% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
                                             {% if a.status == 'En Espera' %}
                                             <span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5 animate-ping"></span>
-                                            <i class="fas fa-couch mr-1 text-amber-600"></i> En Espera
+                                            <i class="fas fa-couch mr-1 text-amber-600"></i> En Espera {% if a.queue_number %}<strong class="ml-1 text-amber-950 font-black">#{{ a.queue_number }}</strong>{% endif %}
                                             {% else %}
                                             {{ a.status }}
                                             {% endif %}
@@ -191,40 +215,39 @@
                                                 <i class="fas fa-bolt mr-1.5"></i> Atender Ahora
                                             </a>
                                             {% else %}
-                                            <button type="button" onclick="notifyDoctorArrival({{ a.id }})" class="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-xs font-bold inline-flex items-center" title="Avisar al WhatsApp del doctor que el paciente está en sala de espera">
+                                            <button type="button" onclick="notifyDoctorArrival({{ a.id }})" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold inline-flex items-center" title="Avisar al WhatsApp del doctor que el paciente está en sala de espera">
                                                 <i class="fab fa-whatsapp mr-1 text-emerald-600"></i> Avisar Dr.
                                             </button>
-                                            <span class="text-xs text-amber-800 bg-amber-100 px-2 py-1 rounded-lg font-semibold inline-flex items-center">
-                                                <i class="fas fa-clock mr-1"></i> En Espera
+                                            <span class="text-xs text-amber-800 bg-amber-100 px-2.5 py-1 rounded-lg font-bold inline-flex items-center">
+                                                <i class="fas fa-ticket-alt mr-1"></i> Turno #{{ a.queue_number or '1' }}
                                             </span>
                                             {% endif %}
                                         {% elif a.status != 'Completada' and a.status != 'Cancelada' %}
-                                            <form method="post" action="/appointments/{{ a.id }}/status" class="inline">
-                                                <input type="hidden" name="new_status" value="En Espera">
-                                                <button type="submit" class="px-2 py-1 bg-amber-100 text-amber-800 hover:bg-amber-200 rounded text-xs font-semibold" title="Marcar que el paciente llegó a recepción y ponerlo en espera">
-                                                    <i class="fas fa-user-clock mr-1"></i> Llegó (Espera)
+                                            <form method="post" action="/appointments/{{ a.id }}/check-in" class="inline">
+                                                <button type="submit" class="px-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-lg text-xs font-bold shadow-xs inline-flex items-center transition-transform active:scale-95" title="Marcar llegada del paciente y asignar Turno automático del día">
+                                                    <i class="fas fa-ticket-alt mr-1.5 text-amber-200"></i> Asignar Turno
                                                 </button>
                                             </form>
                                             <form method="post" action="/appointments/{{ a.id }}/status" class="inline">
                                                 <input type="hidden" name="new_status" value="Confirmada">
-                                                <button type="submit" class="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-xs font-medium" title="Confirmar">
+                                                <button type="submit" class="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-medium" title="Confirmar">
                                                     Confirmar
                                                 </button>
                                             </form>
                                             {% if user.has_permission('consultations') %}
-                                            <a href="/consultations/create?patient_id={{ a.patient_id }}&appointment_id={{ a.id }}" class="px-2 py-1 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded text-xs font-medium" title="Atender Consulta">
+                                            <a href="/consultations/create?patient_id={{ a.patient_id }}&appointment_id={{ a.id }}" class="px-2 py-1 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded-lg text-xs font-medium" title="Atender Consulta">
                                                 Atender
                                             </a>
                                             {% endif %}
                                         {% else %}
-                                            <span class="text-xs text-slate-400">Completada</span>
+                                            <span class="text-xs text-slate-400 font-medium">Completada</span>
                                             {% if user.has_permission('print_prescriptions') and a.consultation and a.consultation[0].prescription %}
-                                            <a href="/consultations/{{ a.consultation[0].id }}/prescription/pdf" target="_blank" class="px-2 py-1 bg-teal-50 text-teal-700 hover:bg-teal-100 rounded text-xs font-semibold border border-teal-200 inline-flex items-center" title="Imprimir Receta Médica en PDF">
+                                            <a href="/consultations/{{ a.consultation[0].id }}/prescription/pdf" target="_blank" class="px-2 py-1 bg-teal-50 text-teal-700 hover:bg-teal-100 rounded-lg text-xs font-semibold border border-teal-200 inline-flex items-center" title="Imprimir Receta Médica en PDF">
                                                 <i class="fas fa-print mr-1"></i> Receta
                                             </a>
                                             {% endif %}
                                         {% endif %}
-                                        <a href="/payments/create?patient_id={{ a.patient_id }}&appointment_id={{ a.id }}" class="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded text-xs font-medium" title="Cobrar Cita">
+                                        <a href="/payments/create?patient_id={{ a.patient_id }}&appointment_id={{ a.id }}{% if a.service_id %}&service_id={{ a.service_id }}{% endif %}" class="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-medium" title="Cobrar Cita">
                                             Cobrar
                                         </a>
                                     </td>
@@ -243,17 +266,17 @@
                 </div>
             </div>
 
-            <!-- MODAL 1: Llegada sin Cita Previa (Walk-in) -->
+            <!-- MODAL 1: Llegada de Paciente y Asignación de Turno (Walk-in) -->
             <div id="walkinModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
                 <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-fade-in">
                     <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                         <div class="flex items-center space-x-2.5">
-                            <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-lg">
-                                <i class="fas fa-couch"></i>
+                            <div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-lg">
+                                <i class="fas fa-ticket-alt"></i>
                             </div>
                             <div>
-                                <h3 class="text-base font-bold text-slate-900">Llegada sin Cita (Poner en Espera)</h3>
-                                <p class="text-xs text-slate-500">Notificar al doctor que el paciente llegó hoy y está en sala de espera.</p>
+                                <h3 class="text-base font-bold text-slate-900">Llegada de Paciente (Asignar Turno)</h3>
+                                <p class="text-xs text-slate-500">Registrar llegada presencial y asignar el siguiente turno del día.</p>
                             </div>
                         </div>
                         <button type="button" onclick="document.getElementById('walkinModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
@@ -264,11 +287,27 @@
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                 Seleccionar Paciente <span class="text-red-500">*</span>
                             </label>
-                            <select name="patient_id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white">
+                            <select name="patient_id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white font-medium">
                                 <option value="">Seleccione el paciente que acaba de llegar...</option>
                                 {% for p in all_patients %}
                                 <option value="{{ p.id }}">
-                                    {{ p.last_name }}, {{ p.first_name }} (DNI: {{ p.document_id or 'N/D' }})
+                                    {{ p.last_name }}, {{ p.first_name }} ({{ p.document_id or 'Sin DNI' }}) - {{ p.insurance_name or 'Privado' }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Talonario de Servicios -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                                <span><i class="fas fa-tags text-amber-600 mr-1"></i> Servicio del Talonario (Opcional)</span>
+                                <a href="/services" target="_blank" class="text-[11px] text-blue-600 hover:underline">Ver talonario</a>
+                            </label>
+                            <select name="service_id" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white font-medium">
+                                <option value="">-- Consulta estándar / Sin servicio previo --</option>
+                                {% for s in services %}
+                                <option value="{{ s.id }}">
+                                    {{ s.name }} (RD$ {{ "{:,.2f}".format(s.price) }})
                                 </option>
                                 {% endfor %}
                             </select>
@@ -276,21 +315,24 @@
 
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                Motivo / Observación de Recepción (Opcional)
+                                Motivo / Observación de Recepción
                             </label>
-                            <input type="text" name="notes" placeholder="Ej. Llega con dolor de cabeza / Control de presión / Sin cita previa" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            <input type="text" name="notes" placeholder="Ej. Chequeo de rutina / Llega con dolor / Control" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500">
                         </div>
 
-                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
-                            <i class="fas fa-info-circle mr-1"></i> Al confirmar, el paciente aparecerá inmediatamente en el Panel del Doctor con el botón <strong>"Atender Ahora"</strong>.
+                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start space-x-2">
+                            <i class="fas fa-info-circle text-amber-600 mt-0.5 shrink-0"></i>
+                            <div>
+                                Al registrar la llegada, el sistema le asignará automáticamente su <strong>Turno consecutivo del día</strong> y aparecerá en la Sala de Espera del Doctor.
+                            </div>
                         </div>
 
                         <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
                             <button type="button" onclick="document.getElementById('walkinModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
                                 Cancelar
                             </button>
-                            <button type="submit" class="px-5 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow transition-all">
-                                <i class="fas fa-check mr-1.5"></i> Poner en Sala de Espera
+                            <button type="submit" class="px-5 py-2.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-md transition-all inline-flex items-center">
+                                <i class="fas fa-ticket-alt mr-1.5"></i> Asignar Turno y Poner en Espera
                             </button>
                         </div>
                     </form>

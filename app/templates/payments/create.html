@@ -31,11 +31,12 @@
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                     Paciente <span class="text-red-500">*</span>
                                 </label>
-                                <select name="patient_id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 bg-white">
+                                <select id="patient_select" name="patient_id" required onchange="onPatientChange(this)"
+                                    class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 bg-white">
                                     <option value="">Seleccione el paciente...</option>
                                     {% for p in patients %}
-                                    <option value="{{ p.id }}" {% if selected_patient_id == p.id %}selected{% endif %}>
-                                        {{ p.last_name }}, {{ p.first_name }} ({{ p.document_id or 'Sin DNI' }})
+                                    <option value="{{ p.id }}" data-insurance="{{ p.insurance_name or '' }}" {% if selected_patient_id == p.id %}selected{% endif %}>
+                                        {{ p.last_name }}, {{ p.first_name }} ({{ p.document_id or 'Sin DNI' }}) {% if p.insurance_name %}[{{ p.insurance_name }}]{% endif %}
                                     </option>
                                     {% endfor %}
                                 </select>
@@ -56,13 +57,55 @@
                             </div>
                         </div>
 
-                        <!-- Servicio / Concepto -->
+                        <!-- Talonario de Servicios y Cobertura ARS -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                        <i class="fas fa-book-medical text-emerald-600 mr-1"></i> Talonario de Servicios (1-Clic)
+                                    </label>
+                                    <a href="/services" target="_blank" class="text-[11px] text-blue-600 hover:underline">
+                                        <i class="fas fa-cog"></i> Configurar
+                                    </a>
+                                </div>
+                                <select id="service_select" name="service_id" onchange="onServiceSelect(this)"
+                                    class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 bg-white">
+                                    <option value="" data-price="" data-name="">-- Seleccionar del Talonario Oficial --</option>
+                                    {% for s in services %}
+                                    <option value="{{ s.id }}" data-price="{{ s.price }}" data-name="{{ s.name }}" {% if selected_service_id == s.id %}selected{% endif %}>
+                                        ● {{ s.name }} — RD$ {{ "{:,.2f}".format(s.price) }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <p class="text-[11px] text-slate-500 mt-1">Al elegir un servicio se auto-rellena el concepto y monto oficial.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    <i class="fas fa-id-card text-blue-600 mr-1"></i> Cobertura ARS / Seguro
+                                </label>
+                                <select id="insurance_select" name="insurance_name"
+                                    class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 bg-white">
+                                    <option value="">Privado / Sin Seguro (Particular)</option>
+                                    {% for ars in ars_list %}
+                                    {% if ars.code != 'privado' %}
+                                    <option value="{{ ars.name }}" {% if selected_patient and selected_patient.insurance_name == ars.name %}selected{% endif %}>
+                                        {{ ars.name }}
+                                    </option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                                <p class="text-[11px] text-slate-500 mt-1">Se auto-selecciona el seguro registrado en la ficha del paciente.</p>
+                            </div>
+                        </div>
+
+                        <!-- Concepto / Servicio Médico Editable -->
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                Concepto / Servicio Médico <span class="text-red-500">*</span>
+                                Concepto / Descripción en Recibo <span class="text-red-500">*</span>
                             </label>
-                            <input type="text" name="service_name" value="Consulta Médica General" required 
-                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500">
+                            <input type="text" id="service_name_input" name="service_name" value="Consulta Médica General" required 
+                                class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500">
                         </div>
 
                         <!-- Montos y Descuento -->
@@ -155,5 +198,48 @@ function calculateTotal() {
     const total = Math.max(0, amount - discount);
     document.getElementById('total_display').innerText = `RD$ ${total.toFixed(2)}`;
 }
+
+function onServiceSelect(selectEl) {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    if (!opt) return;
+    const price = opt.getAttribute('data-price');
+    const name = opt.getAttribute('data-name');
+    if (name) {
+        document.getElementById('service_name_input').value = name;
+    }
+    if (price && parseFloat(price) >= 0) {
+        document.getElementById('amount').value = parseFloat(price).toFixed(2);
+        calculateTotal();
+    }
+}
+
+function onPatientChange(selectEl) {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    if (!opt) return;
+    const ins = opt.getAttribute('data-insurance');
+    const insSelect = document.getElementById('insurance_select');
+    if (ins && insSelect) {
+        let found = false;
+        for (let i = 0; i < insSelect.options.length; i++) {
+            if (insSelect.options[i].value === ins) {
+                insSelect.selectedIndex = i;
+                found = true;
+                break;
+            }
+        }
+        if (!found && ins) {
+            // Option might be private or not in list
+            insSelect.value = ins;
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    calculateTotal();
+    const svcSel = document.getElementById('service_select');
+    if (svcSel && svcSel.value) {
+        onServiceSelect(svcSel);
+    }
+});
 </script>
 {% endblock %}

@@ -72,6 +72,30 @@
                                 <input type="email" name="email" value="{{ patient.email or '' }}" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
                             </div>
 
+                            <!-- Cobertura Médica / ARS (República Dominicana) -->
+                            <div class="md:col-span-2 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 p-4 rounded-xl border border-blue-200">
+                                <div class="flex items-center space-x-2 mb-3">
+                                    <i class="fas fa-shield-alt text-blue-600"></i>
+                                    <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Aseguradora de Salud (ARS República Dominicana)</h4>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">ARS / Seguro Médico</label>
+                                        <select name="insurance_name" id="insurance_name" class="w-full px-3.5 py-2 text-sm border border-blue-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium">
+                                            {% for ars in ARS_LIST %}
+                                            <option value="{{ ars.name }}" {% if (patient.insurance_name and patient.insurance_name == ars.name) or (patient.insurance_name and ars.id in patient.insurance_name.lower()) or (not patient.insurance_name and ars.id == 'privado') %}selected{% endif %}>
+                                                {{ ars.name }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">No. de Afiliado / Contrato (Opcional)</label>
+                                        <input type="text" name="insurance_number" value="{{ patient.insurance_number or '' }}" placeholder="Ej. 123456789-0" class="w-full px-3.5 py-2 text-sm border border-blue-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="md:col-span-2">
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Dirección de Residencia</label>
                                 <input type="text" name="address" value="{{ patient.address or '' }}" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">

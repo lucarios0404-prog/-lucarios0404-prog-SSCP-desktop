@@ -35,6 +35,9 @@ class QuickAppointmentRequest(BaseModel):
     date: str  # YYYY-MM-DD
     start_time: str  # HH:MM
     reason: str
+    service_id: Optional[int] = None
+    price: Optional[float] = None
+    insurance_name: Optional[str] = None
 
 class MobilePatientCreateRequest(BaseModel):
     first_name: str
@@ -49,6 +52,8 @@ class MobilePatientCreateRequest(BaseModel):
     allergies: Optional[str] = None
     emergency_contact_name: Optional[str] = None
     emergency_contact_phone: Optional[str] = None
+    insurance_name: Optional[str] = "Privado / Particular"
+    insurance_number: Optional[str] = None
 
 class QuickConsultationRequest(BaseModel):
     patient_id: int
@@ -63,6 +68,9 @@ class QuickPaymentRequest(BaseModel):
     patient_id: int
     amount: float
     payment_method: str = "Efectivo"
+    service_id: Optional[int] = None
+    service_name: Optional[str] = "Consulta Médica General"
+    insurance_name: Optional[str] = None
     notes: Optional[str] = "Pago registrado desde aplicación móvil"
 
 # --- Public Ping Endpoint for Connection Testing ---
@@ -158,6 +166,13 @@ def mobile_dashboard(
             "start_time": a.start_time.strftime("%H:%M") if a.start_time else "",
             "end_time": a.end_time.strftime("%H:%M") if a.end_time else "",
             "status": a.status,
+            "queue_number": a.queue_number,
+            "service_id": a.service_id,
+            "service_name": a.service.name if a.service else "",
+            "service_color": a.service.color if a.service else "#3b82f6",
+            "price": a.price or (a.service.price if a.service else 0.0),
+            "insurance_name": p.insurance_name if p and p.insurance_name else "Privado / Particular",
+            "insurance_number": p.insurance_number if p and p.insurance_number else "",
             "notes": a.notes or "",
         })
 
@@ -182,15 +197,48 @@ def update_appointment_status(
         raise HTTPException(status_code=404, detail="Cita no encontrada")
 
     old_status = appt.status
+    if payload.status == "En Espera" and not appt.queue_number:
+        from app.routers.appointments import assign_next_queue_number
+        appt.queue_number = assign_next_queue_number(db, appt.date)
+
     appt.status = payload.status
+    appt.updated_at = datetime.utcnow()
     db.commit()
 
     return {
         "success": True,
         "appointment_id": appt.id,
+        "queue_number": appt.queue_number,
         "old_status": old_status,
         "new_status": appt.status,
         "message": f"Estado actualizado a '{appt.status}' por {current_user.name}"
+    }
+
+# --- Check-in Móvil con Asignación Inmediata de Turno ---
+@router.post("/appointments/{appointment_id}/check-in")
+def mobile_check_in_appointment(
+    appointment_id: int,
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+    
+    appt.status = "En Espera"
+    if not appt.queue_number:
+        from app.routers.appointments import assign_next_queue_number
+        appt.queue_number = assign_next_queue_number(db, appt.date)
+    appt.updated_at = datetime.utcnow()
+    db.commit()
+
+    p_name = f"{appt.patient.first_name} {appt.patient.last_name}" if appt.patient else "Paciente"
+    return {
+        "success": True,
+        "appointment_id": appt.id,
+        "queue_number": appt.queue_number,
+        "status": appt.status,
+        "message": f"Turno #{appt.queue_number} asignado a {p_name}"
     }
 
 # --- Quick Appointment Create ---
@@ -321,6 +369,8 @@ def get_patient_options(
             "email": p.email or "",
             "allergies": p.allergies or "",
             "blood_type": p.blood_type or "",
+            "insurance_name": p.insurance_name or "Privado / Particular",
+            "insurance_number": p.insurance_number or "",
             "display": f"{display_name}{display_doc}{display_phone}"
         })
     return {"patients": results, "total": len(results)}
@@ -367,6 +417,8 @@ def list_mobile_patients(
             "address": p.address or "",
             "blood_type": p.blood_type or "",
             "allergies": p.allergies or "",
+            "insurance_name": p.insurance_name or "Privado / Particular",
+            "insurance_number": p.insurance_number or "",
             "emergency_contact": f"{p.emergency_contact_name or ''} {p.emergency_contact_phone or ''}".strip(),
             "created_at": p.created_at.strftime("%d/%m/%Y") if p.created_at else ""
         })
@@ -496,6 +548,8 @@ def create_mobile_patient(
         allergies=payload.allergies.strip() if payload.allergies and payload.allergies.strip() else None,
         emergency_contact_name=payload.emergency_contact_name.strip() if payload.emergency_contact_name and payload.emergency_contact_name.strip() else None,
         emergency_contact_phone=payload.emergency_contact_phone.strip() if payload.emergency_contact_phone and payload.emergency_contact_phone.strip() else None,
+        insurance_name=payload.insurance_name or "Privado / Particular",
+        insurance_number=payload.insurance_number or None,
         is_active=True
     )
     db.add(new_patient)
@@ -514,7 +568,9 @@ def create_mobile_patient(
             "email": new_patient.email or "",
             "date_of_birth": str(new_patient.date_of_birth) if new_patient.date_of_birth else "",
             "gender": new_patient.gender or "",
-            "address": new_patient.address or ""
+            "address": new_patient.address or "",
+            "insurance_name": new_patient.insurance_name or "Privado / Particular",
+            "insurance_number": new_patient.insurance_number or ""
         },
         "message": f"Paciente {new_patient.first_name} {new_patient.last_name} registrado exitosamente en la base de datos central."
     }
@@ -572,6 +628,8 @@ def get_mobile_patient_details(
             "blood_type": patient.blood_type or "No especificado",
             "allergies": patient.allergies or "Ninguna conocida",
             "emergency_contact": f"{patient.emergency_contact_name or ''} {patient.emergency_contact_phone or ''}".strip() or "No registrado",
+            "insurance_name": patient.insurance_name or "Privado / Particular",
+            "insurance_number": patient.insurance_number or "",
             "created_at": patient.created_at.strftime("%d/%m/%Y") if patient.created_at else ""
         },
         "appointments": appts_data,
@@ -613,6 +671,8 @@ def search_patients(
             "document_id": p.document_id or "",
             "email": p.email or "",
             "allergies": getattr(p, "allergies", "") or "",
+            "insurance_name": p.insurance_name or "Privado / Particular",
+            "insurance_number": p.insurance_number or "",
         })
 
     return {"results": results, "count": len(results)}
@@ -700,8 +760,23 @@ def quick_register_payment(
     current_user: User = Depends(require_current_user),
     db: Session = Depends(get_db)
 ):
+    service_name = payload.service_name or "Consulta Médica General"
+    if payload.service_id:
+        svc = db.query(Service).filter(Service.id == payload.service_id).first()
+        if svc and (not payload.service_name or payload.service_name == "Consulta Médica General"):
+            service_name = svc.name
+
+    ins_name = payload.insurance_name
+    if not ins_name:
+        p = db.query(Patient).filter(Patient.id == payload.patient_id).first()
+        if p and p.insurance_name:
+            ins_name = p.insurance_name
+
     payment = Payment(
         patient_id=payload.patient_id,
+        service_id=payload.service_id,
+        service_name=service_name,
+        insurance_name=ins_name or "Privado / Particular",
         amount=payload.amount,
         total=payload.amount,
         payment_method=payload.payment_method,
@@ -716,6 +791,8 @@ def quick_register_payment(
     return {
         "success": True,
         "payment_id": payment.id,
+        "service_name": payment.service_name,
+        "insurance_name": payment.insurance_name,
         "amount": payment.amount,
         "total": payment.total,
         "payment_method": payment.payment_method,
@@ -875,3 +952,34 @@ def get_mobile_reports_summary(
         },
         "pdf_export_url": f"/reports/export/secretary-daily-pdf?report_date={target_date.strftime('%Y-%m-%d')}"
     }
+
+# --- Catálogo de Servicios para la App Móvil (Talonario 1-Clic) ---
+@router.get("/services")
+def list_mobile_services(
+    db: Session = Depends(get_db)
+):
+    from app.models.service import Service
+    services = db.query(Service).filter(Service.is_active == True).order_by(Service.category.asc(), Service.name.asc()).all()
+    return {
+        "services": [
+            {
+                "id": s.id,
+                "name": s.name,
+                "price": s.price,
+                "color": s.color,
+                "category": s.category,
+                "is_active": s.is_active
+            }
+            for s in services
+        ],
+        "total": len(services)
+    }
+
+# --- Catálogo de ARS con Logos para la App Móvil ---
+@router.get("/ars")
+def list_mobile_ars():
+    from app.services.ars_service import get_all_ars
+    return {
+        "ars": get_all_ars()
+    }
+

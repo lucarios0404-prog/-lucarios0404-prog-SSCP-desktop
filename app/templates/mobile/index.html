@@ -727,6 +727,10 @@
                                 <span class="text-teal-800/80 font-bold block uppercase text-[9px]">Alergias Conocidas:</span>
                                 <span id="qa-preview-allergies" class="inline-block font-bold text-red-600 mt-0.5">Ninguna</span>
                             </div>
+                            <div class="col-span-2 pt-1 border-t border-teal-200/50 flex items-center justify-between">
+                                <span class="text-teal-800/80 font-bold uppercase text-[9px]">Seguro / ARS Registrado:</span>
+                                <span id="qa-preview-insurance" class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded bg-white text-teal-900 border border-teal-200">Privado</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -772,6 +776,20 @@
                                class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
                     </div>
 
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Seguro / ARS</label>
+                            <select id="qa-new-insurance" class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-medium">
+                                <option value="Privado / Particular">Privado / Particular</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nº Afiliado ARS</label>
+                            <input type="text" id="qa-new-insurance-num" placeholder="000-0000000"
+                                   class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        </div>
+                    </div>
+
                     <!-- Alerta Dinámica Anti-Duplicados en Vivo -->
                     <div id="qa-new-dup-alert" class="hidden p-3 bg-amber-50 border-2 border-amber-300 rounded-2xl text-xs text-amber-950 space-y-1.5 animate-pulse">
                         <div class="flex items-center space-x-2 font-bold text-amber-900">
@@ -812,6 +830,22 @@
                         </div>
                         <input type="time" id="qa-time" required value="09:00"
                                class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-semibold">
+                    </div>
+
+                    <!-- Talonario de Servicios Oficial (1-Clic) -->
+                    <div class="p-3 bg-teal-50/70 border border-teal-200 rounded-2xl space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-xs font-bold text-teal-900 uppercase">
+                                <i class="fas fa-book-medical text-teal-600 mr-1"></i> Talonario de Servicios (1-Clic)
+                            </label>
+                            <span class="text-[10px] font-bold text-teal-700 bg-white border border-teal-200 px-2 py-0.5 rounded-full">27 Oficiales</span>
+                        </div>
+                        <select id="qa-service-select" onchange="onQaServiceSelect(this)"
+                                class="w-full px-3 py-2 text-xs bg-white border border-teal-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-semibold text-slate-800">
+                            <option value="" data-price="" data-name="">-- Seleccionar Servicio del Talonario --</option>
+                        </select>
+                        <input type="hidden" id="qa-service-id" value="">
+                        <input type="hidden" id="qa-service-price" value="">
                     </div>
 
                     <!-- Motivo con Chips Rápidos -->
@@ -865,6 +899,33 @@
                         <span class="text-emerald-700 text-[11px]" id="qp-selected-doc">Doc</span>
                     </div>
                     <button type="button" onclick="clearSelectedPatient()" class="text-red-500 font-bold">&times; Cambiar</button>
+                </div>
+
+                <!-- Talonario de Servicios Oficial (1-Clic) -->
+                <div class="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-emerald-950 uppercase">
+                            <i class="fas fa-book-medical text-emerald-600 mr-1"></i> Talonario de Servicios (1-Clic)
+                        </label>
+                        <span class="text-[10px] font-bold text-emerald-700 bg-white border border-emerald-200 px-2 py-0.5 rounded-full">Tarifas Oficiales</span>
+                    </div>
+                    <select id="qp-service-select" onchange="onQpServiceSelect(this)"
+                           class="w-full px-3.5 py-2.5 text-xs bg-white border border-emerald-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold text-slate-800">
+                        <option value="" data-price="" data-name="">-- Seleccionar Servicio Oficial --</option>
+                    </select>
+                    <input type="hidden" id="qp-service-id" value="">
+                    <input type="hidden" id="qp-service-name" value="Consulta Médica General">
+                </div>
+
+                <!-- Cobertura ARS en Cobro -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        <i class="fas fa-id-card text-blue-600 mr-1"></i> Cobertura ARS / Seguro
+                    </label>
+                    <select id="qp-insurance-select"
+                           class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium text-slate-800">
+                        <option value="Privado / Particular">Privado / Particular (Sin Seguro)</option>
+                    </select>
                 </div>
 
                 <div>
@@ -1032,6 +1093,20 @@
                     </div>
                 </div>
 
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Seguro / ARS</label>
+                        <select id="np-insurance" class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="Privado / Particular">Privado / Particular</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nº Afiliado ARS</label>
+                        <input type="text" id="np-insurance-num" placeholder="000-0000000"
+                               class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
                 <div class="pt-2">
                     <button type="submit" id="btn-save-new-patient" 
                             class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/30 text-sm flex items-center justify-center space-x-2 transition active:scale-[0.98]">
@@ -1109,6 +1184,10 @@
                     <div>
                         <span class="text-slate-400 block text-[10px] font-bold uppercase">Alergias</span>
                         <span id="detail-allergies" class="font-bold text-rose-700">--</span>
+                    </div>
+                    <div class="col-span-2 pt-1.5 border-t border-slate-200/60 flex items-center justify-between">
+                        <span class="text-slate-400 block text-[10px] font-bold uppercase">Seguro / ARS</span>
+                        <span id="detail-insurance" class="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200 text-[11px]">--</span>
                     </div>
                 </div>
                 <div class="pt-1.5 border-t border-slate-200/60">
@@ -1304,7 +1383,103 @@
             const repDateInput = document.getElementById('report-selected-date');
             if (repDateInput) repDateInput.value = currentReportDate;
 
+            loadMobileCatalogs();
             switchMainTab('today');
+        }
+
+        // --- CATÁLOGOS GLOBALES: TALONARIO DE SERVICIOS Y ARS ---
+        window.mobileServicesCatalog = [];
+        window.mobileArsList = [];
+
+        async function loadMobileCatalogs() {
+            try {
+                const [resServices, resArs] = await Promise.all([
+                    fetch(getApiUrl('/api/mobile/services'), {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    }),
+                    fetch(getApiUrl('/api/mobile/ars'), {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    })
+                ]);
+                if (resServices.ok) {
+                    const data = await resServices.json();
+                    window.mobileServicesCatalog = data.services || [];
+                    populateMobileServicesSelects();
+                }
+                if (resArs.ok) {
+                    const data = await resArs.json();
+                    window.mobileArsList = data.ars || [];
+                    populateMobileArsSelects();
+                }
+            } catch (e) {
+                console.warn('Error cargando catálogos móviles:', e);
+            }
+        }
+
+        function populateMobileServicesSelects() {
+            const qaSelect = document.getElementById('qa-service-select');
+            const qpSelect = document.getElementById('qp-service-select');
+            const services = window.mobileServicesCatalog || [];
+
+            if (qaSelect) {
+                let html = '<option value="" data-price="" data-name="">-- Seleccionar Servicio del Talonario --</option>';
+                services.forEach(s => {
+                    html += `<option value="${s.id}" data-price="${s.price}" data-name="${s.name}">● ${s.name} — RD$ ${Number(s.price).toLocaleString()}</option>`;
+                });
+                qaSelect.innerHTML = html;
+            }
+
+            if (qpSelect) {
+                let html = '<option value="" data-price="" data-name="">-- Seleccionar Servicio Oficial --</option>';
+                services.forEach(s => {
+                    html += `<option value="${s.id}" data-price="${s.price}" data-name="${s.name}">● ${s.name} — RD$ ${Number(s.price).toLocaleString()}</option>`;
+                });
+                qpSelect.innerHTML = html;
+            }
+        }
+
+        function populateMobileArsSelects() {
+            const qaArs = document.getElementById('qa-new-insurance');
+            const qpArs = document.getElementById('qp-insurance-select');
+            const npArs = document.getElementById('np-insurance');
+            const arsList = window.mobileArsList || [];
+
+            let html = '';
+            arsList.forEach(a => {
+                html += `<option value="${a.name}">${a.name}</option>`;
+            });
+
+            if (qaArs && (!qaArs.children || qaArs.children.length <= 1)) qaArs.innerHTML = html;
+            if (qpArs && (!qpArs.children || qpArs.children.length <= 1)) qpArs.innerHTML = html;
+            if (npArs && (!npArs.children || npArs.children.length <= 1)) npArs.innerHTML = html;
+        }
+
+        function onQaServiceSelect(selectEl) {
+            const opt = selectEl.options[selectEl.selectedIndex];
+            if (!opt) return;
+            const price = opt.getAttribute('data-price');
+            const name = opt.getAttribute('data-name');
+            const id = selectEl.value;
+
+            document.getElementById('qa-service-id').value = id || '';
+            document.getElementById('qa-service-price').value = price || '';
+            if (name) {
+                document.getElementById('qa-reason').value = name;
+            }
+        }
+
+        function onQpServiceSelect(selectEl) {
+            const opt = selectEl.options[selectEl.selectedIndex];
+            if (!opt) return;
+            const price = opt.getAttribute('data-price');
+            const name = opt.getAttribute('data-name');
+            const id = selectEl.value;
+
+            document.getElementById('qp-service-id').value = id || '';
+            document.getElementById('qp-service-name').value = name || 'Consulta Médica General';
+            if (price && parseFloat(price) >= 0) {
+                document.getElementById('qp-amount').value = parseFloat(price);
+            }
         }
 
         // Cargar Datos del Dashboard Móvil
@@ -1321,6 +1496,9 @@
 
                 const data = await res.json();
                 renderDashboard(data);
+                if (!window.mobileServicesCatalog || window.mobileServicesCatalog.length === 0) {
+                    loadMobileCatalogs();
+                }
             } catch (e) {
                 console.error('Error cargando datos del dashboard:', e);
             }
@@ -1388,6 +1566,30 @@
                 statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Pendiente</span>';
             }
 
+            const turnoBadge = a.queue_number ? `
+                <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-black bg-indigo-600 text-white shadow-sm mr-1">
+                    <i class="fas fa-ticket-alt mr-1"></i> Turno #${a.queue_number}
+                </span>
+            ` : '';
+
+            const arsBadge = (a.insurance_name && a.insurance_name !== 'Privado / Particular') ? `
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                    <i class="fas fa-shield-alt mr-1 text-blue-600"></i> ${a.insurance_name}
+                </span>
+            ` : `
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-500">
+                    Privado
+                </span>
+            `;
+
+            const serviceTag = a.service_name ? `
+                <div class="flex items-center flex-wrap gap-1.5 text-xs text-slate-700 mt-1">
+                    <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: ${a.service_color || '#6366f1'}"></span>
+                    <span class="font-bold text-slate-800">${a.service_name}</span>
+                    ${a.price ? `<span class="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 font-mono">RD$ ${Number(a.price).toLocaleString()}</span>` : ''}
+                </div>
+            ` : '';
+
             div.className = `bg-white p-4 rounded-2xl border ${a.status === 'En Espera' ? 'border-emerald-300 shadow-md shadow-emerald-500/10' : 'border-slate-200'} shadow-sm space-y-2.5`;
             
             let actionsHtml = '';
@@ -1423,9 +1625,9 @@
                 if (a.status !== 'En Espera' && a.status !== 'Atendida' && a.status !== 'En Consulta') {
                     actionsHtml = `
                         <div class="flex space-x-2 pt-1">
-                            <button onclick="markWaitingRoom(${a.id})" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-600/20 transition flex items-center justify-center space-x-1.5">
-                                <i class="fas fa-bell"></i>
-                                <span>Llegó (Avisar Doctor)</span>
+                            <button onclick="checkInAppointmentMobile(${a.id})" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-600/20 transition flex items-center justify-center space-x-1.5">
+                                <i class="fas fa-ticket-alt"></i>
+                                <span>Llegó Paciente (Asignar Turno)</span>
                             </button>
                             ${a.patient_phone ? `
                             <button onclick="sendWhatsAppReminder('${a.patient_phone}', '${a.patient_name}', '${a.start_time}')" class="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-xl text-xs transition">
@@ -1435,8 +1637,8 @@
                     `;
                 } else if (a.status === 'En Espera') {
                     actionsHtml = `
-                        <div class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 p-2 rounded-xl flex items-center justify-between">
-                            <span><i class="fas fa-check mr-1"></i>Notificado al doctor</span>
+                        <div class="text-[11px] font-semibold text-emerald-800 bg-emerald-50 p-2.5 rounded-xl flex items-center justify-between border border-emerald-200">
+                            <span><i class="fas fa-check-circle text-emerald-600 mr-1.5"></i><strong>${a.queue_number ? 'Turno #' + a.queue_number : 'En Espera'}</strong> notificado al doctor</span>
                             <button onclick="updateAppointmentStatus(${a.id}, 'Pendiente')" class="text-slate-400 hover:text-slate-600 text-[10px] font-bold">Deshacer</button>
                         </div>
                     `;
@@ -1446,11 +1648,14 @@
             div.innerHTML = `
                 <div class="flex items-start justify-between">
                     <div>
-                        <div class="flex items-center space-x-2">
+                        <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                            ${turnoBadge}
                             <span class="text-xs font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg">${a.start_time || '00:00'}</span>
                             <h4 class="font-bold text-slate-900 text-sm">${a.patient_name}</h4>
+                            ${arsBadge}
                         </div>
-                        <p class="text-xs text-slate-500 mt-0.5">${a.reason || 'Consulta General'}</p>
+                        ${serviceTag}
+                        ${a.reason && a.reason !== a.service_name ? `<p class="text-xs text-slate-500 mt-1">${a.reason}</p>` : ''}
                     </div>
                     ${statusBadge}
                 </div>
@@ -1554,9 +1759,30 @@
             }
         }
 
-        // Acciones Secretaria
+        // Acciones Secretaria: Asignar Turno de Llegada
+        async function checkInAppointmentMobile(apptId) {
+            try {
+                const res = await fetch(getApiUrl(`/api/mobile/appointments/${apptId}/check-in`), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Error al asignar turno');
+                }
+                const data = await res.json();
+                await loadDashboardData();
+                alert(`¡Paciente en Sala de Espera!\nSe le asignó el Turno #${data.queue_number}`);
+            } catch (err) {
+                alert('Error al asignar turno: ' + err.message);
+            }
+        }
+
         async function markWaitingRoom(apptId) {
-            await updateAppointmentStatus(apptId, 'En Espera');
+            await checkInAppointmentMobile(apptId);
         }
 
         async function updateAppointmentStatus(apptId, newStatus) {
@@ -1691,6 +1917,11 @@
                 allergiesEl.className = 'inline-block font-bold text-slate-600 mt-0.5';
             }
 
+            const insEl = document.getElementById('qa-preview-insurance');
+            if (insEl) {
+                insEl.textContent = p.insurance_name || 'Privado / Particular';
+            }
+
             document.getElementById('qa-select-container').classList.add('hidden');
             document.getElementById('qa-patient-preview-card').classList.remove('hidden');
         }
@@ -1784,12 +2015,24 @@
             setQaTime(0); // Hora actual
             document.getElementById('qa-reason').value = 'Consulta General';
 
+            // Limpiar selector servicio talonario
+            const svcSel = document.getElementById('qa-service-select');
+            if (svcSel) svcSel.value = '';
+            const svcId = document.getElementById('qa-service-id');
+            if (svcId) svcId.value = '';
+            const svcPrice = document.getElementById('qa-service-price');
+            if (svcPrice) svcPrice.value = '';
+
             // Limpiar campos nuevo paciente
             document.getElementById('qa-new-fname').value = '';
             document.getElementById('qa-new-lname').value = '';
             document.getElementById('qa-new-doc').value = '';
             document.getElementById('qa-new-phone').value = '';
             document.getElementById('qa-new-allergies').value = '';
+            const qaNewIns = document.getElementById('qa-new-insurance');
+            if (qaNewIns) qaNewIns.value = 'Privado / Particular';
+            const qaNewInsNum = document.getElementById('qa-new-insurance-num');
+            if (qaNewInsNum) qaNewInsNum.value = '';
             document.getElementById('qa-new-dup-alert').classList.add('hidden');
 
             document.getElementById('modal-quick-appt').classList.remove('hidden');
@@ -1802,6 +2045,13 @@
             setQaDate(0);
             setQaTime(0);
             document.getElementById('qa-reason').value = 'Consulta General';
+
+            const svcSel = document.getElementById('qa-service-select');
+            if (svcSel) svcSel.value = '';
+            const svcId = document.getElementById('qa-service-id');
+            if (svcId) svcId.value = '';
+            const svcPrice = document.getElementById('qa-service-price');
+            if (svcPrice) svcPrice.value = '';
 
             document.getElementById('modal-quick-appt').classList.remove('hidden');
             loadQaPatientsList(patientId);
@@ -1826,10 +2076,15 @@
             const timeStr = document.getElementById('qa-time').value;
             const reason = document.getElementById('qa-reason').value.trim() || 'Consulta General';
 
+            const serviceIdVal = document.getElementById('qa-service-id') ? document.getElementById('qa-service-id').value : '';
+            const servicePriceVal = document.getElementById('qa-service-price') ? document.getElementById('qa-service-price').value : '';
+
             let payload = {
                 date: dateStr,
                 start_time: timeStr,
-                reason: reason
+                reason: reason,
+                service_id: serviceIdVal ? parseInt(serviceIdVal) : null,
+                price: servicePriceVal ? parseFloat(servicePriceVal) : null
             };
 
             if (mode === 'existing') {
@@ -1844,6 +2099,8 @@
                 const doc = document.getElementById('qa-new-doc').value.trim();
                 const phone = document.getElementById('qa-new-phone').value.trim();
                 const allergies = document.getElementById('qa-new-allergies').value.trim();
+                const insName = document.getElementById('qa-new-insurance') ? document.getElementById('qa-new-insurance').value : 'Privado / Particular';
+                const insNum = document.getElementById('qa-new-insurance-num') ? document.getElementById('qa-new-insurance-num').value.trim() : '';
 
                 if (!fname || !lname) {
                     alert('Debe ingresar el nombre y apellido del nuevo paciente.');
@@ -1859,6 +2116,8 @@
                 payload.patient_document_id = doc;
                 payload.patient_phone = phone;
                 payload.patient_allergies = allergies;
+                payload.insurance_name = insName;
+                payload.insurance_number = insNum;
             }
 
             const submitBtn = document.getElementById('btn-qa-submit');
@@ -1901,6 +2160,13 @@
             document.getElementById('qp-patient-id').value = '';
             document.getElementById('qp-patient-search').value = '';
             document.getElementById('qp-amount').value = '';
+            const qpSvcSel = document.getElementById('qp-service-select');
+            if (qpSvcSel) qpSvcSel.value = '';
+            const qpSvcId = document.getElementById('qp-service-id');
+            if (qpSvcId) qpSvcId.value = '';
+            const qpSvcName = document.getElementById('qp-service-name');
+            if (qpSvcName) qpSvcName.value = 'Consulta Médica General';
+
             document.getElementById('qp-selected-patient-box').classList.add('hidden');
             document.getElementById('qp-patient-search').classList.remove('hidden');
             document.getElementById('modal-quick-payment').classList.remove('hidden');
@@ -1911,6 +2177,13 @@
             document.getElementById('qp-selected-name').textContent = patientName;
             document.getElementById('qp-selected-doc').textContent = `Doc: ${patientDoc || 'N/A'}`;
             document.getElementById('qp-amount').value = '';
+            const qpSvcSel = document.getElementById('qp-service-select');
+            if (qpSvcSel) qpSvcSel.value = '';
+            const qpSvcId = document.getElementById('qp-service-id');
+            if (qpSvcId) qpSvcId.value = '';
+            const qpSvcName = document.getElementById('qp-service-name');
+            if (qpSvcName) qpSvcName.value = 'Consulta Médica General';
+
             document.getElementById('qp-patient-search').classList.add('hidden');
             document.getElementById('qp-search-results').classList.add('hidden');
             document.getElementById('qp-selected-patient-box').classList.remove('hidden');
@@ -1941,7 +2214,7 @@
                     data.results.forEach(p => {
                         const opt = document.createElement('div');
                         opt.className = 'p-2.5 hover:bg-slate-50 cursor-pointer border-b border-slate-100 text-xs';
-                        opt.innerHTML = `<span class="font-bold text-slate-800 block">${p.name}</span><span class="text-slate-400 text-[10px]">Doc: ${p.document_id || 'N/A'} • Tel: ${p.phone}</span>`;
+                        opt.innerHTML = `<span class="font-bold text-slate-800 block">${p.name}</span><span class="text-slate-400 text-[10px]">Doc: ${p.document_id || 'N/A'} • Tel: ${p.phone} • ${p.insurance_name || 'Privado'}</span>`;
                         opt.onclick = () => selectPatientForPayment(p);
                         container.appendChild(opt);
                     });
@@ -1955,10 +2228,15 @@
         function selectPatientForPayment(p) {
             document.getElementById('qp-patient-id').value = p.id;
             document.getElementById('qp-selected-name').textContent = p.name;
-            document.getElementById('qp-selected-doc').textContent = `Doc: ${p.document_id} • Tel: ${p.phone}`;
+            document.getElementById('qp-selected-doc').textContent = `Doc: ${p.document_id} • Tel: ${p.phone} • ${p.insurance_name || 'Privado'}`;
             document.getElementById('qp-search-results').classList.add('hidden');
             document.getElementById('qp-patient-search').classList.add('hidden');
             document.getElementById('qp-selected-patient-box').classList.remove('hidden');
+
+            const insSelect = document.getElementById('qp-insurance-select');
+            if (insSelect && p.insurance_name) {
+                insSelect.value = p.insurance_name;
+            }
         }
 
         function clearSelectedPatient() {
@@ -1973,6 +2251,10 @@
             const patientId = parseInt(document.getElementById('qp-patient-id').value);
             const amount = parseFloat(document.getElementById('qp-amount').value);
             const method = document.getElementById('qp-method').value;
+
+            const serviceId = document.getElementById('qp-service-id') ? document.getElementById('qp-service-id').value : '';
+            const serviceName = document.getElementById('qp-service-name') ? document.getElementById('qp-service-name').value : 'Consulta Médica General';
+            const insurance = document.getElementById('qp-insurance-select') ? document.getElementById('qp-insurance-select').value : 'Privado / Particular';
 
             if (!patientId) {
                 alert('Debe seleccionar un paciente de la lista.');
@@ -1989,13 +2271,16 @@
                     body: JSON.stringify({
                         patient_id: patientId,
                         amount: amount,
-                        payment_method: method
+                        payment_method: method,
+                        service_id: serviceId ? parseInt(serviceId) : null,
+                        service_name: serviceName,
+                        insurance_name: insurance
                     })
                 });
 
                 if (!res.ok) throw new Error('Error al registrar pago');
                 closeModal('modal-quick-payment');
-                alert(`¡Pago de ${amount} registrado correctamente!`);
+                alert(`¡Pago de RD$ ${amount.toLocaleString()} por ${serviceName} registrado correctamente!`);
             } catch (err) {
                 alert(err.message);
             }
@@ -2124,6 +2409,7 @@
                                 ${p.document_id ? `<span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-mono font-bold rounded">${p.document_id}</span>` : '<span class="text-[10px] text-slate-400">Sin cédula</span>'}
                                 ${p.gender ? `<span class="text-[10px] text-slate-400">• ${p.gender}</span>` : ''}
                                 ${p.blood_type ? `<span class="px-1.5 py-0.5 bg-rose-50 text-rose-700 text-[10px] font-bold rounded">${p.blood_type}</span>` : ''}
+                                ${p.insurance_name && p.insurance_name !== 'Privado / Particular' ? `<span class="px-1.5 py-0.5 bg-blue-50 text-blue-800 text-[10px] font-bold rounded border border-blue-200"><i class="fas fa-shield-alt mr-0.5 text-blue-600"></i>${p.insurance_name}</span>` : `<span class="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-medium rounded">Privado</span>`}
                             </div>
                         </div>
                     </div>
@@ -2296,6 +2582,8 @@
             const allergies = document.getElementById('np-allergies').value.trim();
             const emName = document.getElementById('np-emergency-name').value.trim();
             const emPhone = document.getElementById('np-emergency-phone').value.trim();
+            const insName = document.getElementById('np-insurance') ? document.getElementById('np-insurance').value : "Privado / Particular";
+            const insNum = document.getElementById('np-insurance-num') ? document.getElementById('np-insurance-num').value.trim() : "";
 
             const saveBtn = document.getElementById('btn-save-new-patient');
             saveBtn.disabled = true;
@@ -2320,7 +2608,9 @@
                         blood_type: blood || null,
                         allergies: allergies || null,
                         emergency_contact_name: emName || null,
-                        emergency_contact_phone: emPhone || null
+                        emergency_contact_phone: emPhone || null,
+                        insurance_name: insName,
+                        insurance_number: insNum || null
                     })
                 });
 
@@ -2366,6 +2656,10 @@
                 document.getElementById('detail-gender').textContent = p.gender;
                 document.getElementById('detail-blood').textContent = p.blood_type;
                 document.getElementById('detail-allergies').textContent = p.allergies;
+                const insElem = document.getElementById('detail-insurance');
+                if (insElem) {
+                    insElem.textContent = `${p.insurance_name || 'Privado / Particular'}${p.insurance_number ? ' • Nº ' + p.insurance_number : ''}`;
+                }
                 document.getElementById('detail-address').textContent = p.address;
                 document.getElementById('detail-emergency').textContent = `${p.emergency_contact_name || ''} ${p.emergency_contact_phone || ''}`.trim() || 'No registrado';
 

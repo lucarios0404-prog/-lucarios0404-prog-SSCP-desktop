@@ -84,10 +84,42 @@
                             </div>
                         </div>
 
+                        <!-- Talonario de Servicios (Solo Elegir) -->
+                        <div class="bg-gradient-to-br from-blue-50/70 to-indigo-50/50 p-4 rounded-xl border border-blue-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center">
+                                    <i class="fas fa-tags text-blue-600 mr-1.5"></i> Talonario de Servicios (Solo Elegir)
+                                </label>
+                                <a href="/services" target="_blank" class="text-[11px] text-blue-600 hover:underline font-medium">
+                                    <i class="fas fa-plus-circle mr-1"></i>Gestionar servicios
+                                </a>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+                                <div>
+                                    <select name="service_id" id="service_id_select" onchange="onServiceSelect(this)" class="w-full px-3.5 py-2 text-sm border border-blue-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium">
+                                        <option value="">-- Seleccionar Servicio del Talonario --</option>
+                                        {% for s in services %}
+                                        <option value="{{ s.id }}" data-price="{{ s.price }}" data-name="{{ s.name }}" data-color="{{ s.color }}">
+                                            {{ s.name }} (RD$ {{ "{:,.2f}".format(s.price) }})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <div class="relative">
+                                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-bold text-slate-500">RD$</span>
+                                        <input type="number" step="0.01" name="price" id="service_price_input" placeholder="0.00" class="w-full pl-10 pr-3 py-2 text-sm font-bold text-slate-800 border border-blue-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-[11px] text-blue-700">Al seleccionar un servicio, se completará automáticamente el motivo y el precio estimado.</p>
+                        </div>
+
                         <!-- Motivo y Notas -->
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Motivo de la Cita <span class="text-red-500">*</span></label>
-                            <input type="text" name="reason" required placeholder="Ej. Consulta de rutina, Seguimiento de tratamiento, Dolor articular" 
+                            <input type="text" id="appointment_reason" name="reason" required placeholder="Ej. Consulta de rutina, Seguimiento de tratamiento, Dolor articular" 
                                 class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
                         </div>
 
@@ -164,6 +196,21 @@ function toggleRecurrenceFields() {
         opts.classList.remove('hidden');
     } else {
         opts.classList.add('hidden');
+    }
+}
+
+function onServiceSelect(select) {
+    const opt = select.options[select.selectedIndex];
+    if (opt && opt.value) {
+        const price = opt.getAttribute('data-price');
+        const name = opt.getAttribute('data-name');
+        if (price) {
+            document.getElementById('service_price_input').value = parseFloat(price).toFixed(2);
+        }
+        const reasonInput = document.getElementById('appointment_reason');
+        if (reasonInput && (!reasonInput.value || reasonInput.value === 'Consulta General')) {
+            reasonInput.value = name;
+        }
     }
 }
 </script>

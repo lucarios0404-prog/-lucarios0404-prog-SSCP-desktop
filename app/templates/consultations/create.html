@@ -56,6 +56,19 @@
                                 </option>
                                 {% endfor %}
                             </select>
+                            {% if selected_patient %}
+                            <div class="mt-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between flex-wrap gap-2 text-xs">
+                                <div class="flex items-center space-x-2">
+                                    <span class="font-bold text-slate-700">Aseguradora del Paciente:</span>
+                                    {{ selected_patient.insurance_name|ars_badge(selected_patient.insurance_number)|safe }}
+                                </div>
+                                {% if selected_patient.allergies %}
+                                <span class="text-red-700 font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg text-[11px]">
+                                    <i class="fas fa-allergies mr-1"></i> {{ selected_patient.allergies }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
                         </div>
 
                         <!-- Motivo de consulta -->

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Time, Text, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Date, Time, Text, DateTime, ForeignKey, Boolean, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -20,6 +20,11 @@ class Appointment(Base):
     
     is_recurring = Column(Boolean, default=False)
     
+    # Sistema de Turno de Atención en Sala
+    queue_number = Column(Integer, nullable=True, index=True) # Turno del día (ej. 1, 2, 3...)
+    service_id = Column(Integer, ForeignKey("services.id"), nullable=True) # Talonario de Servicios
+    price = Column(Float, nullable=True, default=0.0)
+
     sede_origen = Column(String, default="local")
     
     # WhatsApp recordatorio
@@ -31,3 +36,4 @@ class Appointment(Base):
     
     patient = relationship("Patient", backref="appointments")
     doctor = relationship("User", backref="appointments")
+    service = relationship("Service", backref="appointments")

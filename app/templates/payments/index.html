@@ -106,7 +106,10 @@
                                         <a href="/patients/{{ d.patient.id }}" class="hover:text-blue-600">
                                             {{ d.patient.first_name }} {{ d.patient.last_name }}
                                         </a>
-                                        <span class="block text-[11px] text-slate-400">DNI: {{ d.patient.document_id or 'Sin DNI' }}</span>
+                                        <div class="mt-1">
+                                            {{ d.patient.insurance_name|ars_badge(d.patient.insurance_number)|safe }}
+                                        </div>
+                                        <span class="block text-[11px] text-slate-400 mt-0.5">DNI: {{ d.patient.document_id or 'Sin DNI' }}</span>
                                     </td>
                                     <td class="py-4 px-5 text-xs text-slate-600">{{ d.patient.phone or 'Sin teléfono' }}</td>
                                     <td class="py-4 px-5">
@@ -163,11 +166,28 @@
                                         <a href="/patients/{{ p.patient.id }}" class="hover:text-blue-600">
                                             {{ p.patient.first_name }} {{ p.patient.last_name }}
                                         </a>
+                                        <div class="mt-1">
+                                            {{ (p.insurance_name or p.patient.insurance_name)|ars_badge(p.patient.insurance_number)|safe }}
+                                        </div>
                                         {% else %}
                                         <span class="text-slate-400 italic">Paciente N/D</span>
+                                        {% if p.insurance_name %}
+                                        <div class="mt-1">
+                                            {{ p.insurance_name|ars_badge|safe }}
+                                        </div>
+                                        {% endif %}
                                         {% endif %}
                                     </td>
-                                    <td class="py-4 px-5 text-xs text-slate-700">{{ p.service_name }}</td>
+                                    <td class="py-4 px-5 text-xs text-slate-700">
+                                        <div class="flex items-center gap-1.5">
+                                            {% if p.service and p.service.color %}
+                                            <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {{ p.service.color }};"></span>
+                                            {% else %}
+                                            <span class="w-2.5 h-2.5 rounded-full bg-slate-300 flex-shrink-0"></span>
+                                            {% endif %}
+                                            <span class="font-medium text-slate-800">{{ p.service_name }}</span>
+                                        </div>
+                                    </td>
                                     <td class="py-4 px-5 whitespace-nowrap">
                                         <span class="inline-flex items-center text-xs text-slate-600 font-medium">
                                             {% if p.payment_method == 'cash' %}💵 Efectivo

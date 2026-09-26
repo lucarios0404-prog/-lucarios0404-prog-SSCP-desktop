@@ -63,6 +63,9 @@
                                 <span>Tel: <strong>{{ consultation.patient.phone or 'N/D' }}</strong></span>
                                 <span>Sangre: <strong>{{ consultation.patient.blood_type or 'N/D' }}</strong></span>
                             </div>
+                            <div class="mt-2 flex items-center gap-2">
+                                {{ consultation.patient.insurance_name|ars_badge(consultation.patient.insurance_number)|safe }}
+                            </div>
                         </div>
                     </div>
 

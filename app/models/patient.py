@@ -17,6 +17,10 @@ class Patient(Base):
     blood_type = Column(String, nullable=True)
     allergies = Column(Text, nullable=True) # Alergias conocidas (ej. Penicilina, Sulfas, etc.)
     
+    # ARS y Seguro Médico
+    insurance_name = Column(String, default="Privado", index=True, nullable=True) # ARS (ej: Senasa, Primera ARS, Mapfre, etc.)
+    insurance_number = Column(String, nullable=True) # Número de afiliado / póliza
+
     # Datos de contacto de emergencia
     emergency_contact_name = Column(String, nullable=True)
     emergency_contact_phone = Column(String, nullable=True)

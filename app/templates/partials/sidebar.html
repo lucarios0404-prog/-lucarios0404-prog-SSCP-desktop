@@ -123,6 +123,13 @@
         </a>
         {% endif %}
 
+        {% if user.has_permission('payments') or user.has_permission('appointments') or user.role == 'doctor' or user.role == 'admin' %}
+        <a href="/services" class="{% if active_menu == 'services' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+            <i class="fas fa-tags w-4 mr-3 text-base {% if active_menu == 'services' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+            Talonario de Servicios
+        </a>
+        {% endif %}
+
         {% if user.has_permission('messages') %}
         <a href="/messages" class="{% if active_menu == 'messages' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
             <i class="fas fa-comments w-4 mr-3 text-base {% if active_menu == 'messages' %}text-blue-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>

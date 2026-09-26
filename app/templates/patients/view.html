@@ -38,10 +38,15 @@
                             <span class="relative inline-flex rounded-full h-4 w-4 bg-amber-500"></span>
                         </span>
                         <div>
-                            <div class="flex items-center space-x-2">
+                            <div class="flex items-center space-x-2 flex-wrap">
                                 <span class="text-sm font-extrabold text-amber-900">
                                     <i class="fas fa-couch mr-1"></i> Paciente en Sala de Espera
                                 </span>
+                                {% if active_waiting_appointment.queue_number %}
+                                <span class="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xs shadow-xs">
+                                    <i class="fas fa-ticket-alt mr-1"></i> Turno #{{ active_waiting_appointment.queue_number }}
+                                </span>
+                                {% endif %}
                                 <span class="text-[11px] px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold">
                                     Llegó hoy a las {{ active_waiting_appointment.start_time.strftime("%I:%M %p") }}
                                 </span>
@@ -144,6 +149,10 @@
                                     </span>
                                     <span><i class="fas fa-envelope mr-1 text-slate-400"></i> {{ patient.email or 'Sin correo' }}</span>
                                     <span><i class="fas fa-tint mr-1 text-red-400"></i> Sangre: <strong>{{ patient.blood_type or 'N/D' }}</strong></span>
+                                </div>
+                                <div class="mt-2.5 flex items-center space-x-2 flex-wrap gap-y-1">
+                                    <span class="text-xs font-bold text-slate-500">Aseguradora / ARS:</span>
+                                    {{ patient.insurance_name|ars_badge(patient.insurance_number)|safe }}
                                 </div>
                                 {% if patient.allergies %}
                                 <div class="mt-2.5 inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-300">
