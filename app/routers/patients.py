@@ -4,7 +4,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from pathlib import Path
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, time
+from typing import Optional
 
 from app.database import get_db
 from app.models.patient import Patient
@@ -12,12 +13,16 @@ from app.models.payment import Payment
 from app.models.appointment import Appointment
 from app.models.consultation import Consultation
 from app.models.vital_sign import VitalSign
+from app.models.service import Service
+from app.models.user import User
 from app.core.deps import require_current_user
 from app.services.patient_service import PatientService
 from app.services.audit_service import AuditService
 
 from app.core.templates import templates
 from app.services.ars_service import get_all_ars, ARS_LIST
+from app.routers.appointments import assign_next_queue_number
+from app.routers.payments import generate_receipt_number
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -124,11 +129,24 @@ def list_patients(
     )
 
 @router.get("/create")
-def create_patient_form(request: Request, current_user = Depends(require_current_user)):
+def create_patient_form(
+    request: Request,
+    current_user = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    services = db.query(Service).filter(Service.is_active == True).order_by(Service.category.asc(), Service.name.asc()).all()
+    today_str = date.today().strftime("%Y-%m-%d")
+    now_time_str = datetime.now().strftime("%H:%M")
     return templates.TemplateResponse(
         request=request,
         name="patients/create.html",
-        context={"user": current_user}
+        context={
+            "user": current_user,
+            "ARS_LIST": get_all_ars(),
+            "services": services,
+            "today_str": today_str,
+            "now_time_str": now_time_str,
+        }
     )
 
 @router.post("/create")
@@ -136,18 +154,25 @@ def create_patient(
     request: Request,
     first_name: str = Form(...),
     last_name: str = Form(...),
-    document_id: str = Form(None),
-    date_of_birth: str = Form(None),
-    gender: str = Form(None),
-    phone: str = Form(None),
-    email: str = Form(None),
-    address: str = Form(None),
-    blood_type: str = Form(None),
-    allergies: str = Form(None),
-    emergency_contact_name: str = Form(None),
-    emergency_contact_phone: str = Form(None),
-    insurance_name: str = Form("Privado / Particular"),
-    insurance_number: str = Form(None),
+    document_id: Optional[str] = Form(None),
+    date_of_birth: Optional[str] = Form(None),
+    gender: Optional[str] = Form(None),
+    phone: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    address: Optional[str] = Form(None),
+    blood_type: Optional[str] = Form(None),
+    allergies: Optional[str] = Form(None),
+    emergency_contact_name: Optional[str] = Form(None),
+    emergency_contact_phone: Optional[str] = Form(None),
+    insurance_name: Optional[str] = Form("Privado / Particular"),
+    insurance_number: Optional[str] = Form(None),
+    # Nuevos parámetros del flujo continuo de recepción: Cita y Cobro
+    schedule_action: Optional[str] = Form("none"), # 'none', 'today', 'scheduled'
+    appt_date: Optional[str] = Form(None),
+    appt_time: Optional[str] = Form(None),
+    service_id: Optional[int] = Form(None),
+    appt_reason: Optional[str] = Form(None),
+    payment_action: Optional[str] = Form("none"), # 'none', 'charge_now', 'pay_later'
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
@@ -190,7 +215,146 @@ def create_patient(
         new_data={"document_id": document_id, "phone": phone, "allergies": allergies}
     )
 
-    return RedirectResponse(url=f"/patients/{new_patient.id}", status_code=303)
+    # ── Flujo Continuo de Recepción: Planificación de Cita & Cobro ──────────
+    if schedule_action == "today":
+        today = date.today()
+        now_time = datetime.now().time()
+        end_time_val = (datetime.now() + timedelta(minutes=30)).time()
+        next_q = assign_next_queue_number(db, today)
+
+        doctor = db.query(User).filter(User.role == "doctor", User.is_active == True).first()
+        doc_id = current_user.id if current_user.role == "doctor" else (doctor.id if doctor else 1)
+
+        price = 0.0
+        svc = None
+        if service_id and service_id > 0:
+            svc = db.query(Service).filter(Service.id == service_id).first()
+            if svc:
+                price = float(svc.price or 0.0)
+
+        reason_val = appt_reason or (svc.name if svc else "Consulta Médica General - Llegada presencial")
+
+        new_appt = Appointment(
+            patient_id=new_patient.id,
+            doctor_id=doc_id,
+            date=today,
+            start_time=now_time,
+            end_time=end_time_val,
+            reason=reason_val,
+            notes=f"Llegada presencial registrada en recepción por {current_user.name}",
+            service_id=service_id if service_id and service_id > 0 else None,
+            price=price,
+            status="En Espera",
+            queue_number=next_q
+        )
+        db.add(new_appt)
+        db.commit()
+        db.refresh(new_appt)
+
+        if payment_action == "charge_now":
+            return RedirectResponse(
+                url=f"/payments/create?patient_id={new_patient.id}&appointment_id={new_appt.id}{('&service_id=' + str(service_id)) if service_id else ''}",
+                status_code=303
+            )
+        elif payment_action == "pay_later":
+            pay_amt = price if price and price > 0 else 1500.0
+            rec_no = generate_receipt_number()
+            new_pay = Payment(
+                patient_id=new_patient.id,
+                appointment_id=new_appt.id,
+                service_id=service_id if service_id and service_id > 0 else None,
+                service_name=svc.name if svc else "Consulta Médica General",
+                insurance_name=new_patient.insurance_name or "Privado / Particular",
+                amount=pay_amt,
+                discount=0.0,
+                total=pay_amt,
+                status="pending",
+                payment_method="cash",
+                receipt_number=rec_no,
+                notes=f"Saldo por cobrar en recepción (Pagar después) por {current_user.name}",
+                created_by_id=current_user.id
+            )
+            db.add(new_pay)
+            db.commit()
+            return RedirectResponse(url="/appointments?status=En+Espera&waiting_success=1", status_code=303)
+        else:
+            return RedirectResponse(url="/appointments?status=En+Espera&waiting_success=1", status_code=303)
+
+    elif schedule_action == "scheduled":
+        target_date = date.today() + timedelta(days=1)
+        if appt_date:
+            try:
+                target_date = datetime.strptime(appt_date, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+
+        start_time_val = time(9, 0)
+        if appt_time:
+            try:
+                start_time_val = datetime.strptime(appt_time, "%H:%M").time()
+            except ValueError:
+                pass
+
+        end_time_val = (datetime.combine(target_date, start_time_val) + timedelta(minutes=30)).time()
+
+        doctor = db.query(User).filter(User.role == "doctor", User.is_active == True).first()
+        doc_id = current_user.id if current_user.role == "doctor" else (doctor.id if doctor else 1)
+
+        price = 0.0
+        svc = None
+        if service_id and service_id > 0:
+            svc = db.query(Service).filter(Service.id == service_id).first()
+            if svc:
+                price = float(svc.price or 0.0)
+
+        reason_val = appt_reason or (svc.name if svc else "Consulta Médica Programada")
+
+        new_appt = Appointment(
+            patient_id=new_patient.id,
+            doctor_id=doc_id,
+            date=target_date,
+            start_time=start_time_val,
+            end_time=end_time_val,
+            reason=reason_val,
+            notes=f"Cita programada registrada por {current_user.name}",
+            service_id=service_id if service_id and service_id > 0 else None,
+            price=price,
+            status="Pendiente"
+        )
+        db.add(new_appt)
+        db.commit()
+        db.refresh(new_appt)
+
+        if payment_action == "charge_now":
+            return RedirectResponse(
+                url=f"/payments/create?patient_id={new_patient.id}&appointment_id={new_appt.id}{('&service_id=' + str(service_id)) if service_id else ''}",
+                status_code=303
+            )
+        elif payment_action == "pay_later":
+            pay_amt = price if price and price > 0 else 1500.0
+            rec_no = generate_receipt_number()
+            new_pay = Payment(
+                patient_id=new_patient.id,
+                appointment_id=new_appt.id,
+                service_id=service_id if service_id and service_id > 0 else None,
+                service_name=svc.name if svc else "Consulta Médica General",
+                insurance_name=new_patient.insurance_name or "Privado / Particular",
+                amount=pay_amt,
+                discount=0.0,
+                total=pay_amt,
+                status="pending",
+                payment_method="cash",
+                receipt_number=rec_no,
+                notes=f"Saldo por cobrar de cita programada (Pagar después) por {current_user.name}",
+                created_by_id=current_user.id
+            )
+            db.add(new_pay)
+            db.commit()
+            return RedirectResponse(url=f"/appointments?date={target_date.strftime('%Y-%m-%d')}&scheduled=1", status_code=303)
+        else:
+            return RedirectResponse(url=f"/appointments?date={target_date.strftime('%Y-%m-%d')}&scheduled=1", status_code=303)
+
+    return RedirectResponse(url=f"/patients/{new_patient.id}?new_patient=1", status_code=303)
 
 @router.get("/{patient_id}")
 def view_patient(

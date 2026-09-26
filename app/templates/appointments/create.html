@@ -160,9 +160,42 @@
                             </div>
                         </div>
 
+                        <!-- Facturación y Cobro Inmediato o Cuentas por Cobrar -->
+                        <div class="bg-gradient-to-r from-emerald-50/60 to-teal-50/50 p-4 rounded-xl border border-emerald-200">
+                            <label class="block text-xs font-bold text-emerald-900 uppercase tracking-wider mb-2 flex items-center">
+                                <i class="fas fa-cash-register text-emerald-600 mr-1.5"></i> Gestión de Pago / Facturación
+                            </label>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <label class="flex items-start p-3 bg-white border border-emerald-200 rounded-xl cursor-pointer hover:border-emerald-500 transition-all shadow-xs has-[:checked]:border-emerald-600 has-[:checked]:ring-2 has-[:checked]:ring-emerald-500/20">
+                                    <input type="radio" name="payment_action" value="charge_now" class="mt-0.5 text-emerald-600 focus:ring-emerald-500" onchange="updateApptSubmitLabel('charge_now')">
+                                    <div class="ml-2.5">
+                                        <span class="block text-xs font-bold text-slate-800">💳 Cobrar Ahora</span>
+                                        <span class="block text-[11px] text-slate-500 mt-0.5">Abrir pantalla de cobro/recibo de inmediato.</span>
+                                    </div>
+                                </label>
+
+                                <label class="flex items-start p-3 bg-white border border-amber-200 rounded-xl cursor-pointer hover:border-amber-500 transition-all shadow-xs has-[:checked]:border-amber-600 has-[:checked]:ring-2 has-[:checked]:ring-amber-500/20">
+                                    <input type="radio" name="payment_action" value="pay_later" class="mt-0.5 text-amber-600 focus:ring-amber-500" onchange="updateApptSubmitLabel('pay_later')">
+                                    <div class="ml-2.5">
+                                        <span class="block text-xs font-bold text-slate-800">⏳ Pagar Después</span>
+                                        <span class="block text-[11px] text-slate-500 mt-0.5">Registrar en Cuentas por Cobrar (F13).</span>
+                                    </div>
+                                </label>
+
+                                <label class="flex items-start p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-blue-500 transition-all shadow-xs has-[:checked]:border-blue-600 has-[:checked]:ring-2 has-[:checked]:ring-blue-500/20">
+                                    <input type="radio" name="payment_action" value="none" checked class="mt-0.5 text-blue-600 focus:ring-blue-500" onchange="updateApptSubmitLabel('none')">
+                                    <div class="ml-2.5">
+                                        <span class="block text-xs font-bold text-slate-800">📋 Cobrar al Salir</span>
+                                        <span class="block text-[11px] text-slate-500 mt-0.5">Sin cargo anticipado. Facturar luego.</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="border-t border-slate-100 pt-5 flex items-center justify-end space-x-3">
                             <a href="/appointments" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">Cancelar</a>
-                            <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-blue-500/20 transition-all">
+                            <button type="submit" id="btn_submit_appt" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-blue-500/20 transition-all">
                                 <i class="fas fa-check mr-1.5"></i> Confirmar y Agendar Cita
                             </button>
                         </div>
@@ -211,6 +244,21 @@ function onServiceSelect(select) {
         if (reasonInput && (!reasonInput.value || reasonInput.value === 'Consulta General')) {
             reasonInput.value = name;
         }
+    }
+}
+
+function updateApptSubmitLabel(action) {
+    const btn = document.getElementById('btn_submit_appt');
+    if (!btn) return;
+    if (action === 'charge_now') {
+        btn.innerHTML = '<i class="fas fa-credit-card mr-1.5"></i> Agendar y Proceder al Cobro';
+        btn.className = "px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-emerald-500/20 transition-all";
+    } else if (action === 'pay_later') {
+        btn.innerHTML = '<i class="fas fa-clock mr-1.5"></i> Agendar y Registrar Cuenta por Cobrar';
+        btn.className = "px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-amber-500/20 transition-all";
+    } else {
+        btn.innerHTML = '<i class="fas fa-check mr-1.5"></i> Confirmar y Agendar Cita';
+        btn.className = "px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-blue-500/20 transition-all";
     }
 }
 </script>

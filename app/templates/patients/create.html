@@ -137,10 +137,162 @@
                             </div>
                         </div>
 
+                        <!-- F_RECEPTION: Planificación Inmediata de Cita y Facturación -->
+                        <div class="md:col-span-2 bg-gradient-to-br from-slate-50 via-blue-50/20 to-emerald-50/30 p-5 rounded-2xl border-2 border-blue-200/80 shadow-sm space-y-4">
+                            <div class="flex items-center justify-between border-b border-blue-200/60 pb-3">
+                                <div class="flex items-center space-x-2.5">
+                                    <span class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                                        <i class="fas fa-calendar-check"></i>
+                                    </span>
+                                    <div>
+                                        <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider">Planificación de Cita & Facturación (Admisión Continua)</h4>
+                                        <p class="text-[11px] text-slate-500">Ingresa de inmediato a Sala de Espera hoy, programa una cita y define si cobra ahora o después.</p>
+                                    </div>
+                                </div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                                    Paso Siguiente Automático
+                                </span>
+                            </div>
+
+                            <!-- Opciones de Programación -->
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                                    1. Planificación de la Cita / Atención <span class="text-red-500">*</span>
+                                </label>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <!-- Opción 1: Hoy Mismo -->
+                                    <label class="relative flex flex-col p-3.5 bg-white border-2 border-emerald-300 rounded-xl cursor-pointer hover:bg-emerald-50/50 transition-all shadow-xs has-[:checked]:border-emerald-600 has-[:checked]:ring-2 has-[:checked]:ring-emerald-500/20">
+                                        <input type="radio" name="schedule_action" value="today" checked onchange="toggleScheduleFields()" class="sr-only">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <span class="text-xs font-black text-emerald-800 flex items-center">
+                                                <i class="fas fa-bolt text-emerald-600 mr-1.5"></i> Hoy Mismo (Sala de Espera)
+                                            </span>
+                                            <span class="w-4 h-4 rounded-full border-2 border-emerald-500 flex items-center justify-center">
+                                                <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                                            </span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-500 leading-snug">Llegada presencial hoy. Asigna su <strong>Turno consecutivo</strong> en Sala de Espera.</p>
+                                    </label>
+
+                                    <!-- Opción 2: Cita Programada -->
+                                    <label class="relative flex flex-col p-3.5 bg-white border-2 border-slate-200 rounded-xl cursor-pointer hover:bg-blue-50/50 transition-all shadow-xs has-[:checked]:border-blue-600 has-[:checked]:ring-2 has-[:checked]:ring-blue-500/20">
+                                        <input type="radio" name="schedule_action" value="scheduled" onchange="toggleScheduleFields()" class="sr-only">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <span class="text-xs font-black text-blue-800 flex items-center">
+                                                <i class="fas fa-calendar-alt text-blue-600 mr-1.5"></i> Cita Programada
+                                            </span>
+                                            <span class="w-4 h-4 rounded-full border-2 border-slate-300 flex items-center justify-center"></span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-500 leading-snug">Agendar para una fecha y hora posterior en el calendario.</p>
+                                    </label>
+
+                                    <!-- Opción 3: Solo Expediente -->
+                                    <label class="relative flex flex-col p-3.5 bg-white border-2 border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all shadow-xs has-[:checked]:border-slate-600 has-[:checked]:ring-2 has-[:checked]:ring-slate-500/20">
+                                        <input type="radio" name="schedule_action" value="none" onchange="toggleScheduleFields()" class="sr-only">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <span class="text-xs font-black text-slate-700 flex items-center">
+                                                <i class="fas fa-user-check text-slate-500 mr-1.5"></i> Solo Expediente
+                                            </span>
+                                            <span class="w-4 h-4 rounded-full border-2 border-slate-300 flex items-center justify-center"></span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-500 leading-snug">Guardar ficha clínica sin generar cita por el momento.</p>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Campos de Cita (Visibles si 'today' o 'scheduled') -->
+                            <div id="schedule_details_box" class="space-y-4 pt-1">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <!-- Servicio del Talonario -->
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                                            <span><i class="fas fa-book-medical text-emerald-600 mr-1"></i> Servicio del Talonario</span>
+                                            <a href="/services" target="_blank" class="text-[10px] text-blue-600 hover:underline">Ver catálogo</a>
+                                        </label>
+                                        <select name="service_id" id="patient_service_id" onchange="onPatientServiceSelect(this)" class="w-full px-3.5 py-2.5 text-xs border border-slate-200 rounded-xl bg-white font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                                            <option value="" data-price="1500" data-name="Consulta Médica General">● Consulta Médica General — RD$ 1,500.00</option>
+                                            {% for s in services %}
+                                            <option value="{{ s.id }}" data-price="{{ s.price }}" data-name="{{ s.name }}">
+                                                ● {{ s.name }} — RD$ {{ "{:,.2f}".format(s.price) }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+
+                                    <!-- Motivo de la Cita -->
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                            Motivo / Concepto en Ficha
+                                        </label>
+                                        <input type="text" id="patient_appt_reason" name="appt_reason" value="Consulta Médica General" placeholder="Ej. Chequeo de rutina, Control..." class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                                    </div>
+                                </div>
+
+                                <!-- Campos de Fecha y Hora (visibles si es 'scheduled') -->
+                                <div id="scheduled_datetime_row" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4 bg-blue-50/60 p-3.5 rounded-xl border border-blue-200">
+                                    <div>
+                                        <label class="block text-xs font-bold text-blue-900 uppercase tracking-wider mb-1">Fecha de la Cita</label>
+                                        <input type="date" name="appt_date" id="patient_appt_date" value="{{ today_str }}" class="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 font-medium">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-blue-900 uppercase tracking-wider mb-1">Hora Estimada</label>
+                                        <input type="time" name="appt_time" id="patient_appt_time" value="09:00" class="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 font-medium">
+                                    </div>
+                                </div>
+
+                                <!-- 2. Opciones de Cobro / Facturación -->
+                                <div class="border-t border-slate-200/80 pt-3">
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                                        2. ¿Cómo desea gestionar el cobro de la atención? <span class="text-red-500">*</span>
+                                    </label>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <!-- Cobrar Ahora -->
+                                        <label class="relative flex flex-col p-3 bg-white border-2 border-emerald-300 rounded-xl cursor-pointer hover:bg-emerald-50/50 transition-all shadow-xs has-[:checked]:border-emerald-600 has-[:checked]:ring-2 has-[:checked]:ring-emerald-500/20">
+                                            <input type="radio" name="payment_action" value="charge_now" checked onchange="updateSubmitButtonLabel()" class="sr-only">
+                                            <div class="flex items-center justify-between mb-1">
+                                                <span class="text-xs font-black text-emerald-800 flex items-center">
+                                                    <i class="fas fa-cash-register text-emerald-600 mr-1.5"></i> Cobrar Ahora
+                                                </span>
+                                                <span class="w-3.5 h-3.5 rounded-full border-2 border-emerald-500 flex items-center justify-center">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                                                </span>
+                                            </div>
+                                            <p class="text-[11px] text-slate-500 leading-snug">Pasa de inmediato al formulario de cobro para emitir el recibo.</p>
+                                        </label>
+
+                                        <!-- Pagar Después -->
+                                        <label class="relative flex flex-col p-3 bg-white border-2 border-amber-300 rounded-xl cursor-pointer hover:bg-amber-50/50 transition-all shadow-xs has-[:checked]:border-amber-600 has-[:checked]:ring-2 has-[:checked]:ring-amber-500/20">
+                                            <input type="radio" name="payment_action" value="pay_later" onchange="updateSubmitButtonLabel()" class="sr-only">
+                                            <div class="flex items-center justify-between mb-1">
+                                                <span class="text-xs font-black text-amber-800 flex items-center">
+                                                    <i class="fas fa-clock text-amber-600 mr-1.5"></i> Pagar Después
+                                                </span>
+                                                <span class="w-3.5 h-3.5 rounded-full border-2 border-amber-400 flex items-center justify-center"></span>
+                                            </div>
+                                            <p class="text-[11px] text-slate-500 leading-snug">Registra el saldo como <strong>Cuenta por Cobrar Pendiente (F13)</strong>.</p>
+                                        </label>
+
+                                        <!-- Cobrar al Salir / Sin cobro -->
+                                        <label class="relative flex flex-col p-3 bg-white border-2 border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all shadow-xs has-[:checked]:border-slate-600 has-[:checked]:ring-2 has-[:checked]:ring-slate-500/20">
+                                            <input type="radio" name="payment_action" value="none" onchange="updateSubmitButtonLabel()" class="sr-only">
+                                            <div class="flex items-center justify-between mb-1">
+                                                <span class="text-xs font-black text-slate-700 flex items-center">
+                                                    <i class="fas fa-hand-holding-medical text-slate-500 mr-1.5"></i> Cobrar al Salir
+                                                </span>
+                                                <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-300 flex items-center justify-center"></span>
+                                            </div>
+                                            <p class="text-[11px] text-slate-500 leading-snug">Sin recibo previo; el cobro se gestionará al concluir la consulta.</p>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="border-t border-slate-100 pt-5 flex items-center justify-end space-x-3">
                             <a href="/patients" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">Cancelar</a>
-                            <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-blue-500/20 transition-all">
-                                <i class="fas fa-save mr-1.5"></i> Guardar Paciente
+                            <button type="submit" id="submit_patient_btn" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-2">
+                                <i class="fas fa-arrow-right"></i>
+                                <span id="submit_btn_label">Guardar Paciente y Pasar al Cobro &rarr;</span>
                             </button>
                         </div>
                     </form>
@@ -151,6 +303,58 @@
 </div>
 
 <script>
+function onPatientServiceSelect(selectEl) {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    if (!opt) return;
+    const name = opt.getAttribute('data-name');
+    if (name) {
+        document.getElementById('patient_appt_reason').value = name;
+    }
+}
+
+function toggleScheduleFields() {
+    const action = document.querySelector('input[name="schedule_action"]:checked')?.value || 'today';
+    const detailsBox = document.getElementById('schedule_details_box');
+    const scheduledRow = document.getElementById('scheduled_datetime_row');
+
+    if (action === 'none') {
+        detailsBox.classList.add('hidden');
+    } else {
+        detailsBox.classList.remove('hidden');
+        if (action === 'scheduled') {
+            scheduledRow.classList.remove('hidden');
+        } else {
+            scheduledRow.classList.add('hidden');
+        }
+    }
+    updateSubmitButtonLabel();
+}
+
+function updateSubmitButtonLabel() {
+    const schedAction = document.querySelector('input[name="schedule_action"]:checked')?.value || 'today';
+    const payAction = document.querySelector('input[name="payment_action"]:checked')?.value || 'charge_now';
+    const btn = document.getElementById('submit_patient_btn');
+    const label = document.getElementById('submit_btn_label');
+
+    if (schedAction === 'none') {
+        label.textContent = 'Guardar Expediente del Paciente';
+        btn.className = 'px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-2';
+    } else if (payAction === 'charge_now') {
+        label.textContent = schedAction === 'today' ? 'Guardar, Sala de Espera y Pasar al Cobro →' : 'Guardar, Agendar y Pasar al Cobro →';
+        btn.className = 'px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-2';
+    } else if (payAction === 'pay_later') {
+        label.textContent = schedAction === 'today' ? 'Guardar, Sala de Espera y Dejar Pendiente' : 'Guardar, Agendar y Dejar Pendiente';
+        btn.className = 'px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold shadow-md shadow-amber-500/20 transition-all flex items-center space-x-2';
+    } else {
+        label.textContent = schedAction === 'today' ? 'Guardar y Poner en Sala de Espera (Turno)' : 'Guardar y Confirmar Cita';
+        btn.className = 'px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-2';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    toggleScheduleFields();
+});
+
 // F9: Verificación de Duplicados en Tiempo Real
 let dupTimeout = null;
 const inputs = document.querySelectorAll('.dup-check');

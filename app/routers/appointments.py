@@ -4,17 +4,20 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, func, case
 from pathlib import Path
 from datetime import datetime, date, time, timedelta
+from typing import Optional
 
 from app.database import get_db
 from app.models.appointment import Appointment
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.service import Service
+from app.models.payment import Payment
 from app.core.deps import require_current_user, require_permission
 from app.core.templates import templates
 from app.services.whatsapp_service import WhatsAppService
 from app.services.whatsapp_gateway import gateway_manager
 from app.services.ars_service import get_all_ars
+from app.routers.payments import generate_receipt_number
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -148,6 +151,7 @@ def create_appointment(
     is_recurring: bool = Form(False),
     recurrence_count: int = Form(1), # Número de ocurrencias para F14
     recurrence_interval_days: int = Form(30), # Intervalo en días (30 = mensual)
+    payment_action: Optional[str] = Form("none"), # 'charge_now', 'pay_later', 'none'
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
@@ -160,30 +164,74 @@ def create_appointment(
         svc = db.query(Service).filter(Service.id == service_id).first()
         if svc:
             price = svc.price
+
+    # Determinar médico responsable
+    if current_user.role == "doctor":
+        doc_id = current_user.id
+    else:
+        active_doc = db.query(User).filter(User.role == "doctor", User.is_active == True).first()
+        doc_id = active_doc.id if active_doc else current_user.id
     
     # Determinar cuántas citas crear (F14: citas recurrentes)
     count = max(1, min(12, recurrence_count if is_recurring else 1))
+    created_appts = []
     
     for i in range(count):
         current_appt_date = base_date + timedelta(days=i * recurrence_interval_days)
         reason_label = reason if i == 0 else f"{reason} (Control recurrente #{i+1})"
         
+        # Si la primera cita es para hoy mismo, ponerla en espera y asignar turno correlativo
+        if i == 0 and current_appt_date == date.today():
+            appt_status = "En Espera"
+            queue_num = assign_next_queue_number(db, current_appt_date)
+        else:
+            appt_status = "Pendiente"
+            queue_num = None
+
         new_appointment = Appointment(
             patient_id=patient_id,
-            doctor_id=current_user.id,
+            doctor_id=doc_id,
             date=current_appt_date,
             start_time=start_time_obj,
             end_time=end_time_obj,
             reason=reason_label,
             notes=notes,
-            service_id=service_id,
+            service_id=service_id if service_id and service_id > 0 else None,
             price=price,
             is_recurring=is_recurring,
-            status="Pendiente"
+            status=appt_status,
+            queue_number=queue_num
         )
         db.add(new_appointment)
+        created_appts.append(new_appointment)
 
     db.commit()
+
+    first_appt = created_appts[0] if created_appts else None
+
+    # Acciones de facturación integradas
+    if payment_action == "charge_now" and first_appt:
+        svc_param = f"&service_id={service_id}" if service_id and service_id > 0 else ""
+        return RedirectResponse(
+            url=f"/payments/create?patient_id={patient_id}&appointment_id={first_appt.id}{svc_param}",
+            status_code=303
+        )
+    elif payment_action == "pay_later" and first_appt:
+        pending_payment = Payment(
+            receipt_number=generate_receipt_number(),
+            patient_id=patient_id,
+            appointment_id=first_appt.id,
+            service_id=service_id if service_id and service_id > 0 else None,
+            amount=price if (price and price > 0) else 0.0,
+            payment_method="Pendiente",
+            status="pending",
+            notes=f"Cuenta por cobrar generada al agendar cita #{first_appt.id}",
+            created_by_id=current_user.id
+        )
+        db.add(pending_payment)
+        db.commit()
+        return RedirectResponse(url=f"/appointments?msg=created_pay_later", status_code=303)
+
     return RedirectResponse(url="/appointments", status_code=303)
 
 @router.post("/{appointment_id}/status")
