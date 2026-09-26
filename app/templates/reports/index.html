@@ -20,28 +20,31 @@
                         <p class="text-xs text-slate-500 mt-0.5">Métricas epidemiológicas, demografía de pacientes y exportación de bases de datos a formato Excel/CSV.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <a href="/reports/export/pdf" class="inline-flex items-center px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-sm transition-all" title="Exportar Reporte Ejecutivo Clínico en PDF con membrete del doctor">
+                        <!-- Reporte Clínico PDF -->
+                        <a href="/reports/export/pdf" target="_blank" onclick="handlePdfClick(this)" class="inline-flex items-center px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-sm transition-all active:scale-95" title="Exportar Reporte Ejecutivo Clínico en PDF con membrete del doctor">
                             <i class="fas fa-file-pdf mr-2"></i> Reporte Clínico (PDF)
                         </a>
 
                         <!-- Botón y selector para Reporte de Recepción / Secretaria -->
                         <div class="inline-flex items-center bg-teal-50 border border-teal-200 rounded-xl p-1 gap-1.5 shadow-sm">
                             <input type="date" id="secDateInput" value="{{ today_str }}" class="text-xs bg-white border border-teal-200 text-teal-900 rounded-lg px-2 py-1 font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500">
-                            <button onclick="window.location.href='/reports/export/secretary-daily-pdf?report_date=' + document.getElementById('secDateInput').value" class="inline-flex items-center px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all shadow-xs" title="Descargar Reporte Diario de Recepción / Entrada de la Secretaria para la fecha seleccionada">
+                            <button type="button" onclick="openSecretaryDailyPdf(this)" class="inline-flex items-center px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95" title="Descargar o Ver Reporte Diario de Recepción / Entrada de la Secretaria para la fecha seleccionada">
                                 <i class="fas fa-clipboard-user mr-1.5"></i> Recepción del Día (PDF)
                             </button>
                         </div>
 
                         <span class="w-px h-6 bg-slate-200"></span>
-                        <a href="/reports/export/patients" class="inline-flex items-center px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all">
+
+                        <!-- Botones de Exportación CSV / Excel con descarga garantizada y feedback visual -->
+                        <button type="button" onclick="downloadReportCsv('/reports/export/patients', 'pacientes_sscp.csv', this)" class="inline-flex items-center px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all active:scale-95" title="Exportar base de pacientes a Excel/CSV">
                             <i class="fas fa-file-excel mr-2"></i> Pacientes (.csv)
-                        </a>
-                        <a href="/reports/export/consultations" class="inline-flex items-center px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all">
+                        </button>
+                        <button type="button" onclick="downloadReportCsv('/reports/export/consultations', 'consultas_sscp.csv', this)" class="inline-flex items-center px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all active:scale-95" title="Exportar historial clínico y consultas a Excel/CSV">
                             <i class="fas fa-file-csv mr-2"></i> Consultas (.csv)
-                        </a>
-                        <a href="/reports/export/financial" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all">
+                        </button>
+                        <button type="button" onclick="downloadReportCsv('/reports/export/financial', 'facturacion_sscp.csv', this)" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all active:scale-95" title="Exportar reporte de ingresos y pagos a Excel/CSV">
                             <i class="fas fa-file-invoice-dollar mr-2"></i> Facturación (.csv)
-                        </a>
+                        </button>
                     </div>
 
                 </div>
@@ -215,3 +218,78 @@
     </div>
 </div>
 {% endblock %}
+
+{% block scripts %}
+<script>
+    function handlePdfClick(btn) {
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i> Abriendo...';
+        setTimeout(() => { btn.innerHTML = orig; }, 2500);
+    }
+
+    function openSecretaryDailyPdf(btn) {
+        const orig = btn.innerHTML;
+        const dateInput = document.getElementById('secDateInput');
+        const reportDate = dateInput ? dateInput.value : '';
+        const url = '/reports/export/secretary-daily-pdf?report_date=' + encodeURIComponent(reportDate);
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i> Abriendo...';
+        
+        // Abrir en ventana externa o pestaña del navegador
+        window.open(url, '_blank');
+        
+        setTimeout(() => {
+            btn.innerHTML = orig;
+            btn.disabled = false;
+        }, 2000);
+    }
+
+    async function downloadReportCsv(url, fallbackFilename, btn) {
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.classList.add('opacity-75', 'cursor-wait');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i> Exportando...';
+
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('Error del servidor: HTTP ' + res.status);
+
+            let filename = fallbackFilename;
+            const disposition = res.headers.get('content-disposition');
+            if (disposition && disposition.includes('filename=')) {
+                const match = disposition.match(/filename=["']?([^"';]+)["']?/);
+                if (match && match[1]) filename = match[1];
+            }
+
+            const blob = await res.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(blobUrl);
+            }, 2000);
+
+            btn.innerHTML = '<i class="fas fa-check mr-1.5 text-emerald-300"></i> ¡Listo!';
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.disabled = false;
+                btn.classList.remove('opacity-75', 'cursor-wait');
+            }, 1500);
+        } catch (err) {
+            console.warn('Fallback a apertura directa:', err);
+            window.open(url, '_blank');
+            btn.innerHTML = orig;
+            btn.disabled = false;
+            btn.classList.remove('opacity-75', 'cursor-wait');
+        }
+    }
+</script>
+{% endblock %}
+

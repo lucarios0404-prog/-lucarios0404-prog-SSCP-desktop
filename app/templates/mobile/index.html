@@ -1495,7 +1495,16 @@
         function downloadDailyPdf() {
             const dateInput = document.getElementById('report-selected-date').value || currentReportDate || new Date().toISOString().split('T')[0];
             const pdfUrl = getApiUrl(`/reports/export/secretary-daily-pdf?report_date=${dateInput}&token=${encodeURIComponent(authToken)}`);
-            window.open(pdfUrl, '_blank');
+            try {
+                if (isNativeApp) {
+                    // En Android WebView nativo, navegar por location activa shouldOverrideUrlLoading e Intent.ACTION_VIEW
+                    window.location.href = pdfUrl;
+                } else {
+                    window.open(pdfUrl, '_blank');
+                }
+            } catch (e) {
+                window.location.href = pdfUrl;
+            }
         }
     </script>
 </body>

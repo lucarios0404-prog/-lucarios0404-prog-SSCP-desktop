@@ -107,6 +107,14 @@ def run():
     try:
         import webview
 
+        # Habilitar descargas de archivos (PDFs, CSV, backups) y enlaces externos en la ventana nativa
+        try:
+            webview.settings['ALLOW_DOWNLOADS'] = True
+            webview.settings['ALLOW_FILE_URLS'] = True
+            webview.settings['OPEN_EXTERNAL_LINKS_IN_BROWSER'] = True
+        except Exception:
+            pass
+
         icon_path = str(BASE_DIR / "static" / "app_icon.ico")
         if not os.path.exists(icon_path):
             icon_path = None
