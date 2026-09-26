@@ -29,6 +29,15 @@
             Offline
         </div>
 
+        <!-- Botón de Vinculación Rápida de WhatsApp (Accesible para Doctor, Secretaria y Admin) -->
+        <button type="button" onclick="openWhatsAppModal()" id="header-wa-btn"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-all shadow-xs active:scale-95"
+            title="Estado y Vinculación de WhatsApp Gateway (Celular de Secretaría / Consultorio)">
+            <i class="fab fa-whatsapp text-emerald-600 text-sm"></i>
+            <span id="header-wa-status-text" class="hidden sm:inline">WhatsApp</span>
+            <span id="header-wa-status-dot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        </button>
+
         <!-- Toggle Modo Claro / Oscuro -->
         <button id="theme-toggle-btn" type="button" onclick="toggleDarkMode()" 
             class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium shadow-sm transition-all bg-white hover:bg-slate-50 border-slate-200 text-slate-600" 

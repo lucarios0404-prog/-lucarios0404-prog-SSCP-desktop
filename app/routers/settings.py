@@ -9,7 +9,7 @@ import os
 
 from app.database import get_db, DB_PATH
 from app.models.setting import Setting
-from app.core.deps import require_admin
+from app.core.deps import require_admin, require_current_user
 from app.services.whatsapp_gateway import gateway_manager
 from app.services.whatsapp_service import (
     WhatsAppService,
@@ -221,7 +221,7 @@ async def upload_doctor_logo(
 @router.get("/whatsapp/status")
 def get_whatsapp_gateway_status(
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_current_user)
 ):
     """Retorna el estado de conexión actual del gateway y estadísticas."""
     status = gateway_manager.get_status()
@@ -231,7 +231,7 @@ def get_whatsapp_gateway_status(
 def generate_whatsapp_qr(
     phone: str = Form(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_current_user)
 ):
     """Genera un nuevo código QR dinámico para vinculación de WhatsApp."""
     setting = get_or_create_settings(db)
@@ -247,7 +247,7 @@ def generate_whatsapp_qr(
 def confirm_whatsapp_pairing(
     phone: str = Form("+1 (809) 555-0199"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_current_user)
 ):
     """Confirma la vinculación del dispositivo (tras escanear el QR)."""
     result = gateway_manager.confirm_pairing(phone=phone)
@@ -262,7 +262,7 @@ def confirm_whatsapp_pairing(
 @router.post("/whatsapp/disconnect")
 def disconnect_whatsapp_gateway(
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_current_user)
 ):
     """Desvincula la sesión activa del Gateway de WhatsApp."""
     result = gateway_manager.disconnect()
@@ -279,7 +279,7 @@ def send_whatsapp_test_message(
     phone: str = Form(...),
     message: str = Form("Mensaje de prueba desde SSCP Desktop: La integración de WhatsApp está funcionando correctamente."),
     db: Session = Depends(get_db),
-    current_user = Depends(require_admin)
+    current_user = Depends(require_current_user)
 ):
     """Prueba el envío de un mensaje de WhatsApp (vía gateway o wa.me)."""
     result = WhatsAppService.dispatch_message(phone=phone, message=message)

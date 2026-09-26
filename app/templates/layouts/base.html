@@ -53,6 +53,8 @@
 <body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
     {% block body %}{% endblock %}
     
+    {% include "partials/whatsapp_modal.html" %}
+
     <script src="/static/js/app.js"></script>
     {% block scripts %}{% endblock %}
 </body>
