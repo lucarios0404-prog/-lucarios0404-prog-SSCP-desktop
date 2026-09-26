@@ -28,7 +28,10 @@ class StatusUpdateRequest(BaseModel):
 class QuickAppointmentRequest(BaseModel):
     patient_id: Optional[int] = None
     patient_name: Optional[str] = None
+    patient_last_name: Optional[str] = None
+    patient_document_id: Optional[str] = None
     patient_phone: Optional[str] = None
+    patient_allergies: Optional[str] = None
     date: str  # YYYY-MM-DD
     start_time: str  # HH:MM
     reason: str
@@ -202,18 +205,27 @@ def quick_create_appointment(
     # Si no se pasó patient_id explícito, buscar primero si ya existe para evitar duplicados
     if not patient_id and payload.patient_name:
         name_clean = payload.patient_name.strip()
+        last_clean = (payload.patient_last_name or "").strip()
         phone_clean = (payload.patient_phone or "").strip()
+        doc_clean = (payload.patient_document_id or "").strip()
 
         existing = None
-        # 1. Buscar coincidencia por teléfono
-        if phone_clean:
+        # 1. Buscar coincidencia por cédula / DNI
+        if doc_clean:
+            existing = db.query(Patient).filter(Patient.document_id == doc_clean, Patient.is_active == True).first()
+
+        # 2. Buscar coincidencia por teléfono
+        if not existing and phone_clean:
             existing = db.query(Patient).filter(Patient.phone == phone_clean, Patient.is_active == True).first()
 
-        # 2. Si no coincide por teléfono, buscar coincidencia por nombre y apellido
+        # 3. Si no coincide por cédula o teléfono, buscar coincidencia por nombre y apellido
         if not existing and name_clean:
-            parts = name_clean.split(" ", 1)
-            fname = parts[0]
-            lname = parts[1] if len(parts) > 1 else ""
+            fname = name_clean
+            lname = last_clean
+            if not lname and " " in fname:
+                parts = fname.split(" ", 1)
+                fname = parts[0]
+                lname = parts[1]
             if lname:
                 existing = db.query(Patient).filter(
                     Patient.first_name.ilike(fname),
@@ -224,15 +236,18 @@ def quick_create_appointment(
         if existing:
             patient_id = existing.id
         else:
-            # Crear paciente sin forzar identificador falso
-            parts = name_clean.split(" ", 1)
-            fname = parts[0]
-            lname = parts[1] if len(parts) > 1 else ""
+            fname = name_clean
+            lname = last_clean
+            if not lname and " " in fname:
+                parts = fname.split(" ", 1)
+                fname = parts[0]
+                lname = parts[1]
             new_patient = Patient(
                 first_name=fname,
                 last_name=lname,
-                phone=phone_clean,
-                document_id=None,
+                phone=phone_clean or None,
+                document_id=doc_clean or None,
+                allergies=(payload.patient_allergies or "").strip() or None,
                 is_active=True
             )
             db.add(new_patient)
@@ -271,6 +286,44 @@ def quick_create_appointment(
         "start_time": new_appt.start_time.strftime("%H:%M"),
         "status": new_appt.status
     }
+
+# --- Listado Completo de Pacientes para Selectores y Agendar Citas Rápidas ---
+@router.get("/patients/options")
+def get_patient_options(
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """Retorna la lista completa de pacientes activos ordenada alfabéticamente (como en pagos/citas del doctor) para selects y buscadores."""
+    patients = (
+        db.query(Patient)
+        .filter(or_(Patient.is_active == True, Patient.is_active == None))
+        .order_by(func.coalesce(Patient.last_name, ''), Patient.first_name)
+        .all()
+    )
+    results = []
+    for p in patients:
+        ln = (p.last_name or "").strip()
+        fn = (p.first_name or "").strip()
+        doc = (p.document_id or "").strip()
+        phone = (p.phone or "").strip()
+
+        display_name = f"{ln}, {fn}".strip(", ")
+        display_doc = f" ({doc})" if doc else " (Sin DNI)"
+        display_phone = f" - Tel: {phone}" if phone else ""
+
+        results.append({
+            "id": p.id,
+            "first_name": fn,
+            "last_name": ln,
+            "name": f"{fn} {ln}".strip(),
+            "document_id": doc,
+            "phone": phone,
+            "email": p.email or "",
+            "allergies": p.allergies or "",
+            "blood_type": p.blood_type or "",
+            "display": f"{display_name}{display_doc}{display_phone}"
+        })
+    return {"patients": results, "total": len(results)}
 
 # --- Directorio de Pacientes Móvil con Paginación y Búsqueda ---
 @router.get("/patients")

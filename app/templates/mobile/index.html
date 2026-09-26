@@ -628,90 +628,212 @@
         </div>
     </div>
 
-    <!-- MODAL 3: AGENDAR CITA EXPRESS (SECRETARIA) CON BÚSQUEDA Y ANTI-DUPLICADOS -->
+    <!-- MODAL 3: AGENDAR CITA RÁPIDA (CONEXIÓN DIRECTA A PACIENTES DEL DOCTOR Y ANTI-DUPLICADOS) -->
     <div id="modal-quick-appt" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto shadow-2xl space-y-4">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 class="font-bold text-slate-900 text-base flex items-center">
-                    <i class="fas fa-calendar-plus text-teal-600 mr-2"></i> Agendar Cita Express
-                </h3>
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-9 h-9 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
+                        <i class="fas fa-calendar-check text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base leading-tight">Agendar Cita Rápida</h3>
+                        <p class="text-[11px] text-slate-400 font-medium">Carga en vivo desde la base de datos del doctor</p>
+                    </div>
+                </div>
                 <button onclick="closeModal('modal-quick-appt')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
             </div>
 
-            <form onsubmit="handleSaveQuickAppt(event)" class="space-y-3">
+            <!-- Selector de Modo: Paciente del Sistema vs Nuevo Paciente -->
+            <div class="grid grid-cols-2 p-1 bg-slate-100 rounded-2xl text-xs font-bold">
+                <button type="button" id="qa-tab-existing" onclick="switchQaMode('existing')" 
+                        class="py-2.5 rounded-xl transition bg-white text-teal-800 shadow-sm flex items-center justify-center space-x-1.5">
+                    <i class="fas fa-users"></i>
+                    <span>Paciente del Sistema</span>
+                </button>
+                <button type="button" id="qa-tab-new" onclick="switchQaMode('new')" 
+                        class="py-2.5 rounded-xl transition text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-1.5">
+                    <i class="fas fa-user-plus"></i>
+                    <span>+ Crear Nuevo</span>
+                </button>
+            </div>
+
+            <form onsubmit="handleSaveQuickAppt(event)" class="space-y-3.5">
                 <input type="hidden" id="qa-patient-id" value="">
+                <input type="hidden" id="qa-active-mode" value="existing">
 
-                <!-- Selector de Paciente Existente vs Nuevo -->
-                <div>
-                    <div class="flex items-center justify-between mb-1">
-                        <label class="block text-xs font-bold text-slate-700 uppercase">Paciente <span class="text-red-500">*</span></label>
-                        <button type="button" onclick="openNewPatientModalFromAppt()" class="text-[11px] text-teal-700 hover:text-teal-800 font-bold flex items-center space-x-1">
-                            <i class="fas fa-user-plus text-[10px]"></i>
-                            <span>+ Registrar Nuevo</span>
-                        </button>
+                <!-- SECCIÓN 1: PACIENTE EXISTENTE DEL SISTEMA (CARGADO COMO EN PAGOS) -->
+                <div id="qa-section-existing" class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-slate-700 uppercase">
+                            Seleccionar Paciente <span class="text-red-500">*</span>
+                        </label>
+                        <span id="qa-patients-count" class="text-[10px] bg-teal-50 text-teal-700 font-bold px-2 py-0.5 rounded-full border border-teal-200">
+                            Cargando lista...
+                        </span>
                     </div>
 
-                    <!-- Cuadro de Paciente Existente Seleccionado -->
-                    <div id="qa-selected-patient-box" class="hidden bg-teal-50 border border-teal-200 p-3 rounded-2xl text-xs flex items-center justify-between mb-2">
-                        <div class="flex items-center space-x-2.5">
-                            <div class="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center font-bold">
-                                <i class="fas fa-check text-xs"></i>
-                            </div>
-                            <div>
-                                <span class="font-bold text-teal-950 block text-sm" id="qa-selected-name">Paciente</span>
-                                <span class="text-teal-700 text-[11px]" id="qa-selected-meta">Doc / Tel</span>
-                            </div>
-                        </div>
-                        <button type="button" onclick="clearSelectedQaPatient()" class="px-2.5 py-1 bg-white hover:bg-teal-100 text-teal-800 font-bold rounded-lg border border-teal-200 text-[11px] transition">
-                            Cambiar
-                        </button>
-                    </div>
+                    <!-- Cuadro Selector estilo Pagos / Citas Desktop -->
+                    <div id="qa-select-container" class="space-y-1.5">
+                        <select id="qa-patient-select" onchange="onQaSelectPatientChange(this.value)"
+                                class="w-full px-3.5 py-3 text-xs bg-slate-50 border-2 border-slate-200 focus:border-teal-500 rounded-2xl font-semibold text-slate-800 focus:outline-none transition">
+                            <option value="">-- Clic para elegir paciente de la lista --</option>
+                        </select>
 
-                    <!-- Buscador en tiempo real de Paciente Existente -->
-                    <div id="qa-search-box-container" class="relative">
+                        <!-- Buscador / Filtro Rápido en Tiempo Real -->
                         <div class="relative">
                             <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                                 <i class="fas fa-search text-xs"></i>
                             </span>
-                            <input type="text" id="qa-patient-search" placeholder="Escriba nombre o cédula para buscar..."
-                                   oninput="debounceQaPatientSearch(this.value)" autocomplete="off"
-                                   class="w-full pl-9 pr-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                            <input type="text" id="qa-patient-filter" placeholder="O filtre por nombre, cédula o teléfono..."
+                                   oninput="filterQaPatients(this.value)" autocomplete="off"
+                                   class="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-medium">
+                            <button type="button" onclick="clearQaFilter()" id="qa-filter-clear" class="hidden absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 text-xs">
+                                &times;
+                            </button>
                         </div>
-                        <div id="qa-search-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl max-h-48 overflow-y-auto shadow-2xl z-50 divide-y divide-slate-100">
-                            <!-- Resultados en vivo -->
+                    </div>
+
+                    <!-- Tarjeta de Verificación de Datos del Paciente antes de entrar -->
+                    <div id="qa-patient-preview-card" class="hidden p-3.5 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-2xl shadow-sm space-y-2.5">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center space-x-2.5">
+                                <div class="w-10 h-10 rounded-2xl bg-teal-600 text-white flex items-center justify-center font-bold text-base shadow-sm">
+                                    <i class="fas fa-user-check"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-teal-950 text-sm leading-snug" id="qa-preview-name">Nombre Paciente</h4>
+                                    <p class="text-[11px] text-teal-700 font-semibold" id="qa-preview-doc">DNI / Cédula</p>
+                                </div>
+                            </div>
+                            <button type="button" onclick="clearSelectedQaPatient()" 
+                                    class="px-2.5 py-1 bg-white hover:bg-teal-100 text-teal-800 font-bold rounded-xl border border-teal-300 text-[11px] shadow-sm transition">
+                                <i class="fas fa-sync-alt mr-1"></i> Cambiar
+                            </button>
                         </div>
-                        <p class="text-[11px] text-slate-400 mt-1">Busque en la base de datos o escriba el nombre directamente.</p>
+
+                        <!-- Datos del Paciente antes de entrar a consulta -->
+                        <div class="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-teal-200/70">
+                            <div>
+                                <span class="text-teal-800/80 font-bold block uppercase text-[9px]">WhatsApp / Teléfono:</span>
+                                <div class="flex items-center space-x-1.5 font-bold text-teal-950 mt-0.5">
+                                    <span id="qa-preview-phone">---</span>
+                                    <button type="button" id="qa-preview-wa-btn" onclick="sendWaToQaPatient()" class="text-emerald-600 hover:text-emerald-700 text-sm ml-1" title="Mensaje WhatsApp">
+                                        <i class="fab fa-whatsapp"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-teal-800/80 font-bold block uppercase text-[9px]">Alergias Conocidas:</span>
+                                <span id="qa-preview-allergies" class="inline-block font-bold text-red-600 mt-0.5">Ninguna</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Teléfono Móvil (WhatsApp)</label>
-                    <input type="tel" id="qa-patient-phone" placeholder="809-555-0123"
-                           class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                <!-- SECCIÓN 2: CREAR PACIENTE NUEVO (SOLO SI NO EXISTE EN EL SISTEMA) -->
+                <div id="qa-section-new" class="hidden space-y-2.5">
+                    <div class="p-2.5 bg-blue-50 border border-blue-200 rounded-2xl text-[11px] text-blue-900 leading-snug flex items-center space-x-2">
+                        <i class="fas fa-info-circle text-blue-600 text-sm"></i>
+                        <span>Complete estos datos <strong>solo si es un paciente que acude por primera vez</strong>. Se guardará de inmediato en el sistema.</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nombre(s) <span class="text-red-500">*</span></label>
+                            <input type="text" id="qa-new-fname" placeholder="Juan"
+                                   class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-semibold">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Apellido(s) <span class="text-red-500">*</span></label>
+                            <input type="text" id="qa-new-lname" placeholder="Pérez"
+                                   class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-semibold">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Cédula / DNI</label>
+                            <input type="text" id="qa-new-doc" placeholder="001-0000000-0"
+                                   oninput="debounceCheckNewPatientDup()"
+                                   class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Teléfono (WhatsApp) <span class="text-red-500">*</span></label>
+                            <input type="tel" id="qa-new-phone" placeholder="809-555-0123"
+                                   oninput="debounceCheckNewPatientDup()"
+                                   class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Alergias o Notas Críticas</label>
+                        <input type="text" id="qa-new-allergies" placeholder="Ej: Penicilina, Hipertensión o Ninguna"
+                               class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                    </div>
+
+                    <!-- Alerta Dinámica Anti-Duplicados en Vivo -->
+                    <div id="qa-new-dup-alert" class="hidden p-3 bg-amber-50 border-2 border-amber-300 rounded-2xl text-xs text-amber-950 space-y-1.5 animate-pulse">
+                        <div class="flex items-center space-x-2 font-bold text-amber-900">
+                            <i class="fas fa-triangle-exclamation text-amber-600"></i>
+                            <span>¡Paciente encontrado en el sistema!</span>
+                        </div>
+                        <p id="qa-new-dup-msg" class="text-[11px] text-amber-800 leading-snug">Ya existe un paciente con estos datos.</p>
+                        <button type="button" id="qa-new-dup-use-btn" class="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow transition">
+                            Usar el Paciente Existente
+                        </button>
+                    </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2">
+                <!-- SECCIÓN COMÚN: FECHA, HORA Y MOTIVO -->
+                <div class="pt-2 border-t border-slate-100 space-y-3">
+                    <!-- Fecha y Atajos Rápidos -->
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Fecha</label>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-xs font-bold text-slate-700 uppercase">Fecha de Cita <span class="text-red-500">*</span></label>
+                            <div class="flex space-x-1">
+                                <button type="button" onclick="setQaDate(0)" class="px-2 py-0.5 bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-800 text-[10px] font-bold rounded-md transition">Hoy</button>
+                                <button type="button" onclick="setQaDate(1)" class="px-2 py-0.5 bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-800 text-[10px] font-bold rounded-md transition">Mañana</button>
+                            </div>
+                        </div>
                         <input type="date" id="qa-date" required
-                               class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                               class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-semibold">
                     </div>
+
+                    <!-- Hora y Atajos Rápidos -->
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Hora</label>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-xs font-bold text-slate-700 uppercase">Hora de Cita <span class="text-red-500">*</span></label>
+                            <div class="flex space-x-1">
+                                <button type="button" onclick="setQaTime(0)" class="px-2 py-0.5 bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-800 text-[10px] font-bold rounded-md transition">Ahora</button>
+                                <button type="button" onclick="setQaTime(15)" class="px-2 py-0.5 bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-800 text-[10px] font-bold rounded-md transition">+15m</button>
+                                <button type="button" onclick="setQaTime(30)" class="px-2 py-0.5 bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-800 text-[10px] font-bold rounded-md transition">+30m</button>
+                            </div>
+                        </div>
                         <input type="time" id="qa-time" required value="09:00"
-                               class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                               class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-semibold">
+                    </div>
+
+                    <!-- Motivo con Chips Rápidos -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-xs font-bold text-slate-700 uppercase">Motivo de Consulta</label>
+                            <span class="text-[10px] text-slate-400 font-semibold">Toque un atajo:</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1 mb-1.5">
+                            <button type="button" onclick="setQaReason('Consulta General')" class="px-2 py-0.5 bg-slate-100 hover:bg-teal-100 text-slate-700 hover:text-teal-900 text-[10px] font-semibold rounded-lg transition">Consulta General</button>
+                            <button type="button" onclick="setQaReason('Control / Seguimiento')" class="px-2 py-0.5 bg-slate-100 hover:bg-teal-100 text-slate-700 hover:text-teal-900 text-[10px] font-semibold rounded-lg transition">Control</button>
+                            <button type="button" onclick="setQaReason('Revisión de Análisis')" class="px-2 py-0.5 bg-slate-100 hover:bg-teal-100 text-slate-700 hover:text-teal-900 text-[10px] font-semibold rounded-lg transition">Análisis</button>
+                            <button type="button" onclick="setQaReason('Paciente Presencial / Sin Cita')" class="px-2 py-0.5 bg-slate-100 hover:bg-teal-100 text-slate-700 hover:text-teal-900 text-[10px] font-semibold rounded-lg transition">Walk-in</button>
+                        </div>
+                        <input type="text" id="qa-reason" placeholder="Consulta General, Chequeo, Control..."
+                               class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo de Consulta</label>
-                    <input type="text" id="qa-reason" placeholder="Consulta General, Chequeo, Control..."
-                           class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
-                </div>
-
-                <button type="submit" id="btn-qa-submit" class="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-lg shadow-teal-600/30 text-sm flex items-center justify-center space-x-2">
-                    <i class="fas fa-save"></i>
-                    <span>Crear Cita</span>
+                <button type="submit" id="btn-qa-submit" class="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-lg shadow-teal-600/30 text-sm flex items-center justify-center space-x-2 transition active:scale-95">
+                    <i class="fas fa-calendar-check"></i>
+                    <span id="qa-submit-text">Agendar Cita en el Sistema</span>
                 </button>
             </form>
         </div>
@@ -1454,123 +1576,295 @@
             }
         }
 
-        // --- AGENDAR CITA EXPRESS (CON BÚSQUEDA Y ANTI-DUPLICADOS) ---
-        function openQuickApptModal() {
-            clearSelectedQaPatient();
-            document.getElementById('qa-patient-search').value = '';
-            document.getElementById('qa-patient-phone').value = '';
-            document.getElementById('qa-reason').value = '';
-            document.getElementById('modal-quick-appt').classList.remove('hidden');
-        }
+        // --- GESTIÓN DE PACIENTES Y AGENDAR CITA RÁPIDA (INTEGRADO AL SISTEMA DEL DOCTOR) ---
+        window.qaPatientsList = [];
+        let qaDupCheckTimeout = null;
 
-        function openQuickApptForPatient(patientId, patientName, patientPhone) {
-            document.getElementById('qa-patient-id').value = patientId;
-            document.getElementById('qa-selected-name').textContent = patientName;
-            document.getElementById('qa-selected-meta').textContent = patientPhone ? `Tel: ${patientPhone}` : 'Sin teléfono';
-            document.getElementById('qa-patient-phone').value = patientPhone || '';
-            document.getElementById('qa-search-box-container').classList.add('hidden');
-            document.getElementById('qa-selected-patient-box').classList.remove('hidden');
-            document.getElementById('modal-quick-appt').classList.remove('hidden');
-        }
+        function switchQaMode(mode) {
+            document.getElementById('qa-active-mode').value = mode;
+            const tabExisting = document.getElementById('qa-tab-existing');
+            const tabNew = document.getElementById('qa-tab-new');
+            const secExisting = document.getElementById('qa-section-existing');
+            const secNew = document.getElementById('qa-section-new');
 
-        let qaSearchTimeout = null;
-        function debounceQaPatientSearch(val) {
-            clearTimeout(qaSearchTimeout);
-            const container = document.getElementById('qa-search-results');
-            if (!val || val.trim().length < 2) {
-                container.classList.add('hidden');
-                container.innerHTML = '';
-                return;
+            if (mode === 'existing') {
+                tabExisting.className = 'py-2.5 rounded-xl transition bg-white text-teal-800 shadow-sm flex items-center justify-center space-x-1.5 font-bold';
+                tabNew.className = 'py-2.5 rounded-xl transition text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-1.5 font-medium';
+                secExisting.classList.remove('hidden');
+                secNew.classList.add('hidden');
+                document.getElementById('qa-submit-text').textContent = 'Agendar Cita en el Sistema';
+            } else {
+                tabNew.className = 'py-2.5 rounded-xl transition bg-white text-teal-800 shadow-sm flex items-center justify-center space-x-1.5 font-bold';
+                tabExisting.className = 'py-2.5 rounded-xl transition text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-1.5 font-medium';
+                secNew.classList.remove('hidden');
+                secExisting.classList.add('hidden');
+                document.getElementById('qa-submit-text').textContent = 'Crear Paciente y Agendar Cita';
             }
-            qaSearchTimeout = setTimeout(() => searchPatientsForAppt(val.trim()), 300);
         }
 
-        async function searchPatientsForAppt(query) {
-            const container = document.getElementById('qa-search-results');
+        async function loadQaPatientsList(selectedId = null) {
+            const countBadge = document.getElementById('qa-patients-count');
+            countBadge.textContent = 'Cargando...';
             try {
-                const res = await fetch(getApiUrl(`/api/mobile/patients/search?q=${encodeURIComponent(query)}`), {
+                const res = await fetch(getApiUrl('/api/mobile/patients/options'), {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
+                if (!res.ok) throw new Error('Error al cargar pacientes');
                 const data = await res.json();
-                container.innerHTML = '';
-                if (!data.results || data.results.length === 0) {
-                    container.innerHTML = `
-                        <div class="p-3 text-xs text-slate-500 flex items-center justify-between">
-                            <span>No se encontró ningún paciente con ese término.</span>
-                            <button type="button" onclick="openNewPatientModalFromAppt()" class="text-teal-700 font-bold underline ml-2 whitespace-nowrap">+ Registrar</button>
-                        </div>
-                    `;
-                } else {
-                    data.results.forEach(p => {
-                        const row = document.createElement('div');
-                        row.className = 'p-3 hover:bg-teal-50 cursor-pointer flex items-center justify-between transition';
-                        row.innerHTML = `
-                            <div>
-                                <span class="font-bold text-slate-900 block text-xs">${p.name}</span>
-                                <span class="text-[10px] text-slate-400">Doc: ${p.document_id || 'N/A'} • Tel: ${p.phone || 'N/A'}</span>
-                            </div>
-                            <span class="px-2 py-0.5 bg-teal-100 text-teal-800 text-[10px] font-bold rounded-lg">Seleccionar</span>
-                        `;
-                        row.onclick = () => selectQaPatient(p);
-                        container.appendChild(row);
-                    });
+                window.qaPatientsList = data.patients || [];
+                countBadge.textContent = `${window.qaPatientsList.length} en sistema`;
+                populateQaPatientSelect(window.qaPatientsList, selectedId);
+            } catch (err) {
+                console.error('Error cargando lista de pacientes:', err);
+                countBadge.textContent = 'Error al cargar';
+            }
+        }
+
+        function populateQaPatientSelect(list, selectedId = null) {
+            const select = document.getElementById('qa-patient-select');
+            select.innerHTML = '<option value="">-- Clic para elegir paciente de la lista --</option>';
+            list.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.display;
+                if (selectedId && String(p.id) === String(selectedId)) {
+                    opt.selected = true;
                 }
-                container.classList.remove('hidden');
-            } catch (e) {
-                console.error('Error buscando pacientes para cita:', e);
+                select.appendChild(opt);
+            });
+            if (selectedId) {
+                onQaSelectPatientChange(selectedId);
+            }
+        }
+
+        function filterQaPatients(term) {
+            const clearBtn = document.getElementById('qa-filter-clear');
+            if (!term || !term.trim()) {
+                clearBtn.classList.add('hidden');
+                populateQaPatientSelect(window.qaPatientsList);
+                return;
+            }
+            clearBtn.classList.remove('hidden');
+            const clean = term.trim().toLowerCase();
+            const filtered = window.qaPatientsList.filter(p => {
+                const name = (p.name || '').toLowerCase();
+                const doc = (p.document_id || '').toLowerCase();
+                const phone = (p.phone || '').toLowerCase();
+                return name.includes(clean) || doc.includes(clean) || phone.includes(clean);
+            });
+            populateQaPatientSelect(filtered);
+            if (filtered.length === 1) {
+                document.getElementById('qa-patient-select').value = filtered[0].id;
+                onQaSelectPatientChange(filtered[0].id);
+            }
+        }
+
+        function clearQaFilter() {
+            document.getElementById('qa-patient-filter').value = '';
+            document.getElementById('qa-filter-clear').classList.add('hidden');
+            populateQaPatientSelect(window.qaPatientsList);
+        }
+
+        function onQaSelectPatientChange(val) {
+            if (!val) {
+                clearSelectedQaPatient();
+                return;
+            }
+            const p = window.qaPatientsList.find(x => String(x.id) === String(val));
+            if (p) {
+                selectQaPatient(p);
             }
         }
 
         function selectQaPatient(p) {
             document.getElementById('qa-patient-id').value = p.id;
-            document.getElementById('qa-selected-name').textContent = p.name;
-            document.getElementById('qa-selected-meta').textContent = `Doc: ${p.document_id || 'S/N'} • Tel: ${p.phone || 'S/T'}`;
-            if (p.phone) {
-                document.getElementById('qa-patient-phone').value = p.phone;
+            document.getElementById('qa-preview-name').textContent = p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim();
+            document.getElementById('qa-preview-doc').textContent = p.document_id ? `Cédula: ${p.document_id}` : 'Sin cédula registrada';
+            document.getElementById('qa-preview-phone').textContent = p.phone || 'Sin teléfono';
+            document.getElementById('qa-preview-allergies').textContent = p.allergies || 'Ninguna registrada';
+            
+            // Estilo visual según si tiene alergias o no
+            const allergiesEl = document.getElementById('qa-preview-allergies');
+            if (p.allergies && p.allergies.toLowerCase() !== 'ninguna') {
+                allergiesEl.className = 'inline-block font-bold text-red-600 mt-0.5 bg-red-100/70 px-1.5 py-0.5 rounded';
+            } else {
+                allergiesEl.className = 'inline-block font-bold text-slate-600 mt-0.5';
             }
-            document.getElementById('qa-search-results').classList.add('hidden');
-            document.getElementById('qa-search-box-container').classList.add('hidden');
-            document.getElementById('qa-selected-patient-box').classList.remove('hidden');
+
+            document.getElementById('qa-select-container').classList.add('hidden');
+            document.getElementById('qa-patient-preview-card').classList.remove('hidden');
         }
 
         function clearSelectedQaPatient() {
             document.getElementById('qa-patient-id').value = '';
-            document.getElementById('qa-selected-patient-box').classList.add('hidden');
-            document.getElementById('qa-search-box-container').classList.remove('hidden');
-            document.getElementById('qa-search-results').classList.add('hidden');
+            document.getElementById('qa-patient-select').value = '';
+            document.getElementById('qa-patient-preview-card').classList.add('hidden');
+            document.getElementById('qa-select-container').classList.remove('hidden');
         }
 
-        function openNewPatientModalFromAppt() {
-            closeModal('modal-quick-appt');
-            window.__returnToApptModalAfterPatientSave = true;
-            openNewPatientModal();
+        function sendWaToQaPatient() {
+            const phone = document.getElementById('qa-preview-phone').textContent.replace(/[^0-9]/g, '');
+            const name = document.getElementById('qa-preview-name').textContent;
+            if (!phone) {
+                alert('Este paciente no tiene teléfono registrado.');
+                return;
+            }
+            const msg = encodeURIComponent(`Hola ${name}, le escribimos desde el consultorio médico.`);
+            window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+        }
+
+        function setQaDate(offsetDays) {
+            const d = new Date();
+            d.setDate(d.getDate() + offsetDays);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            document.getElementById('qa-date').value = `${yyyy}-${mm}-${dd}`;
+        }
+
+        function setQaTime(offsetMinutes) {
+            const d = new Date();
+            if (offsetMinutes > 0) {
+                d.setMinutes(d.getMinutes() + offsetMinutes);
+            }
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            document.getElementById('qa-time').value = `${hh}:${mm}`;
+        }
+
+        function setQaReason(reason) {
+            document.getElementById('qa-reason').value = reason;
+        }
+
+        function debounceCheckNewPatientDup() {
+            clearTimeout(qaDupCheckTimeout);
+            const doc = document.getElementById('qa-new-doc').value.trim();
+            const phone = document.getElementById('qa-new-phone').value.trim();
+            const alertBox = document.getElementById('qa-new-dup-alert');
+
+            if (doc.length < 5 && phone.length < 7) {
+                alertBox.classList.add('hidden');
+                return;
+            }
+
+            qaDupCheckTimeout = setTimeout(async () => {
+                try {
+                    let url = getApiUrl('/api/mobile/patients/check-duplicate?');
+                    if (doc) url += `document_id=${encodeURIComponent(doc)}&`;
+                    if (phone) url += `phone=${encodeURIComponent(phone)}&`;
+                    const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+                    const data = await res.json();
+                    if (data.is_duplicate && data.patient) {
+                        document.getElementById('qa-new-dup-msg').textContent = data.message;
+                        const useBtn = document.getElementById('qa-new-dup-use-btn');
+                        useBtn.onclick = () => {
+                            switchQaMode('existing');
+                            selectQaPatient(data.patient);
+                            alertBox.classList.add('hidden');
+                        };
+                        alertBox.classList.remove('hidden');
+                    } else {
+                        alertBox.classList.add('hidden');
+                    }
+                } catch (e) {
+                    console.error('Error verificando duplicados:', e);
+                }
+            }, 400);
+        }
+
+        function openQuickApptModal() {
+            switchQaMode('existing');
+            clearSelectedQaPatient();
+            clearQaFilter();
+
+            // Fechas y horas por defecto
+            setQaDate(0); // Hoy
+            setQaTime(0); // Hora actual
+            document.getElementById('qa-reason').value = 'Consulta General';
+
+            // Limpiar campos nuevo paciente
+            document.getElementById('qa-new-fname').value = '';
+            document.getElementById('qa-new-lname').value = '';
+            document.getElementById('qa-new-doc').value = '';
+            document.getElementById('qa-new-phone').value = '';
+            document.getElementById('qa-new-allergies').value = '';
+            document.getElementById('qa-new-dup-alert').classList.add('hidden');
+
+            document.getElementById('modal-quick-appt').classList.remove('hidden');
+            loadQaPatientsList();
+        }
+
+        function openQuickApptForPatient(patientId, patientName, patientPhone) {
+            switchQaMode('existing');
+            clearQaFilter();
+            setQaDate(0);
+            setQaTime(0);
+            document.getElementById('qa-reason').value = 'Consulta General';
+
+            document.getElementById('modal-quick-appt').classList.remove('hidden');
+            loadQaPatientsList(patientId);
+
+            // Muestra inmediatamente los datos mientras carga la lista
+            selectQaPatient({
+                id: patientId,
+                name: patientName,
+                first_name: patientName,
+                document_id: '',
+                phone: patientPhone || '',
+                allergies: 'Cargando datos...',
+                display: `${patientName} - Tel: ${patientPhone || 'S/T'}`
+            });
         }
 
         async function handleSaveQuickAppt(e) {
             e.preventDefault();
+            const mode = document.getElementById('qa-active-mode').value;
             const patientIdVal = document.getElementById('qa-patient-id').value;
-            const patientId = patientIdVal ? parseInt(patientIdVal) : null;
-            const searchVal = document.getElementById('qa-patient-search').value.trim();
-            const phone = document.getElementById('qa-patient-phone').value.trim();
             const dateStr = document.getElementById('qa-date').value;
             const timeStr = document.getElementById('qa-time').value;
             const reason = document.getElementById('qa-reason').value.trim() || 'Consulta General';
 
-            let patientName = '';
-            if (patientId) {
-                patientName = document.getElementById('qa-selected-name').textContent;
-            } else {
-                patientName = searchVal;
-            }
+            let payload = {
+                date: dateStr,
+                start_time: timeStr,
+                reason: reason
+            };
 
-            if (!patientName && !patientId) {
-                alert('Por favor busque y seleccione un paciente o ingrese su nombre.');
-                return;
+            if (mode === 'existing') {
+                if (!patientIdVal) {
+                    alert('Por favor seleccione un paciente del sistema o cambie a la pestaña "Crear Nuevo".');
+                    return;
+                }
+                payload.patient_id = parseInt(patientIdVal);
+            } else {
+                const fname = document.getElementById('qa-new-fname').value.trim();
+                const lname = document.getElementById('qa-new-lname').value.trim();
+                const doc = document.getElementById('qa-new-doc').value.trim();
+                const phone = document.getElementById('qa-new-phone').value.trim();
+                const allergies = document.getElementById('qa-new-allergies').value.trim();
+
+                if (!fname || !lname) {
+                    alert('Debe ingresar el nombre y apellido del nuevo paciente.');
+                    return;
+                }
+                if (!phone) {
+                    alert('Debe ingresar el teléfono / WhatsApp del nuevo paciente.');
+                    return;
+                }
+
+                payload.patient_name = fname;
+                payload.patient_last_name = lname;
+                payload.patient_document_id = doc;
+                payload.patient_phone = phone;
+                payload.patient_allergies = allergies;
             }
 
             const submitBtn = document.getElementById('btn-qa-submit');
+            const submitText = document.getElementById('qa-submit-text');
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Programando...';
+            submitText.textContent = 'Guardando cita...';
 
             try {
                 const res = await fetch(getApiUrl('/api/mobile/appointments/quick-create'), {
@@ -1579,26 +1873,20 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
-                    body: JSON.stringify({
-                        patient_id: patientId,
-                        patient_name: patientName,
-                        patient_phone: phone,
-                        date: dateStr,
-                        start_time: timeStr,
-                        reason: reason
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || 'Error al agendar cita');
                 closeModal('modal-quick-appt');
-                alert(data.message || 'Cita programada con éxito.');
+                alert(data.message || 'Cita agendada exitosamente en el sistema del doctor.');
                 loadDashboardData();
+                loadQaPatientsList(); // Actualizar caché de pacientes
             } catch (err) {
                 alert(err.message);
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="fas fa-save mr-1"></i> Crear Cita';
+                submitText.textContent = mode === 'existing' ? 'Agendar Cita en el Sistema' : 'Crear Paciente y Agendar Cita';
             }
         }
 
