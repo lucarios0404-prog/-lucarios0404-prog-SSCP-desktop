@@ -117,13 +117,14 @@
                         </div>
 
                         <!-- Opción de personalizar -->
-                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                            <label class="inline-flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" id="use_custom_perms" name="use_custom_perms" value="1" onchange="toggleCustomPerms(this.checked)" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                        <input type="hidden" id="reset_to_defaults" name="reset_to_defaults" value="0">
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                                <input type="checkbox" id="use_custom_perms" name="use_custom_perms" value="1" onchange="onCustomToggle(this.checked)" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
                                 <span class="text-xs font-bold text-slate-800">Personalizar permisos manualmente (Sobrescribe las reglas por defecto del rol)</span>
                             </label>
-                            <span id="role_preset_badge" class="text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                                Perfil Médico activo
+                            <span id="role_preset_badge" class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto">
+                                <i class="fas fa-check-circle text-[10px]"></i> Perfil Médico activo
                             </span>
                         </div>
 
@@ -165,18 +166,33 @@
 <script>
 const roleDefaults = {{ default_permissions_json | safe }};
 
-function onRoleChange(role) {
+function onPermissionChange() {
+    const customToggle = document.getElementById('use_custom_perms');
+    const resetInput = document.getElementById('reset_to_defaults');
+    if (customToggle) customToggle.checked = true;
+    if (resetInput) resetInput.value = '0';
     const badge = document.getElementById('role_preset_badge');
-    if (role === 'admin') {
-        badge.innerText = 'Perfil Administrador (Acceso total)';
-        badge.className = 'text-[11px] font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full';
-    } else if (role === 'doctor') {
-        badge.innerText = 'Perfil Médico (Clínica y prescripciones)';
-        badge.className = 'text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full';
-    } else {
-        badge.innerText = 'Perfil Secretaria (Recepción, caja y citas)';
-        badge.className = 'text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full';
+    if (badge) {
+        badge.className = 'text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto';
+        badge.innerHTML = '<i class="fas fa-sliders-h text-[10px]"></i> Permisos personalizados';
     }
+}
+
+function onCustomToggle(checked) {
+    const resetInput = document.getElementById('reset_to_defaults');
+    if (!checked) {
+        applyRoleDefaults();
+    } else {
+        if (resetInput) resetInput.value = '0';
+        const badge = document.getElementById('role_preset_badge');
+        if (badge) {
+            badge.className = 'text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto';
+            badge.innerHTML = '<i class="fas fa-sliders-h text-[10px]"></i> Permisos personalizados';
+        }
+    }
+}
+
+function onRoleChange(role) {
     applyRoleDefaults();
 }
 
@@ -187,20 +203,45 @@ function applyRoleDefaults() {
     checkboxes.forEach(cb => {
         cb.checked = defaults.includes(cb.value);
     });
+    const customToggle = document.getElementById('use_custom_perms');
+    const resetInput = document.getElementById('reset_to_defaults');
+    if (customToggle) customToggle.checked = false;
+    if (resetInput) resetInput.value = '1';
+
+    const badge = document.getElementById('role_preset_badge');
+    if (badge) {
+        if (role === 'admin') {
+            badge.innerHTML = '<i class="fas fa-shield-alt text-[10px]"></i> Perfil Administrador (Acceso total)';
+            badge.className = 'text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto';
+        } else if (role === 'doctor') {
+            badge.innerHTML = '<i class="fas fa-user-md text-[10px]"></i> Perfil Médico activo';
+            badge.className = 'text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto';
+        } else {
+            badge.innerHTML = '<i class="fas fa-headset text-[10px]"></i> Perfil Secretaria activo';
+            badge.className = 'text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto';
+        }
+    }
 }
 
 function toggleAll(status) {
-    document.getElementById('use_custom_perms').checked = true;
+    const customToggle = document.getElementById('use_custom_perms');
+    const resetInput = document.getElementById('reset_to_defaults');
+    if (customToggle) customToggle.checked = true;
+    if (resetInput) resetInput.value = '0';
     document.querySelectorAll('.perm-checkbox').forEach(cb => cb.checked = status);
-}
-
-function toggleCustomPerms(checked) {
-    // Si se activa personalización manual, se mantienen los checkboxes seleccionados
+    const badge = document.getElementById('role_preset_badge');
+    if (badge) {
+        badge.className = 'text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto';
+        badge.innerHTML = '<i class="fas fa-sliders-h text-[10px]"></i> Permisos personalizados';
+    }
 }
 
 // Inicializar al cargar
 document.addEventListener('DOMContentLoaded', () => {
     applyRoleDefaults();
+    document.querySelectorAll('.perm-checkbox').forEach(cb => {
+        cb.addEventListener('change', onPermissionChange);
+    });
 });
 </script>
 {% endblock %}

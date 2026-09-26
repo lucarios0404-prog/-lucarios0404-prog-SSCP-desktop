@@ -89,6 +89,7 @@ def create_user_submit(
     is_active: bool = Form(True),
     custom_permissions: Optional[List[str]] = Form(None),
     use_custom_perms: Optional[str] = Form(None),
+    reset_to_defaults: Optional[str] = Form("0"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin)
 ):
@@ -109,10 +110,19 @@ def create_user_submit(
             status_code=400
         )
 
-    # Si se especificaron permisos personalizados
+    # Control de delimitación de permisos
     perms_json = None
-    if use_custom_perms == "1" and custom_permissions is not None:
-        perms_json = json.dumps(custom_permissions)
+    if role == "admin":
+        perms_json = None
+    elif reset_to_defaults == "1":
+        perms_json = None
+    else:
+        defaults = DEFAULT_ROLE_PERMISSIONS.get(role, [])
+        selected = custom_permissions if custom_permissions is not None else []
+        if use_custom_perms == "1" or set(selected) != set(defaults):
+            perms_json = json.dumps(selected)
+        else:
+            perms_json = None
 
     new_user = User(
         name=name.strip(),
@@ -177,6 +187,7 @@ def edit_user_submit(
     is_active: Optional[str] = Form(None),
     custom_permissions: Optional[List[str]] = Form(None),
     use_custom_perms: Optional[str] = Form(None),
+    reset_to_defaults: Optional[str] = Form("0"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin)
 ):
@@ -205,13 +216,21 @@ def edit_user_submit(
     if password and password.strip():
         target_user.hashed_password = get_password_hash(password.strip())
 
-    # Permisos
+    # Control de delimitación de permisos
     if role == "admin":
         target_user.permissions = None
-    elif use_custom_perms == "1" and custom_permissions is not None:
-        target_user.permissions = json.dumps(custom_permissions)
+    elif reset_to_defaults == "1":
+        # Reversión explícita a los predeterminados del rol
+        target_user.permissions = None
     else:
-        target_user.permissions = None  # Usar los predeterminados del rol
+        defaults = DEFAULT_ROLE_PERMISSIONS.get(role, [])
+        selected = custom_permissions if custom_permissions is not None else []
+        # Si se activó personalización, si las casillas difieren de los defaults del rol,
+        # o si el usuario ya tenía permisos personalizados asignados:
+        if use_custom_perms == "1" or set(selected) != set(defaults) or target_user.permissions is not None:
+            target_user.permissions = json.dumps(selected)
+        else:
+            target_user.permissions = None
 
     db.commit()
     return RedirectResponse(url="/users?success=actualizado", status_code=status.HTTP_303_SEE_OTHER)

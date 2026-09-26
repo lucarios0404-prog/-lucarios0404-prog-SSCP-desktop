@@ -121,14 +121,19 @@
                             </div>
                         </div>
 
-                        <!-- Opción de personalizar -->
-                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                            <label class="inline-flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" id="use_custom_perms" name="use_custom_perms" value="1" {% if has_custom %}checked{% endif %} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                        <!-- Opción de personalizar y estado -->
+                        <input type="hidden" id="reset_to_defaults" name="reset_to_defaults" value="0">
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                                <input type="checkbox" id="use_custom_perms" name="use_custom_perms" value="1" {% if has_custom %}checked{% endif %} onchange="onCustomToggle(this.checked)" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
                                 <span class="text-xs font-bold text-slate-800">Personalizar permisos manualmente (Sobrescribe las reglas por defecto del rol)</span>
                             </label>
-                            <span id="role_preset_badge" class="text-[11px] font-semibold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-full">
-                                Permisos asignados
+                            <span id="role_preset_badge" class="text-[11px] font-semibold {% if has_custom %}text-indigo-700 bg-indigo-50 border border-indigo-200{% else %}text-emerald-700 bg-emerald-50 border border-emerald-200{% endif %} px-2.5 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto">
+                                {% if has_custom %}
+                                <i class="fas fa-sliders-h text-[10px]"></i> Permisos personalizados
+                                {% else %}
+                                <i class="fas fa-check-circle text-[10px]"></i> Predeterminados del rol
+                                {% endif %}
                             </span>
                         </div>
 
@@ -170,6 +175,37 @@
 <script>
 const roleDefaults = {{ default_permissions_json | safe }};
 
+function updateBadge(isCustom) {
+    const badge = document.getElementById('role_preset_badge');
+    if (isCustom) {
+        badge.className = 'text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto';
+        badge.innerHTML = '<i class="fas fa-sliders-h text-[10px]"></i> Permisos personalizados';
+    } else {
+        badge.className = 'text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto';
+        badge.innerHTML = '<i class="fas fa-check-circle text-[10px]"></i> Predeterminados del rol';
+    }
+}
+
+function onPermissionChange() {
+    // Al modificar cualquier casilla de permiso individual, marcar automáticamente como personalizado
+    const customToggle = document.getElementById('use_custom_perms');
+    const resetInput = document.getElementById('reset_to_defaults');
+    if (customToggle) customToggle.checked = true;
+    if (resetInput) resetInput.value = '0';
+    updateBadge(true);
+}
+
+function onCustomToggle(checked) {
+    const resetInput = document.getElementById('reset_to_defaults');
+    if (!checked) {
+        // Si el usuario desmarca la personalización manual, restablecer a los predeterminados del rol
+        applyRoleDefaults();
+    } else {
+        if (resetInput) resetInput.value = '0';
+        updateBadge(true);
+    }
+}
+
 function onRoleChange(role) {
     applyRoleDefaults();
 }
@@ -181,11 +217,27 @@ function applyRoleDefaults() {
     checkboxes.forEach(cb => {
         cb.checked = defaults.includes(cb.value);
     });
+    const customToggle = document.getElementById('use_custom_perms');
+    const resetInput = document.getElementById('reset_to_defaults');
+    if (customToggle) customToggle.checked = false;
+    if (resetInput) resetInput.value = '1';
+    updateBadge(false);
 }
 
 function toggleAll(status) {
-    document.getElementById('use_custom_perms').checked = true;
+    const customToggle = document.getElementById('use_custom_perms');
+    const resetInput = document.getElementById('reset_to_defaults');
+    if (customToggle) customToggle.checked = true;
+    if (resetInput) resetInput.value = '0';
     document.querySelectorAll('.perm-checkbox').forEach(cb => cb.checked = status);
+    updateBadge(true);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Escuchar cambios en cada casilla de permiso
+    document.querySelectorAll('.perm-checkbox').forEach(cb => {
+        cb.addEventListener('change', onPermissionChange);
+    });
+});
 </script>
 {% endblock %}
