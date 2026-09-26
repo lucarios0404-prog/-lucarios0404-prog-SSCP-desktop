@@ -265,7 +265,76 @@
                 </div>
             </div>
 
-            <!-- VISTA 2: REPORTES Y CUADRE (PAGOS, VISTOS, CITAS PREVIAS Y PDF) -->
+            <!-- VISTA 2: DIRECTORIO DE PACIENTES (CENTRALIZADO - PREVENCIÓN DE DUPLICADOS) -->
+            <div id="view-patients" class="hidden space-y-4">
+                
+                <!-- Encabezado de Directorio y Botón Nuevo Paciente -->
+                <div class="bg-gradient-to-br from-indigo-700 via-indigo-800 to-slate-900 p-4 rounded-3xl text-white shadow-xl shadow-indigo-900/20">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] uppercase font-black tracking-widest text-indigo-300 block">Base de Datos Central</span>
+                            <h3 class="text-base font-black tracking-tight mt-0.5">Directorio de Pacientes</h3>
+                        </div>
+                        <span id="patient-count-badge" class="px-2.5 py-1 bg-white/20 backdrop-blur-md text-white text-xs font-black rounded-xl">
+                            0 Pacientes
+                        </span>
+                    </div>
+                    <p class="text-xs text-indigo-200 mt-1 leading-relaxed">
+                        Conectado a la clínica en tiempo real. Búsqueda instantánea y registro con validación anti-duplicados.
+                    </p>
+                    <div class="mt-3 pt-3 border-t border-white/10 flex space-x-2">
+                        <button type="button" onclick="openNewPatientModal()" 
+                                class="flex-1 py-2.5 bg-white hover:bg-slate-100 text-indigo-900 font-extrabold rounded-xl text-xs shadow-md transition active:scale-95 flex items-center justify-center space-x-1.5">
+                            <i class="fas fa-user-plus text-indigo-600"></i>
+                            <span>+ Nuevo Paciente</span>
+                        </button>
+                        <button type="button" onclick="loadMobilePatients(1)" title="Refrescar lista"
+                                class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition active:rotate-180">
+                            <i class="fas fa-sync-alt text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Buscador de Pacientes en Tiempo Real -->
+                <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <i class="fas fa-search text-xs"></i>
+                        </span>
+                        <input type="text" id="mobile-patients-search-input" 
+                               oninput="debounceMobilePatientSearch(this.value)"
+                               placeholder="Buscar por nombre, cédula o teléfono..." 
+                               class="w-full pl-9 pr-8 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-800">
+                        <button id="mobile-patients-clear-search" onclick="clearMobilePatientSearch()" class="hidden absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600">
+                            <i class="fas fa-times-circle text-sm"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                        <span id="mobile-patients-info-text">Cargando directorio de la clínica...</span>
+                        <span id="mobile-patients-page-info">Pág 1</span>
+                    </div>
+                </div>
+
+                <!-- Lista de Pacientes -->
+                <div id="mobile-patients-list-container" class="space-y-2.5">
+                    <!-- Dinámico -->
+                </div>
+
+                <!-- Paginación Móvil -->
+                <div id="mobile-patients-pagination" class="hidden flex items-center justify-between pt-2">
+                    <button type="button" id="btn-patient-prev" onclick="goToPatientsPage(-1)" 
+                            class="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-xl border border-slate-200 text-xs transition disabled:opacity-40 disabled:cursor-not-allowed">
+                        <i class="fas fa-chevron-left mr-1"></i> Anterior
+                    </button>
+                    <span id="mobile-patients-pagination-label" class="text-xs font-extrabold text-slate-600">Pág 1 / 1</span>
+                    <button type="button" id="btn-patient-next" onclick="goToPatientsPage(1)" 
+                            class="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-xl border border-slate-200 text-xs transition disabled:opacity-40 disabled:cursor-not-allowed">
+                        Siguiente <i class="fas fa-chevron-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- VISTA 3: REPORTES Y CUADRE (PAGOS, VISTOS, CITAS PREVIAS Y PDF) -->
             <div id="view-reports" class="hidden space-y-4">
                 
                 <!-- Selector de Fecha de Reporte -->
@@ -425,16 +494,21 @@
             </div>
         </main>
 
-        <!-- BOTÓN FLOTANTE PARA SECRETARIA: NUEVA CITA / COBRO (UBICADO ARRIBA DEL NAV INFERIOR) -->
+        <!-- BOTÓN FLOTANTE PARA SECRETARIA: NUEVO PACIENTE / CITA / COBRO (UBICADO ARRIBA DEL NAV INFERIOR) -->
         <div id="secretary-floating-bar" class="hidden fixed bottom-16 inset-x-4 max-w-md mx-auto z-20">
             <div class="flex space-x-2">
+                <button onclick="openNewPatientModal()" 
+                        class="px-3 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-xl shadow-indigo-600/30 flex items-center justify-center space-x-1.5 text-xs transition active:scale-95">
+                    <i class="fas fa-user-plus"></i>
+                    <span>+ Paciente</span>
+                </button>
                 <button onclick="openQuickApptModal()" 
-                        class="flex-1 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-xl shadow-teal-600/30 flex items-center justify-center space-x-2 text-xs transition active:scale-95">
+                        class="flex-1 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-xl shadow-teal-600/30 flex items-center justify-center space-x-1.5 text-xs transition active:scale-95">
                     <i class="fas fa-calendar-plus"></i>
-                    <span>Agendar Cita Rápida</span>
+                    <span>Agendar Cita</span>
                 </button>
                 <button onclick="openQuickPaymentModal()" 
-                        class="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/30 flex items-center justify-center space-x-2 text-xs transition active:scale-95">
+                        class="px-3.5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/30 flex items-center justify-center space-x-1.5 text-xs transition active:scale-95">
                     <i class="fas fa-cash-register"></i>
                     <span>Cobro</span>
                 </button>
@@ -447,6 +521,11 @@
                     class="flex flex-col items-center justify-center flex-1 py-1 text-indigo-600 font-bold text-[11px] transition">
                 <i class="fas fa-clipboard-check text-base mb-0.5"></i>
                 <span>Atención Hoy</span>
+            </button>
+            <button id="nav-btn-patients" onclick="switchMainTab('patients')" 
+                    class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-600 font-medium text-[11px] transition">
+                <i class="fas fa-users text-base mb-0.5"></i>
+                <span>Pacientes</span>
             </button>
             <button id="nav-btn-reports" onclick="switchMainTab('reports')" 
                     class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-600 font-medium text-[11px] transition">
@@ -549,7 +628,7 @@
         </div>
     </div>
 
-    <!-- MODAL 3: AGENDAR CITA RÁPIDA (SECRETARIA) -->
+    <!-- MODAL 3: AGENDAR CITA EXPRESS (SECRETARIA) CON BÚSQUEDA Y ANTI-DUPLICADOS -->
     <div id="modal-quick-appt" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
         <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -560,10 +639,49 @@
             </div>
 
             <form onsubmit="handleSaveQuickAppt(event)" class="space-y-3">
+                <input type="hidden" id="qa-patient-id" value="">
+
+                <!-- Selector de Paciente Existente vs Nuevo -->
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre Completo del Paciente <span class="text-red-500">*</span></label>
-                    <input type="text" id="qa-patient-name" required placeholder="Ej: Juan Pérez"
-                           class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-xs font-bold text-slate-700 uppercase">Paciente <span class="text-red-500">*</span></label>
+                        <button type="button" onclick="openNewPatientModalFromAppt()" class="text-[11px] text-teal-700 hover:text-teal-800 font-bold flex items-center space-x-1">
+                            <i class="fas fa-user-plus text-[10px]"></i>
+                            <span>+ Registrar Nuevo</span>
+                        </button>
+                    </div>
+
+                    <!-- Cuadro de Paciente Existente Seleccionado -->
+                    <div id="qa-selected-patient-box" class="hidden bg-teal-50 border border-teal-200 p-3 rounded-2xl text-xs flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center font-bold">
+                                <i class="fas fa-check text-xs"></i>
+                            </div>
+                            <div>
+                                <span class="font-bold text-teal-950 block text-sm" id="qa-selected-name">Paciente</span>
+                                <span class="text-teal-700 text-[11px]" id="qa-selected-meta">Doc / Tel</span>
+                            </div>
+                        </div>
+                        <button type="button" onclick="clearSelectedQaPatient()" class="px-2.5 py-1 bg-white hover:bg-teal-100 text-teal-800 font-bold rounded-lg border border-teal-200 text-[11px] transition">
+                            Cambiar
+                        </button>
+                    </div>
+
+                    <!-- Buscador en tiempo real de Paciente Existente -->
+                    <div id="qa-search-box-container" class="relative">
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i class="fas fa-search text-xs"></i>
+                            </span>
+                            <input type="text" id="qa-patient-search" placeholder="Escriba nombre o cédula para buscar..."
+                                   oninput="debounceQaPatientSearch(this.value)" autocomplete="off"
+                                   class="w-full pl-9 pr-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        </div>
+                        <div id="qa-search-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl max-h-48 overflow-y-auto shadow-2xl z-50 divide-y divide-slate-100">
+                            <!-- Resultados en vivo -->
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1">Busque en la base de datos o escriba el nombre directamente.</p>
+                    </div>
                 </div>
 
                 <div>
@@ -591,7 +709,7 @@
                            class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
                 </div>
 
-                <button type="submit" class="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-lg shadow-teal-600/30 text-sm flex items-center justify-center space-x-2">
+                <button type="submit" id="btn-qa-submit" class="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-lg shadow-teal-600/30 text-sm flex items-center justify-center space-x-2">
                     <i class="fas fa-save"></i>
                     <span>Crear Cita</span>
                 </button>
@@ -651,6 +769,257 @@
                     <span>Confirmar y Guardar Pago</span>
                 </button>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL 5: REGISTRAR NUEVO PACIENTE (SECRETARIA) CON ANTI-DUPLICADOS -->
+    <div id="modal-new-patient" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-base">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base">Alta de Nuevo Paciente</h3>
+                        <p class="text-xs text-slate-400">Base de Datos Centralizada</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-new-patient')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <!-- Banner Alerta de Duplicado de Cédula en Tiempo Real -->
+            <div id="np-dup-warning" class="hidden p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs space-y-2">
+                <div class="flex items-start space-x-2 text-rose-800 font-bold">
+                    <i class="fas fa-exclamation-triangle mt-0.5 text-rose-600"></i>
+                    <span id="np-dup-msg">Ya existe un paciente con este documento.</span>
+                </div>
+                <div id="np-dup-patient-info" class="p-2.5 bg-white rounded-xl border border-rose-100 text-[11px] text-slate-700 font-medium">
+                    <!-- Detalle del paciente existente -->
+                </div>
+                <button type="button" onclick="selectExistingDuplicatePatient()" class="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-sm transition">
+                    Usar Paciente Existente
+                </button>
+            </div>
+
+            <form onsubmit="handleSaveNewPatient(event)" class="space-y-3.5">
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre(s) <span class="text-red-500">*</span></label>
+                        <input type="text" id="np-first-name" required placeholder="Ej: Carlos"
+                               class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Apellido(s) <span class="text-red-500">*</span></label>
+                        <input type="text" id="np-last-name" required placeholder="Ej: Sánchez"
+                               class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Cédula / Documento con verificación en vivo -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-xs font-bold text-slate-700 uppercase">Cédula o Pasaporte</label>
+                        <span id="np-doc-status" class="text-[10px] font-bold text-slate-400">Verificación anti-duplicados</span>
+                    </div>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <i class="fas fa-id-card text-xs"></i>
+                        </span>
+                        <input type="text" id="np-document-id" placeholder="Ej: 001-0000000-0"
+                               oninput="debounceCheckDocDuplicate(this.value)"
+                               class="w-full pl-9 pr-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono">
+                    </div>
+                </div>
+
+                <!-- Teléfono con verificación en vivo -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Teléfono Móvil (WhatsApp)</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-emerald-600">
+                            <i class="fab fa-whatsapp text-sm"></i>
+                        </span>
+                        <input type="tel" id="np-phone" placeholder="809-555-0123"
+                               oninput="debounceCheckPhoneDuplicate(this.value)"
+                               class="w-full pl-9 pr-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div id="np-phone-dup-info" class="hidden text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded-lg mt-1 font-semibold"></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Fecha Nacimiento</label>
+                        <input type="date" id="np-dob"
+                               class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Género</label>
+                        <select id="np-gender" class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="">Seleccione...</option>
+                            <option value="M">Masculino</option>
+                            <option value="F">Femenino</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Correo Electrónico</label>
+                    <input type="email" id="np-email" placeholder="paciente@correo.com"
+                           class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Dirección Residencial</label>
+                    <input type="text" id="np-address" placeholder="Calle, Sector, Ciudad..."
+                           class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tipo de Sangre</label>
+                        <select id="np-blood-type" class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="">No especificado</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Alergias Conocidas</label>
+                        <input type="text" id="np-allergies" placeholder="Penicilina, polen..."
+                               class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Contacto Emergencia</label>
+                        <input type="text" id="np-emergency-name" placeholder="Nombre de familiar"
+                               class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tel. Emergencia</label>
+                        <input type="tel" id="np-emergency-phone" placeholder="809-555-9999"
+                               class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" id="btn-save-new-patient" 
+                            class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/30 text-sm flex items-center justify-center space-x-2 transition active:scale-[0.98]">
+                        <i class="fas fa-save"></i>
+                        <span>Guardar Paciente en Base de Datos</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 6: DETALLE Y EXPEDIENTE MÓVIL DEL PACIENTE -->
+    <div id="modal-patient-details" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-3">
+                    <div id="detail-patient-avatar" class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-base shadow-md">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <h3 id="detail-patient-name" class="font-extrabold text-slate-900 text-base leading-tight">Cargando...</h3>
+                        <p id="detail-patient-doc" class="text-xs text-slate-400 mt-0.5"></p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-patient-details')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <!-- Acciones Rápidas (WhatsApp, Llamar, Cita, Cobro) -->
+            <div class="grid grid-cols-4 gap-2">
+                <button type="button" id="detail-btn-whatsapp" 
+                        class="py-2.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-center text-xs font-bold transition flex flex-col items-center justify-center space-y-1">
+                    <i class="fab fa-whatsapp text-base text-emerald-600"></i>
+                    <span class="text-[10px]">WhatsApp</span>
+                </button>
+                <button type="button" id="detail-btn-call" 
+                        class="py-2.5 px-2 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-xl text-center text-xs font-bold transition flex flex-col items-center justify-center space-y-1">
+                    <i class="fas fa-phone-alt text-base text-blue-600"></i>
+                    <span class="text-[10px]">Llamar</span>
+                </button>
+                <button type="button" id="detail-btn-appt" 
+                        class="py-2.5 px-2 bg-teal-50 hover:bg-teal-100 text-teal-800 rounded-xl text-center text-xs font-bold transition flex flex-col items-center justify-center space-y-1">
+                    <i class="fas fa-calendar-plus text-base text-teal-600"></i>
+                    <span class="text-[10px]">Agendar</span>
+                </button>
+                <button type="button" id="detail-btn-pay" 
+                        class="py-2.5 px-2 bg-violet-50 hover:bg-violet-100 text-violet-800 rounded-xl text-center text-xs font-bold transition flex flex-col items-center justify-center space-y-1">
+                    <i class="fas fa-cash-register text-base text-violet-600"></i>
+                    <span class="text-[10px]">Cobro</span>
+                </button>
+            </div>
+
+            <!-- Ficha Técnica Resumida -->
+            <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 space-y-2 text-xs">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <span class="text-slate-400 block text-[10px] font-bold uppercase">Teléfono</span>
+                        <span id="detail-phone" class="font-bold text-slate-800">--</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px] font-bold uppercase">Correo</span>
+                        <span id="detail-email" class="font-bold text-slate-800 truncate block">--</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px] font-bold uppercase">Fecha Nac. / Edad</span>
+                        <span id="detail-dob" class="font-bold text-slate-800">--</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px] font-bold uppercase">Género</span>
+                        <span id="detail-gender" class="font-bold text-slate-800">--</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px] font-bold uppercase">Tipo de Sangre</span>
+                        <span id="detail-blood" class="font-bold text-slate-800">--</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px] font-bold uppercase">Alergias</span>
+                        <span id="detail-allergies" class="font-bold text-rose-700">--</span>
+                    </div>
+                </div>
+                <div class="pt-1.5 border-t border-slate-200/60">
+                    <span class="text-slate-400 block text-[10px] font-bold uppercase">Dirección</span>
+                    <span id="detail-address" class="font-medium text-slate-700">--</span>
+                </div>
+                <div class="pt-1.5 border-t border-slate-200/60">
+                    <span class="text-slate-400 block text-[10px] font-bold uppercase">Contacto Emergencia</span>
+                    <span id="detail-emergency" class="font-medium text-slate-700">--</span>
+                </div>
+            </div>
+
+            <!-- Historial de Citas del Paciente -->
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-black uppercase text-slate-700 tracking-wider">Historial de Citas</h4>
+                    <span id="detail-appts-count" class="text-[10px] font-bold text-slate-400">0 citas</span>
+                </div>
+                <div id="detail-appts-list" class="space-y-1.5 text-xs max-h-36 overflow-y-auto">
+                    <!-- Dinámico -->
+                </div>
+            </div>
+
+            <!-- Historial de Pagos del Paciente -->
+            <div class="space-y-2 pt-1">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-black uppercase text-slate-700 tracking-wider">Historial de Pagos</h4>
+                    <span id="detail-payments-count" class="text-[10px] font-bold text-slate-400">0 pagos</span>
+                </div>
+                <div id="detail-payments-list" class="space-y-1.5 text-xs max-h-36 overflow-y-auto">
+                    <!-- Dinámico -->
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1085,19 +1454,123 @@
             }
         }
 
+        // --- AGENDAR CITA EXPRESS (CON BÚSQUEDA Y ANTI-DUPLICADOS) ---
         function openQuickApptModal() {
-            document.getElementById('qa-patient-name').value = '';
+            clearSelectedQaPatient();
+            document.getElementById('qa-patient-search').value = '';
             document.getElementById('qa-patient-phone').value = '';
+            document.getElementById('qa-reason').value = '';
             document.getElementById('modal-quick-appt').classList.remove('hidden');
+        }
+
+        function openQuickApptForPatient(patientId, patientName, patientPhone) {
+            document.getElementById('qa-patient-id').value = patientId;
+            document.getElementById('qa-selected-name').textContent = patientName;
+            document.getElementById('qa-selected-meta').textContent = patientPhone ? `Tel: ${patientPhone}` : 'Sin teléfono';
+            document.getElementById('qa-patient-phone').value = patientPhone || '';
+            document.getElementById('qa-search-box-container').classList.add('hidden');
+            document.getElementById('qa-selected-patient-box').classList.remove('hidden');
+            document.getElementById('modal-quick-appt').classList.remove('hidden');
+        }
+
+        let qaSearchTimeout = null;
+        function debounceQaPatientSearch(val) {
+            clearTimeout(qaSearchTimeout);
+            const container = document.getElementById('qa-search-results');
+            if (!val || val.trim().length < 2) {
+                container.classList.add('hidden');
+                container.innerHTML = '';
+                return;
+            }
+            qaSearchTimeout = setTimeout(() => searchPatientsForAppt(val.trim()), 300);
+        }
+
+        async function searchPatientsForAppt(query) {
+            const container = document.getElementById('qa-search-results');
+            try {
+                const res = await fetch(getApiUrl(`/api/mobile/patients/search?q=${encodeURIComponent(query)}`), {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                container.innerHTML = '';
+                if (!data.results || data.results.length === 0) {
+                    container.innerHTML = `
+                        <div class="p-3 text-xs text-slate-500 flex items-center justify-between">
+                            <span>No se encontró ningún paciente con ese término.</span>
+                            <button type="button" onclick="openNewPatientModalFromAppt()" class="text-teal-700 font-bold underline ml-2 whitespace-nowrap">+ Registrar</button>
+                        </div>
+                    `;
+                } else {
+                    data.results.forEach(p => {
+                        const row = document.createElement('div');
+                        row.className = 'p-3 hover:bg-teal-50 cursor-pointer flex items-center justify-between transition';
+                        row.innerHTML = `
+                            <div>
+                                <span class="font-bold text-slate-900 block text-xs">${p.name}</span>
+                                <span class="text-[10px] text-slate-400">Doc: ${p.document_id || 'N/A'} • Tel: ${p.phone || 'N/A'}</span>
+                            </div>
+                            <span class="px-2 py-0.5 bg-teal-100 text-teal-800 text-[10px] font-bold rounded-lg">Seleccionar</span>
+                        `;
+                        row.onclick = () => selectQaPatient(p);
+                        container.appendChild(row);
+                    });
+                }
+                container.classList.remove('hidden');
+            } catch (e) {
+                console.error('Error buscando pacientes para cita:', e);
+            }
+        }
+
+        function selectQaPatient(p) {
+            document.getElementById('qa-patient-id').value = p.id;
+            document.getElementById('qa-selected-name').textContent = p.name;
+            document.getElementById('qa-selected-meta').textContent = `Doc: ${p.document_id || 'S/N'} • Tel: ${p.phone || 'S/T'}`;
+            if (p.phone) {
+                document.getElementById('qa-patient-phone').value = p.phone;
+            }
+            document.getElementById('qa-search-results').classList.add('hidden');
+            document.getElementById('qa-search-box-container').classList.add('hidden');
+            document.getElementById('qa-selected-patient-box').classList.remove('hidden');
+        }
+
+        function clearSelectedQaPatient() {
+            document.getElementById('qa-patient-id').value = '';
+            document.getElementById('qa-selected-patient-box').classList.add('hidden');
+            document.getElementById('qa-search-box-container').classList.remove('hidden');
+            document.getElementById('qa-search-results').classList.add('hidden');
+        }
+
+        function openNewPatientModalFromAppt() {
+            closeModal('modal-quick-appt');
+            window.__returnToApptModalAfterPatientSave = true;
+            openNewPatientModal();
         }
 
         async function handleSaveQuickAppt(e) {
             e.preventDefault();
-            const name = document.getElementById('qa-patient-name').value.trim();
+            const patientIdVal = document.getElementById('qa-patient-id').value;
+            const patientId = patientIdVal ? parseInt(patientIdVal) : null;
+            const searchVal = document.getElementById('qa-patient-search').value.trim();
             const phone = document.getElementById('qa-patient-phone').value.trim();
             const dateStr = document.getElementById('qa-date').value;
             const timeStr = document.getElementById('qa-time').value;
             const reason = document.getElementById('qa-reason').value.trim() || 'Consulta General';
+
+            let patientName = '';
+            if (patientId) {
+                patientName = document.getElementById('qa-selected-name').textContent;
+            } else {
+                patientName = searchVal;
+            }
+
+            if (!patientName && !patientId) {
+                alert('Por favor busque y seleccione un paciente o ingrese su nombre.');
+                return;
+            }
+
+            const submitBtn = document.getElementById('btn-qa-submit');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Programando...';
 
             try {
                 const res = await fetch(getApiUrl('/api/mobile/appointments/quick-create'), {
@@ -1107,7 +1580,8 @@
                         'Authorization': `Bearer ${authToken}`
                     },
                     body: JSON.stringify({
-                        patient_name: name,
+                        patient_id: patientId,
+                        patient_name: patientName,
                         patient_phone: phone,
                         date: dateStr,
                         start_time: timeStr,
@@ -1115,12 +1589,16 @@
                     })
                 });
 
-                if (!res.ok) throw new Error('Error al agendar cita');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Error al agendar cita');
                 closeModal('modal-quick-appt');
-                alert('Cita programada con éxito.');
+                alert(data.message || 'Cita programada con éxito.');
                 loadDashboardData();
             } catch (err) {
                 alert(err.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-save mr-1"></i> Crear Cita';
             }
         }
 
@@ -1130,13 +1608,24 @@
             window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
         }
 
-        // Cobro Rápido
+        // --- COBRO RÁPIDO ---
         function openQuickPaymentModal() {
             document.getElementById('qp-patient-id').value = '';
             document.getElementById('qp-patient-search').value = '';
             document.getElementById('qp-amount').value = '';
             document.getElementById('qp-selected-patient-box').classList.add('hidden');
             document.getElementById('qp-patient-search').classList.remove('hidden');
+            document.getElementById('modal-quick-payment').classList.remove('hidden');
+        }
+
+        function openQuickPaymentForPatient(patientId, patientName, patientDoc) {
+            document.getElementById('qp-patient-id').value = patientId;
+            document.getElementById('qp-selected-name').textContent = patientName;
+            document.getElementById('qp-selected-doc').textContent = `Doc: ${patientDoc || 'N/A'}`;
+            document.getElementById('qp-amount').value = '';
+            document.getElementById('qp-patient-search').classList.add('hidden');
+            document.getElementById('qp-search-results').classList.add('hidden');
+            document.getElementById('qp-selected-patient-box').classList.remove('hidden');
             document.getElementById('modal-quick-payment').classList.remove('hidden');
         }
 
@@ -1224,6 +1713,450 @@
             }
         }
 
+        // --- DIRECTORIO DE PACIENTES CENTRALIZADO ---
+        let currentPatientsPage = 1;
+        let currentPatientsTotalPages = 1;
+        let currentPatientsQuery = '';
+        let patientSearchDebounce = null;
+
+        function debounceMobilePatientSearch(val) {
+            clearTimeout(patientSearchDebounce);
+            const clearBtn = document.getElementById('mobile-patients-clear-search');
+            if (val && val.trim()) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+            patientSearchDebounce = setTimeout(() => {
+                currentPatientsQuery = val.trim();
+                loadMobilePatients(1, currentPatientsQuery);
+            }, 300);
+        }
+
+        function clearMobilePatientSearch() {
+            const input = document.getElementById('mobile-patients-search-input');
+            input.value = '';
+            document.getElementById('mobile-patients-clear-search').classList.add('hidden');
+            currentPatientsQuery = '';
+            loadMobilePatients(1);
+        }
+
+        function goToPatientsPage(delta) {
+            const newPage = currentPatientsPage + delta;
+            if (newPage >= 1 && newPage <= currentPatientsTotalPages) {
+                loadMobilePatients(newPage, currentPatientsQuery);
+            }
+        }
+
+        async function loadMobilePatients(page = 1, query = '') {
+            currentPatientsPage = page;
+            const container = document.getElementById('mobile-patients-list-container');
+            const infoText = document.getElementById('mobile-patients-info-text');
+            const pageInfo = document.getElementById('mobile-patients-page-info');
+            const countBadge = document.getElementById('patient-count-badge');
+            const paginationBox = document.getElementById('mobile-patients-pagination');
+            const pagLabel = document.getElementById('mobile-patients-pagination-label');
+            const prevBtn = document.getElementById('btn-patient-prev');
+            const nextBtn = document.getElementById('btn-patient-next');
+
+            infoText.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Buscando en base de datos...';
+
+            try {
+                const res = await fetch(getApiUrl(`/api/mobile/patients?page=${page}&limit=12&q=${encodeURIComponent(query)}`), {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (res.status === 401) {
+                    handleLogout();
+                    return;
+                }
+
+                const data = await res.json();
+                countBadge.textContent = `${data.total} Pacientes`;
+                currentPatientsTotalPages = data.pages || 1;
+
+                if (query) {
+                    infoText.textContent = `${data.total} encontrados para "${query}"`;
+                } else {
+                    infoText.textContent = `${data.total} pacientes en la base de datos central`;
+                }
+                pageInfo.textContent = `Pág ${data.page} de ${data.pages}`;
+                pagLabel.textContent = `Pág ${data.page} / ${data.pages}`;
+
+                prevBtn.disabled = data.page <= 1;
+                nextBtn.disabled = data.page >= data.pages;
+                if (data.pages > 1) {
+                    paginationBox.classList.remove('hidden');
+                } else {
+                    paginationBox.classList.add('hidden');
+                }
+
+                container.innerHTML = '';
+                if (!data.patients || data.patients.length === 0) {
+                    container.innerHTML = `
+                        <div class="bg-white p-6 rounded-2xl border border-dashed border-slate-200 text-center text-xs text-slate-400 space-y-2">
+                            <i class="fas fa-user-slash text-2xl text-slate-300 block"></i>
+                            <p>No se encontraron pacientes que coincidan con la búsqueda.</p>
+                            <button type="button" onclick="openNewPatientModal()" class="inline-flex items-center space-x-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 font-bold rounded-xl text-xs hover:bg-indigo-100 transition">
+                                <i class="fas fa-user-plus text-[10px]"></i>
+                                <span>Registrar nuevo paciente</span>
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                data.patients.forEach(p => {
+                    const card = createPatientCard(p);
+                    container.appendChild(card);
+                });
+
+            } catch (err) {
+                console.error('Error cargando pacientes móviles:', err);
+                infoText.textContent = 'Error al conectar con la base de datos de pacientes.';
+            }
+        }
+
+        function createPatientCard(p) {
+            const card = document.createElement('div');
+            card.className = 'bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-sm space-y-2.5 transition active:bg-slate-50/50';
+
+            const cleanPhone = (p.phone || '').replace(/[^0-9]/g, '');
+            const hasPhone = cleanPhone.length >= 7;
+
+            card.innerHTML = `
+                <div class="flex items-start justify-between">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+                            ${(p.first_name ? p.first_name[0] : '') + (p.last_name ? p.last_name[0] : '') || 'P'}
+                        </div>
+                        <div>
+                            <h4 class="font-extrabold text-slate-900 text-sm leading-tight">${p.name}</h4>
+                            <div class="flex items-center flex-wrap gap-1 mt-0.5">
+                                ${p.document_id ? `<span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-mono font-bold rounded">${p.document_id}</span>` : '<span class="text-[10px] text-slate-400">Sin cédula</span>'}
+                                ${p.gender ? `<span class="text-[10px] text-slate-400">• ${p.gender}</span>` : ''}
+                                ${p.blood_type ? `<span class="px-1.5 py-0.5 bg-rose-50 text-rose-700 text-[10px] font-bold rounded">${p.blood_type}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="openMobilePatientDetails(${p.id})" title="Ver Ficha y Expediente" 
+                            class="w-8 h-8 rounded-xl bg-slate-50 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 flex items-center justify-center text-xs transition">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+
+                <!-- Barra de Acciones Directas del Paciente -->
+                <div class="flex items-center space-x-1.5 pt-1 border-t border-slate-100 text-xs">
+                    ${hasPhone ? `
+                    <button onclick="sendWhatsAppDirect('${cleanPhone}', '${p.name}')" title="Chat WhatsApp"
+                            class="py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl text-[11px] flex items-center space-x-1 transition active:scale-95">
+                        <i class="fab fa-whatsapp text-emerald-600 text-xs"></i>
+                        <span>WhatsApp</span>
+                    </button>
+                    <button onclick="makePhoneCall('${cleanPhone}')" title="Llamar"
+                            class="py-1.5 px-2 bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold rounded-xl text-[11px] flex items-center space-x-1 transition active:scale-95">
+                        <i class="fas fa-phone-alt text-blue-600 text-[10px]"></i>
+                    </button>
+                    ` : `
+                    <span class="text-[10px] text-slate-400 italic">Sin teléfono registrado</span>
+                    `}
+                    <div class="flex-1"></div>
+                    <button onclick="openQuickApptForPatient(${p.id}, '${p.name}', '${p.phone || ''}')" title="Agendar Cita"
+                            class="py-1.5 px-2.5 bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold rounded-xl text-[11px] flex items-center space-x-1 transition active:scale-95">
+                        <i class="fas fa-calendar-plus text-teal-600 text-xs"></i>
+                        <span>Cita</span>
+                    </button>
+                    <button onclick="openQuickPaymentForPatient(${p.id}, '${p.name}', '${p.document_id || ''}')" title="Cobrar Consulta"
+                            class="py-1.5 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-[11px] flex items-center space-x-1 shadow-sm transition active:scale-95">
+                        <i class="fas fa-cash-register text-xs"></i>
+                        <span>Cobrar</span>
+                    </button>
+                </div>
+            `;
+
+            return card;
+        }
+
+        function sendWhatsAppDirect(cleanPhone, name) {
+            const msg = encodeURIComponent(`Hola ${name}, nos comunicamos desde ${currentClinic?.name || 'la clínica'}. ¿En qué podemos ayudarle?`);
+            window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
+        }
+
+        function makePhoneCall(cleanPhone) {
+            window.location.href = `tel:${cleanPhone}`;
+        }
+
+        // --- ALTA DE PACIENTE CON VALIDACIÓN ANTI-DUPLICADOS ---
+        let checkDocTimeout = null;
+        let lastDuplicateFound = null;
+
+        function openNewPatientModal() {
+            document.getElementById('np-first-name').value = '';
+            document.getElementById('np-last-name').value = '';
+            document.getElementById('np-document-id').value = '';
+            document.getElementById('np-phone').value = '';
+            document.getElementById('np-dob').value = '';
+            document.getElementById('np-gender').value = '';
+            document.getElementById('np-email').value = '';
+            document.getElementById('np-address').value = '';
+            document.getElementById('np-blood-type').value = '';
+            document.getElementById('np-allergies').value = '';
+            document.getElementById('np-emergency-name').value = '';
+            document.getElementById('np-emergency-phone').value = '';
+            document.getElementById('np-dup-warning').classList.add('hidden');
+            document.getElementById('np-phone-dup-info').classList.add('hidden');
+            document.getElementById('np-doc-status').textContent = 'Verificación anti-duplicados';
+            document.getElementById('np-doc-status').className = 'text-[10px] font-bold text-slate-400';
+            document.getElementById('btn-save-new-patient').disabled = false;
+            lastDuplicateFound = null;
+            document.getElementById('modal-new-patient').classList.remove('hidden');
+        }
+
+        function debounceCheckDocDuplicate(val) {
+            clearTimeout(checkDocTimeout);
+            const statusElem = document.getElementById('np-doc-status');
+            const warnBox = document.getElementById('np-dup-warning');
+            const saveBtn = document.getElementById('btn-save-new-patient');
+
+            if (!val || val.trim().length < 3) {
+                warnBox.classList.add('hidden');
+                statusElem.textContent = 'Verificación anti-duplicados';
+                statusElem.className = 'text-[10px] font-bold text-slate-400';
+                saveBtn.disabled = false;
+                lastDuplicateFound = null;
+                return;
+            }
+
+            statusElem.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Verificando cédula...';
+            checkDocTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(getApiUrl(`/api/mobile/patients/check-duplicate?document_id=${encodeURIComponent(val.trim())}`), {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+                    const data = await res.json();
+                    if (data.is_duplicate) {
+                        lastDuplicateFound = data.patient;
+                        statusElem.textContent = '⚠️ ¡Cédula Duplicada!';
+                        statusElem.className = 'text-[10px] font-bold text-red-600';
+                        document.getElementById('np-dup-msg').textContent = data.message;
+                        document.getElementById('np-dup-patient-info').innerHTML = `
+                            <strong>${data.patient.name}</strong> • Cédula: <strong>${data.patient.document_id}</strong><br>
+                            Teléfono: ${data.patient.phone || 'No registrado'}
+                        `;
+                        warnBox.classList.remove('hidden');
+                        saveBtn.disabled = true;
+                    } else {
+                        lastDuplicateFound = null;
+                        statusElem.textContent = '✓ Documento Disponible';
+                        statusElem.className = 'text-[10px] font-bold text-emerald-600';
+                        warnBox.classList.add('hidden');
+                        saveBtn.disabled = false;
+                    }
+                } catch (e) {
+                    console.error('Error verificando duplicado:', e);
+                }
+            }, 300);
+        }
+
+        let checkPhoneTimeout = null;
+        function debounceCheckPhoneDuplicate(val) {
+            clearTimeout(checkPhoneTimeout);
+            const phoneInfo = document.getElementById('np-phone-dup-info');
+            if (!val || val.trim().length < 7) {
+                phoneInfo.classList.add('hidden');
+                return;
+            }
+            checkPhoneTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(getApiUrl(`/api/mobile/patients/check-duplicate?phone=${encodeURIComponent(val.trim())}`), {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+                    const data = await res.json();
+                    if (data.is_duplicate) {
+                        phoneInfo.innerHTML = `<i class="fas fa-info-circle mr-1"></i> Aviso: Este teléfono ya está registrado a nombre de: <strong>${data.patient.name}</strong>.`;
+                        phoneInfo.classList.remove('hidden');
+                    } else {
+                        phoneInfo.classList.add('hidden');
+                    }
+                } catch (e) {}
+            }, 350);
+        }
+
+        function selectExistingDuplicatePatient() {
+            if (!lastDuplicateFound) return;
+            const p = lastDuplicateFound;
+            closeModal('modal-new-patient');
+            if (window.__returnToApptModalAfterPatientSave) {
+                window.__returnToApptModalAfterPatientSave = false;
+                openQuickApptForPatient(p.id, p.name, p.phone);
+            } else {
+                openMobilePatientDetails(p.id);
+            }
+        }
+
+        async function handleSaveNewPatient(e) {
+            e.preventDefault();
+            const fn = document.getElementById('np-first-name').value.trim();
+            const ln = document.getElementById('np-last-name').value.trim();
+            const docId = document.getElementById('np-document-id').value.trim();
+            const phone = document.getElementById('np-phone').value.trim();
+            const dob = document.getElementById('np-dob').value;
+            const gender = document.getElementById('np-gender').value;
+            const email = document.getElementById('np-email').value.trim();
+            const address = document.getElementById('np-address').value.trim();
+            const blood = document.getElementById('np-blood-type').value;
+            const allergies = document.getElementById('np-allergies').value.trim();
+            const emName = document.getElementById('np-emergency-name').value.trim();
+            const emPhone = document.getElementById('np-emergency-phone').value.trim();
+
+            const saveBtn = document.getElementById('btn-save-new-patient');
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i> Guardando en base de datos...';
+
+            try {
+                const res = await fetch(getApiUrl('/api/mobile/patients'), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        first_name: fn,
+                        last_name: ln,
+                        document_id: docId || null,
+                        phone: phone || null,
+                        date_of_birth: dob || null,
+                        gender: gender || null,
+                        email: email || null,
+                        address: address || null,
+                        blood_type: blood || null,
+                        allergies: allergies || null,
+                        emergency_contact_name: emName || null,
+                        emergency_contact_phone: emPhone || null
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || 'Error al registrar paciente');
+                }
+
+                closeModal('modal-new-patient');
+                alert(data.message || 'Paciente registrado exitosamente.');
+
+                // Si se abrió desde Agendar Cita, regresar a la cita con el paciente seleccionado
+                if (window.__returnToApptModalAfterPatientSave && data.patient) {
+                    window.__returnToApptModalAfterPatientSave = false;
+                    openQuickApptForPatient(data.patient.id, data.patient.name, data.patient.phone);
+                } else if (currentMainTab === 'patients') {
+                    loadMobilePatients(1);
+                }
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save mr-1.5"></i> Guardar Paciente en Base de Datos';
+            }
+        }
+
+        // --- EXPEDIENTE Y DETALLE MÓVIL DEL PACIENTE ---
+        async function openMobilePatientDetails(patientId) {
+            try {
+                const res = await fetch(getApiUrl(`/api/mobile/patients/${patientId}/details`), {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!res.ok) throw new Error('No se pudo cargar el detalle del paciente');
+                const data = await res.json();
+                const p = data.patient;
+
+                document.getElementById('detail-patient-name').textContent = p.name;
+                document.getElementById('detail-patient-doc').textContent = `Cédula/Doc: ${p.document_id} • Tel: ${p.phone}`;
+                document.getElementById('detail-phone').textContent = p.phone;
+                document.getElementById('detail-email').textContent = p.email;
+                document.getElementById('detail-dob').textContent = p.date_of_birth;
+                document.getElementById('detail-gender').textContent = p.gender;
+                document.getElementById('detail-blood').textContent = p.blood_type;
+                document.getElementById('detail-allergies').textContent = p.allergies;
+                document.getElementById('detail-address').textContent = p.address;
+                document.getElementById('detail-emergency').textContent = `${p.emergency_contact_name || ''} ${p.emergency_contact_phone || ''}`.trim() || 'No registrado';
+
+                // Acciones
+                const cleanPhone = (p.phone || '').replace(/[^0-9]/g, '');
+                const btnWa = document.getElementById('detail-btn-whatsapp');
+                const btnCall = document.getElementById('detail-btn-call');
+                if (cleanPhone.length >= 7) {
+                    btnWa.onclick = () => sendWhatsAppDirect(cleanPhone, p.name);
+                    btnCall.onclick = () => makePhoneCall(cleanPhone);
+                    btnWa.disabled = false;
+                    btnCall.disabled = false;
+                    btnWa.classList.remove('opacity-40');
+                    btnCall.classList.remove('opacity-40');
+                } else {
+                    btnWa.disabled = true;
+                    btnCall.disabled = true;
+                    btnWa.classList.add('opacity-40');
+                    btnCall.classList.add('opacity-40');
+                }
+
+                document.getElementById('detail-btn-appt').onclick = () => {
+                    closeModal('modal-patient-details');
+                    openQuickApptForPatient(p.id, p.name, p.phone);
+                };
+
+                document.getElementById('detail-btn-pay').onclick = () => {
+                    closeModal('modal-patient-details');
+                    openQuickPaymentForPatient(p.id, p.name, p.document_id);
+                };
+
+                // Citas
+                const apptsContainer = document.getElementById('detail-appts-list');
+                apptsContainer.innerHTML = '';
+                document.getElementById('detail-appts-count').textContent = `${(data.appointments || []).length} citas`;
+                if (!data.appointments || data.appointments.length === 0) {
+                    apptsContainer.innerHTML = '<div class="text-slate-400 italic py-1">No tiene citas registradas.</div>';
+                } else {
+                    data.appointments.forEach(a => {
+                        const row = document.createElement('div');
+                        row.className = 'p-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between';
+                        row.innerHTML = `
+                            <div>
+                                <span class="font-bold text-slate-800">${a.reason}</span>
+                                <span class="text-[10px] text-slate-400 block">${a.date} ${a.start_time}</span>
+                            </div>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${a.status === 'Atendida' ? 'bg-violet-100 text-violet-800' : 'bg-amber-100 text-amber-800'}">${a.status}</span>
+                        `;
+                        apptsContainer.appendChild(row);
+                    });
+                }
+
+                // Pagos
+                const paysContainer = document.getElementById('detail-payments-list');
+                paysContainer.innerHTML = '';
+                document.getElementById('detail-payments-count').textContent = `${(data.payments || []).length} pagos`;
+                if (!data.payments || data.payments.length === 0) {
+                    paysContainer.innerHTML = '<div class="text-slate-400 italic py-1">No registra pagos aún.</div>';
+                } else {
+                    data.payments.forEach(py => {
+                        const row = document.createElement('div');
+                        row.className = 'p-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between';
+                        row.innerHTML = `
+                            <div>
+                                <span class="font-bold text-slate-800">${py.receipt}</span>
+                                <span class="text-[10px] text-slate-400 block">${py.method} • ${py.date}</span>
+                            </div>
+                            <span class="font-black text-emerald-700">RD$ ${py.amount.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
+                        `;
+                        paysContainer.appendChild(row);
+                    });
+                }
+
+                document.getElementById('modal-patient-details').classList.remove('hidden');
+            } catch (e) {
+                alert('Error al abrir expediente: ' + e);
+            }
+        }
+
         function closeModal(id) {
             document.getElementById(id).classList.add('hidden');
         }
@@ -1236,17 +2169,26 @@
         function switchMainTab(tab) {
             currentMainTab = tab;
             const viewToday = document.getElementById('view-today');
+            const viewPatients = document.getElementById('view-patients');
             const viewReports = document.getElementById('view-reports');
             const btnToday = document.getElementById('nav-btn-today');
+            const btnPatients = document.getElementById('nav-btn-patients');
             const btnReports = document.getElementById('nav-btn-reports');
             const secFloating = document.getElementById('secretary-floating-bar');
 
+            // Reset vistas
+            viewToday.classList.add('hidden');
+            viewPatients.classList.add('hidden');
+            viewReports.classList.add('hidden');
+
+            // Reset botones nav
+            btnToday.className = 'flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-600 font-medium text-[11px] transition';
+            btnPatients.className = 'flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-600 font-medium text-[11px] transition';
+            btnReports.className = 'flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-600 font-medium text-[11px] transition';
+
             if (tab === 'today') {
                 viewToday.classList.remove('hidden');
-                viewReports.classList.add('hidden');
-
                 btnToday.className = 'flex flex-col items-center justify-center flex-1 py-1 text-indigo-600 font-bold text-[11px] transition';
-                btnReports.className = 'flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-600 font-medium text-[11px] transition';
 
                 if (currentUser && currentUser.role !== 'doctor') {
                     secFloating.classList.remove('hidden');
@@ -1254,11 +2196,18 @@
                     secFloating.classList.add('hidden');
                 }
                 loadDashboardData();
-            } else {
-                viewToday.classList.add('hidden');
-                viewReports.classList.remove('hidden');
+            } else if (tab === 'patients') {
+                viewPatients.classList.remove('hidden');
+                btnPatients.className = 'flex flex-col items-center justify-center flex-1 py-1 text-indigo-600 font-bold text-[11px] transition';
 
-                btnToday.className = 'flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-600 font-medium text-[11px] transition';
+                if (currentUser && currentUser.role !== 'doctor') {
+                    secFloating.classList.remove('hidden');
+                } else {
+                    secFloating.classList.add('hidden');
+                }
+                loadMobilePatients(1);
+            } else if (tab === 'reports') {
+                viewReports.classList.remove('hidden');
                 btnReports.className = 'flex flex-col items-center justify-center flex-1 py-1 text-indigo-600 font-bold text-[11px] transition';
 
                 secFloating.classList.add('hidden');

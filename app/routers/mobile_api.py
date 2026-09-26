@@ -33,6 +33,20 @@ class QuickAppointmentRequest(BaseModel):
     start_time: str  # HH:MM
     reason: str
 
+class MobilePatientCreateRequest(BaseModel):
+    first_name: str
+    last_name: str
+    document_id: Optional[str] = None
+    phone: Optional[str] = None
+    date_of_birth: Optional[str] = None  # YYYY-MM-DD
+    gender: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    blood_type: Optional[str] = None
+    allergies: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+
 class QuickConsultationRequest(BaseModel):
     patient_id: int
     appointment_id: Optional[int] = None
@@ -185,25 +199,49 @@ def quick_create_appointment(
 ):
     patient_id = payload.patient_id
 
-    # If no patient_id but name given, find or create patient
+    # Si no se pasó patient_id explícito, buscar primero si ya existe para evitar duplicados
     if not patient_id and payload.patient_name:
-        parts = payload.patient_name.strip().split(" ", 1)
-        fname = parts[0]
-        lname = parts[1] if len(parts) > 1 else ""
-        new_patient = Patient(
-            first_name=fname,
-            last_name=lname,
-            phone=payload.patient_phone or "",
-            document_id=f"TEMP-{int(datetime.now().timestamp())}",
-            is_active=True
-        )
-        db.add(new_patient)
-        db.commit()
-        db.refresh(new_patient)
-        patient_id = new_patient.id
+        name_clean = payload.patient_name.strip()
+        phone_clean = (payload.patient_phone or "").strip()
+
+        existing = None
+        # 1. Buscar coincidencia por teléfono
+        if phone_clean:
+            existing = db.query(Patient).filter(Patient.phone == phone_clean, Patient.is_active == True).first()
+
+        # 2. Si no coincide por teléfono, buscar coincidencia por nombre y apellido
+        if not existing and name_clean:
+            parts = name_clean.split(" ", 1)
+            fname = parts[0]
+            lname = parts[1] if len(parts) > 1 else ""
+            if lname:
+                existing = db.query(Patient).filter(
+                    Patient.first_name.ilike(fname),
+                    Patient.last_name.ilike(lname),
+                    Patient.is_active == True
+                ).first()
+
+        if existing:
+            patient_id = existing.id
+        else:
+            # Crear paciente sin forzar identificador falso
+            parts = name_clean.split(" ", 1)
+            fname = parts[0]
+            lname = parts[1] if len(parts) > 1 else ""
+            new_patient = Patient(
+                first_name=fname,
+                last_name=lname,
+                phone=phone_clean,
+                document_id=None,
+                is_active=True
+            )
+            db.add(new_patient)
+            db.commit()
+            db.refresh(new_patient)
+            patient_id = new_patient.id
 
     if not patient_id:
-        raise HTTPException(status_code=400, detail="Debe especificar un paciente válido")
+        raise HTTPException(status_code=400, detail="Debe especificar o registrar un paciente válido")
 
     try:
         appt_date = datetime.strptime(payload.date, "%Y-%m-%d").date()
@@ -232,6 +270,262 @@ def quick_create_appointment(
         "date": str(new_appt.date),
         "start_time": new_appt.start_time.strftime("%H:%M"),
         "status": new_appt.status
+    }
+
+# --- Directorio de Pacientes Móvil con Paginación y Búsqueda ---
+@router.get("/patients")
+def list_mobile_patients(
+    q: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(30, ge=1, le=100),
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """Listado del directorio de pacientes para la versión móvil."""
+    query = db.query(Patient).filter(Patient.is_active == True)
+
+    if q and q.strip():
+        term = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                Patient.first_name.ilike(term),
+                Patient.last_name.ilike(term),
+                Patient.phone.ilike(term),
+                Patient.document_id.ilike(term),
+                Patient.email.ilike(term)
+            )
+        )
+
+    total = query.count()
+    patients = query.order_by(Patient.id.desc()).offset((page - 1) * limit).limit(limit).all()
+
+    results = []
+    for p in patients:
+        results.append({
+            "id": p.id,
+            "name": f"{p.first_name} {p.last_name}",
+            "first_name": p.first_name,
+            "last_name": p.last_name,
+            "document_id": p.document_id or "",
+            "phone": p.phone or "",
+            "email": p.email or "",
+            "date_of_birth": str(p.date_of_birth) if p.date_of_birth else "",
+            "gender": p.gender or "",
+            "address": p.address or "",
+            "blood_type": p.blood_type or "",
+            "allergies": p.allergies or "",
+            "emergency_contact": f"{p.emergency_contact_name or ''} {p.emergency_contact_phone or ''}".strip(),
+            "created_at": p.created_at.strftime("%d/%m/%Y") if p.created_at else ""
+        })
+
+    return {
+        "patients": results,
+        "total": total,
+        "page": page,
+        "pages": (total + limit - 1) // limit if total > 0 else 1
+    }
+
+# --- Verificador Anti-Duplicados en Tiempo Real ---
+@router.get("/patients/check-duplicate")
+def check_patient_duplicate(
+    document_id: Optional[str] = None,
+    phone: Optional[str] = None,
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    exclude_id: Optional[int] = None,
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """Verifica si ya existe un paciente registrado con la misma cédula, teléfono o nombre completo para prevenir duplicidad."""
+    query = db.query(Patient).filter(Patient.is_active == True)
+    if exclude_id:
+        query = query.filter(Patient.id != exclude_id)
+
+    # 1. Cédula / DNI
+    if document_id and document_id.strip():
+        clean_doc = document_id.strip()
+        match = query.filter(Patient.document_id == clean_doc).first()
+        if match:
+            return {
+                "is_duplicate": True,
+                "field": "cédula",
+                "patient": {
+                    "id": match.id,
+                    "name": f"{match.first_name} {match.last_name}",
+                    "document_id": match.document_id or "",
+                    "phone": match.phone or "",
+                    "email": match.email or ""
+                },
+                "message": f"Ya existe un paciente con la cédula '{clean_doc}': {match.first_name} {match.last_name}"
+            }
+
+    # 2. Teléfono
+    if phone and phone.strip():
+        clean_phone = phone.strip()
+        match = query.filter(Patient.phone == clean_phone).first()
+        if match:
+            return {
+                "is_duplicate": True,
+                "field": "teléfono",
+                "patient": {
+                    "id": match.id,
+                    "name": f"{match.first_name} {match.last_name}",
+                    "document_id": match.document_id or "",
+                    "phone": match.phone or "",
+                    "email": match.email or ""
+                },
+                "message": f"Ya existe un paciente con este teléfono '{clean_phone}': {match.first_name} {match.last_name}"
+            }
+
+    # 3. Nombre y Apellido idénticos
+    if first_name and last_name and first_name.strip() and last_name.strip():
+        fn = first_name.strip()
+        ln = last_name.strip()
+        match = query.filter(Patient.first_name.ilike(fn), Patient.last_name.ilike(ln)).first()
+        if match:
+            return {
+                "is_duplicate": True,
+                "field": "nombre",
+                "patient": {
+                    "id": match.id,
+                    "name": f"{match.first_name} {match.last_name}",
+                    "document_id": match.document_id or "",
+                    "phone": match.phone or "",
+                    "email": match.email or ""
+                },
+                "message": f"Existe un paciente con el mismo nombre y apellido: {match.first_name} {match.last_name} (Cédula: {match.document_id or 'S/N'}, Tel: {match.phone or 'S/T'})"
+            }
+
+    return {"is_duplicate": False, "message": "No se encontraron duplicados"}
+
+# --- Registro de Nuevo Paciente desde Móvil (Secretaria) con Anti-Duplicados ---
+@router.post("/patients")
+def create_mobile_patient(
+    payload: MobilePatientCreateRequest,
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """Alta oficial de paciente desde la aplicación móvil de secretaría."""
+    fn = payload.first_name.strip()
+    ln = payload.last_name.strip()
+    doc_id = payload.document_id.strip() if payload.document_id and payload.document_id.strip() else None
+    phone = payload.phone.strip() if payload.phone and payload.phone.strip() else None
+
+    if not fn or not ln:
+        raise HTTPException(status_code=400, detail="El nombre y apellido del paciente son obligatorios")
+
+    # Validación anti-duplicados por cédula
+    if doc_id:
+        dup_doc = db.query(Patient).filter(Patient.document_id == doc_id, Patient.is_active == True).first()
+        if dup_doc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ya existe un paciente con la cédula '{doc_id}': {dup_doc.first_name} {dup_doc.last_name}. Utilice el paciente existente para evitar duplicidad."
+            )
+
+    dob = None
+    if payload.date_of_birth:
+        try:
+            dob = datetime.strptime(payload.date_of_birth, "%Y-%m-%d").date()
+        except Exception:
+            pass
+
+    new_patient = Patient(
+        first_name=fn,
+        last_name=ln,
+        document_id=doc_id,
+        phone=phone,
+        date_of_birth=dob,
+        gender=payload.gender,
+        email=payload.email.strip().lower() if payload.email and payload.email.strip() else None,
+        address=payload.address.strip() if payload.address and payload.address.strip() else None,
+        blood_type=payload.blood_type,
+        allergies=payload.allergies.strip() if payload.allergies and payload.allergies.strip() else None,
+        emergency_contact_name=payload.emergency_contact_name.strip() if payload.emergency_contact_name and payload.emergency_contact_name.strip() else None,
+        emergency_contact_phone=payload.emergency_contact_phone.strip() if payload.emergency_contact_phone and payload.emergency_contact_phone.strip() else None,
+        is_active=True
+    )
+    db.add(new_patient)
+    db.commit()
+    db.refresh(new_patient)
+
+    return {
+        "success": True,
+        "patient": {
+            "id": new_patient.id,
+            "name": f"{new_patient.first_name} {new_patient.last_name}",
+            "first_name": new_patient.first_name,
+            "last_name": new_patient.last_name,
+            "document_id": new_patient.document_id or "",
+            "phone": new_patient.phone or "",
+            "email": new_patient.email or "",
+            "date_of_birth": str(new_patient.date_of_birth) if new_patient.date_of_birth else "",
+            "gender": new_patient.gender or "",
+            "address": new_patient.address or ""
+        },
+        "message": f"Paciente {new_patient.first_name} {new_patient.last_name} registrado exitosamente en la base de datos central."
+    }
+
+# --- Ficha Detallada del Paciente para la Secretaria / Doctor ---
+@router.get("/patients/{patient_id}/details")
+def get_mobile_patient_details(
+    patient_id: int,
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    patient = db.query(Patient).filter(Patient.id == patient_id, Patient.is_active == True).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+    # Citas del paciente
+    appts = db.query(Appointment).filter(Appointment.patient_id == patient_id).order_by(Appointment.date.desc(), Appointment.start_time.desc()).limit(10).all()
+    appts_data = []
+    for a in appts:
+        appts_data.append({
+            "id": a.id,
+            "date": a.date.strftime("%d/%m/%Y") if a.date else "",
+            "start_time": a.start_time.strftime("%H:%M") if a.start_time else "",
+            "reason": a.reason or "Consulta General",
+            "status": a.status
+        })
+
+    # Pagos registrados
+    payments = db.query(Payment).filter(Payment.patient_id == patient_id).order_by(Payment.created_at.desc()).limit(5).all()
+    payments_data = []
+    total_paid = 0.0
+    for py in payments:
+        val = float(py.total if py.total is not None and py.total > 0 else (py.amount or 0.0))
+        total_paid += val
+        payments_data.append({
+            "id": py.id,
+            "amount": val,
+            "method": py.payment_method or "Efectivo",
+            "date": py.created_at.strftime("%d/%m/%Y %H:%M") if py.created_at else "",
+            "receipt": py.receipt_number or f"REC-{py.id:04d}"
+        })
+
+    return {
+        "patient": {
+            "id": patient.id,
+            "name": f"{patient.first_name} {patient.last_name}",
+            "first_name": patient.first_name,
+            "last_name": patient.last_name,
+            "document_id": patient.document_id or "No registrada",
+            "phone": patient.phone or "No registrado",
+            "email": patient.email or "No registrado",
+            "date_of_birth": str(patient.date_of_birth) if patient.date_of_birth else "No especificada",
+            "gender": patient.gender or "No especificado",
+            "address": patient.address or "No especificada",
+            "blood_type": patient.blood_type or "No especificado",
+            "allergies": patient.allergies or "Ninguna conocida",
+            "emergency_contact": f"{patient.emergency_contact_name or ''} {patient.emergency_contact_phone or ''}".strip() or "No registrado",
+            "created_at": patient.created_at.strftime("%d/%m/%Y") if patient.created_at else ""
+        },
+        "appointments": appts_data,
+        "payments": {
+            "total_paid": round(total_paid, 2),
+            "recent": payments_data
+        }
     }
 
 # --- Search Patients ---
