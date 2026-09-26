@@ -151,10 +151,27 @@ class SyncService:
                 "created_at": pay.created_at.isoformat() if pay.created_at else None,
             })
 
+        # Extraer correo e identidad del médico para aislamiento multi-sede / multi-doctor
+        doctor_email = None
+        doctor_name = setting.doctor_name if setting else None
+        try:
+            from app.models.user import User
+            doctor_user = db.query(User).filter(User.role == "doctor").first()
+            if setting and setting.email and "@" in setting.email and "sscp.local" not in setting.email:
+                doctor_email = setting.email.strip()
+            elif doctor_user and doctor_user.email:
+                doctor_email = doctor_user.email.strip()
+            elif setting and setting.email:
+                doctor_email = setting.email.strip()
+        except Exception:
+            pass
+
         return {
             "version": "1.0",
             "exported_at": datetime.utcnow().isoformat(),
             "sede": setting.sede_name if setting else "Sede Central",
+            "doctor_email": doctor_email,
+            "doctor_name": doctor_name,
             "counts": {
                 "patients": len(patients),
                 "consultations": len(consultations),
@@ -172,7 +189,9 @@ class SyncService:
     @staticmethod
     def import_package(db: Session, package: dict) -> dict:
         """
-        Importa registros de un paquete JSON resolviendo referencias por document_id.
+        Importa registros de un paquete JSON resolviendo referencias por document_id
+        o por Nombre Completo + Fecha de Nacimiento. Reconcilia historias clínicas
+        sin duplicar pacientes existentes.
         """
         if not package or "data" not in package:
             return {"success": False, "message": "Estructura de paquete de datos inválida."}
@@ -180,18 +199,39 @@ class SyncService:
         data = package["data"]
         created_counts = {"patients": 0, "consultations": 0, "vital_signs": 0, "payments": 0}
 
-        # 1. Importar o fusionar Pacientes
-        patient_map = {} # document_id -> Patient model
+        # 1. Importar o fusionar Pacientes (Deduplicación estricta)
+        patient_map = {} # document_id / remote_id -> Patient model
         for p_data in data.get("patients", []):
-            doc_id = p_data.get("document_id")
+            doc_id = str(p_data.get("document_id") or "").strip() or None
+            fn = str(p_data.get("first_name") or "").strip()
+            ln = str(p_data.get("last_name") or "").strip()
+            full_n = (f"{fn} {ln}".strip()) or str(p_data.get("full_name") or "Paciente Sincronizado").strip()
+
             existing = None
+
+            # Prioridad 1: Buscar por Cédula / Documento de Identidad
             if doc_id:
                 existing = db.query(Patient).filter(Patient.document_id == doc_id).first()
-            
+
+            # Prioridad 2: Buscar por Nombre Completo y Fecha de Nacimiento si no hay Cédula
+            if not existing and fn:
+                q = db.query(Patient).filter(Patient.first_name == fn)
+                if ln:
+                    q = q.filter(Patient.last_name == ln)
+                dob = p_data.get("date_of_birth")
+                if dob:
+                    try:
+                        dob_d = datetime.fromisoformat(dob.split("T")[0]).date()
+                        q = q.filter(Patient.date_of_birth == dob_d)
+                    except Exception:
+                        pass
+                existing = q.first()
+
             if not existing:
+                # Paciente nuevo: Registrar
                 new_patient = Patient(
-                    first_name=p_data.get("first_name", ""),
-                    last_name=p_data.get("last_name", ""),
+                    first_name=fn or full_n,
+                    last_name=ln,
                     document_id=doc_id,
                     phone=p_data.get("phone"),
                     email=p_data.get("email"),
@@ -201,54 +241,93 @@ class SyncService:
                 )
                 db.add(new_patient)
                 db.flush()
-                patient_map[doc_id] = new_patient
+                if doc_id:
+                    patient_map[doc_id] = new_patient
+                if p_data.get("id"):
+                    patient_map[str(p_data["id"])] = new_patient
                 created_counts["patients"] += 1
             else:
-                # Estrategia 'Último Gana' (Last-Write-Wins): actualizar campos si el paquete entrante trae datos más recientes
-                if p_data.get("allergies"):
+                # Paciente ya existe: No duplicar; actualizar datos de contacto si cambiaron
+                if p_data.get("allergies") and not existing.allergies:
                     existing.allergies = p_data.get("allergies")
-                if p_data.get("phone"):
+                if p_data.get("phone") and not existing.phone:
                     existing.phone = p_data.get("phone")
-                if p_data.get("email"):
+                if p_data.get("email") and not existing.email:
                     existing.email = p_data.get("email")
-                patient_map[doc_id] = existing
+                if doc_id and not existing.document_id:
+                    existing.document_id = doc_id
+                if doc_id:
+                    patient_map[doc_id] = existing
+                if p_data.get("id"):
+                    patient_map[str(p_data["id"])] = existing
 
-        # 2. Importar Consultas
+        # 2. Importar Consultas (Cuadrar historias clínicas)
         for c_data in data.get("consultations", []):
             doc_id = c_data.get("patient_document_id")
-            patient = patient_map.get(doc_id)
+            patient = patient_map.get(doc_id) if doc_id else None
+            if not patient and c_data.get("patient_id"):
+                patient = patient_map.get(str(c_data.get("patient_id")))
+
             if patient:
-                # Comprobar si ya existe consulta con igual fecha y motivo
+                c_created = None
+                if c_data.get("created_at"):
+                    try:
+                        c_created = datetime.fromisoformat(c_data["created_at"].replace("Z", "+00:00"))
+                    except Exception:
+                        c_created = None
+
+                reason = (c_data.get("reason") or "Consulta médica").strip()
+
+                # Comprobar si ya existe consulta con igual motivo o en igual fecha para este paciente
                 existing_c = db.query(Consultation).filter(
                     Consultation.patient_id == patient.id,
-                    Consultation.reason == c_data.get("reason")
+                    Consultation.reason == reason
                 ).first()
+
+                if not existing_c and c_created:
+                    from sqlalchemy import func
+                    existing_c = db.query(Consultation).filter(
+                        Consultation.patient_id == patient.id,
+                        func.date(Consultation.created_at) == c_created.date()
+                    ).first()
+
                 if not existing_c:
+                    # Consulta nueva: agregar al historial médico
                     new_c = Consultation(
                         patient_id=patient.id,
                         doctor_id=1,
-                        reason=c_data.get("reason", "Consulta importada"),
+                        reason=reason,
                         symptoms=c_data.get("symptoms"),
                         physical_exam=c_data.get("physical_exam"),
                         diagnosis=c_data.get("diagnosis"),
                         treatment=c_data.get("treatment"),
                         prescription=c_data.get("prescription"),
                         notes=c_data.get("notes"),
-                        sede_origen=c_data.get("sede_origen", "remoto")
+                        sede_origen=c_data.get("sede_origen", "remoto"),
+                        created_at=c_created or datetime.utcnow()
                     )
                     db.add(new_c)
                     created_counts["consultations"] += 1
                 else:
-                    # LWW: Si la consulta existe pero faltaba diagnóstico o receta, enriquecerla
+                    # Cuadrar historia clínica: si la consulta ya existía pero faltaba diagnóstico o receta, completarla
                     if not existing_c.diagnosis and c_data.get("diagnosis"):
                         existing_c.diagnosis = c_data.get("diagnosis")
                     if not existing_c.prescription and c_data.get("prescription"):
                         existing_c.prescription = c_data.get("prescription")
+                    if not existing_c.treatment and c_data.get("treatment"):
+                        existing_c.treatment = c_data.get("treatment")
+                    if not existing_c.physical_exam and c_data.get("physical_exam"):
+                        existing_c.physical_exam = c_data.get("physical_exam")
+                    if not existing_c.symptoms and c_data.get("symptoms"):
+                        existing_c.symptoms = c_data.get("symptoms")
 
         # 3. Importar Signos Vitales
         for v_data in data.get("vital_signs", []):
             doc_id = v_data.get("patient_document_id")
-            patient = patient_map.get(doc_id)
+            patient = patient_map.get(doc_id) if doc_id else None
+            if not patient and v_data.get("patient_id"):
+                patient = patient_map.get(str(v_data.get("patient_id")))
+
             if patient:
                 existing_v = db.query(VitalSign).filter(
                     VitalSign.patient_id == patient.id,
@@ -287,24 +366,45 @@ class SyncService:
 
         return {
             "success": True,
-            "message": f"Paquete importado con éxito: {created_counts['patients']} pacientes, {created_counts['consultations']} consultas y {created_counts['vital_signs']} signos vitales nuevos.",
+            "message": f"Paquete importado con éxito: {created_counts['patients']} pacientes, {created_counts['consultations']} consultas y {created_counts['vital_signs']} signos vitales nuevos reconciliados.",
             "counts": created_counts
         }
 
     @staticmethod
     def _get_auth_headers(db: Session) -> dict:
-        """Genera las cabeceras de autenticación para comunicarse con la nube de SSCP."""
+        """Genera las cabeceras de autenticación para comunicarse con la nube de SSCP con aislamiento por doctor."""
         headers = {
             "Content-Type": "application/json",
             "X-License-Key": "sscp-license-api-sec-2026-laxarus",
         }
         try:
             from app.models.license_config import LicenseConfig
+            from app.models.setting import Setting
+            from app.models.user import User
+
             lic = db.query(LicenseConfig).first()
             if lic and lic.license_key:
                 headers["X-License-Token"] = lic.license_key
             if lic and lic.machine_id:
                 headers["X-Machine-Id"] = lic.machine_id
+            if lic and lic.doctor_name:
+                headers["X-Doctor-Name"] = lic.doctor_name
+
+            setting = db.query(Setting).first()
+            doctor_user = db.query(User).filter(User.role == "doctor").first()
+            doctor_email = None
+
+            if setting and setting.email and "@" in setting.email and "sscp.local" not in setting.email:
+                doctor_email = setting.email.strip()
+            elif doctor_user and doctor_user.email:
+                doctor_email = doctor_user.email.strip()
+            elif setting and setting.email:
+                doctor_email = setting.email.strip()
+
+            if doctor_email:
+                headers["X-Doctor-Email"] = doctor_email
+            if setting and setting.doctor_name and "X-Doctor-Name" not in headers:
+                headers["X-Doctor-Name"] = setting.doctor_name
         except Exception:
             pass
         return headers
@@ -321,7 +421,7 @@ class SyncService:
         
         try:
             verify_ssl = SyncService._should_verify_ssl(remote_url)
-            async with httpx.AsyncClient(timeout=15.0, verify=verify_ssl) as client:
+            async with httpx.AsyncClient(timeout=120.0, verify=verify_ssl) as client:
                 resp = await client.post(endpoint, json=package, headers=headers)
                 status_code = resp.status_code
                 if 200 <= status_code < 300:
@@ -378,7 +478,7 @@ class SyncService:
         headers = SyncService._get_auth_headers(db)
         try:
             verify_ssl = SyncService._should_verify_ssl(remote_url)
-            async with httpx.AsyncClient(timeout=15.0, verify=verify_ssl) as client:
+            async with httpx.AsyncClient(timeout=120.0, verify=verify_ssl) as client:
                 resp = await client.get(endpoint, headers=headers)
                 if 200 <= resp.status_code < 300:
                     data = resp.json()

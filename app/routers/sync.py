@@ -28,12 +28,25 @@ async def sync_dashboard(
 ):
     stats = SyncService.get_sync_stats(db)
     setting = db.query(Setting).first()
-    remote_url = setting.email if (setting and "http" in (setting.email or "")) else "https://sscp.laxarusdevs.com"
-    if setting and setting.tailscale_ip:
-        remote_url = f"http://{setting.tailscale_ip}:8000"
+
+    # Si la base de datos local aún tiene la IP quemada de laxarusserver (100.111.106.27), limpiarla
+    if setting and setting.tailscale_ip == "100.111.106.27":
+        setting.tailscale_ip = None
+        db.commit()
+
+    DEFAULT_REMOTE_URL = "https://sscp.laxarusdevs.com"
+    remote_url = DEFAULT_REMOTE_URL
+
+    if setting and setting.email and ("http://" in setting.email or "https://" in setting.email):
+        remote_url = setting.email.strip()
+    elif setting and setting.tailscale_ip and setting.tailscale_ip.strip() and setting.tailscale_ip.strip() != "100.111.106.27":
+        candidate_url = f"http://{setting.tailscale_ip.strip()}:8000"
+        candidate_chk = await SyncService.check_connection(candidate_url, timeout=1.0)
+        if candidate_chk.get("online"):
+            remote_url = candidate_url
 
     # Chequeo no bloqueante rápido
-    conn_result = await SyncService.check_connection(remote_url, timeout=1.5)
+    conn_result = await SyncService.check_connection(remote_url, timeout=2.0)
     recent_logs = SyncService.get_recent_logs(db, limit=10)
 
     return templates.TemplateResponse(
@@ -58,6 +71,9 @@ async def trigger_sync(
     db: Session = Depends(get_db),
     current_user = Depends(require_admin)
 ):
+    if not remote_url or "100.111.106.27" in remote_url:
+        remote_url = "https://sscp.laxarusdevs.com"
+
     setting = db.query(Setting).first()
     node_ip = setting.tailscale_ip if setting else None
     
@@ -84,6 +100,9 @@ async def push_sync(
     db: Session = Depends(get_db),
     current_user = Depends(require_admin)
 ):
+    if not remote_url or "100.111.106.27" in remote_url:
+        remote_url = "https://sscp.laxarusdevs.com"
+
     setting = db.query(Setting).first()
     res = await SyncService.push_to_remote(db, remote_url, node_ip=setting.tailscale_ip if setting else None)
     msg_type = "success" if res.get("success") else "warning"
@@ -95,6 +114,9 @@ async def pull_sync(
     db: Session = Depends(get_db),
     current_user = Depends(require_admin)
 ):
+    if not remote_url or "100.111.106.27" in remote_url:
+        remote_url = "https://sscp.laxarusdevs.com"
+
     setting = db.query(Setting).first()
     res = await SyncService.pull_from_remote(db, remote_url, node_ip=setting.tailscale_ip if setting else None)
     msg_type = "success" if res.get("success") else "warning"
