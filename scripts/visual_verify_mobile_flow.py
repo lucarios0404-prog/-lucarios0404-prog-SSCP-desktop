@@ -114,6 +114,31 @@ def run_visual_verification():
         page_m.click('#modal-quick-appt button:has-text("×")')
         page_m.wait_for_timeout(300)
 
+        # -------------------------------------------------------------
+        # PARTE 3: VERIFICACIÓN DEL MÓDULO DE REPORTES Y CUADRE MÓVIL
+        # -------------------------------------------------------------
+        print("\n[5/5] Probando pestaña de Reportes & Cuadre (Pagos, Vistos, Citas Previas)...")
+        page_m.click('#nav-btn-reports')
+        page_m.wait_for_timeout(1000)
+
+        img_rep_pay = ARTIFACT_DIR / "evidence_mobile_reports_payments.png"
+        page_m.screenshot(path=str(img_rep_pay))
+        print(f"  [OK] Captura Reporte de Pagos: {img_rep_pay.name}")
+
+        # Subpestaña: Pacientes Vistos
+        page_m.click('#subtab-btn-attended')
+        page_m.wait_for_timeout(500)
+        img_rep_att = ARTIFACT_DIR / "evidence_mobile_reports_attended.png"
+        page_m.screenshot(path=str(img_rep_att))
+        print(f"  [OK] Captura Reporte de Vistos: {img_rep_att.name}")
+
+        # Subpestaña: Citas Previas / Historial
+        page_m.click('#subtab-btn-history')
+        page_m.wait_for_timeout(500)
+        img_rep_hist = ARTIFACT_DIR / "evidence_mobile_reports_history.png"
+        page_m.screenshot(path=str(img_rep_hist))
+        print(f"  [OK] Captura Reporte de Citas Previas: {img_rep_hist.name}")
+
         page_m.close()
         context_mobile.close()
         browser.close()

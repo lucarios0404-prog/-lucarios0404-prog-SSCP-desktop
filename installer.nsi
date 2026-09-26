@@ -10,7 +10,7 @@ Unicode true
 
 ; Definiciones Generales
 !define PRODUCT_NAME "SSCP Desktop"
-!define PRODUCT_VERSION "1.0.5"
+!define PRODUCT_VERSION "1.0.6"
 !define PRODUCT_PUBLISHER "SSCP Medical Systems"
 !define PRODUCT_WEB_SITE "https://sscp.laxarusdevs.com"
 !define PRODUCT_EXE "SSCP-Desktop.exe"
