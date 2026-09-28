@@ -469,16 +469,31 @@ function submitTalonarioDirect() {
         return;
     }
 
-    const form = document.getElementById('lab-order-form');
-    const oldAction = form.action;
-    const oldTarget = form.target;
+    // Crear formulario dinámico aislado para abrir el PDF en nueva pestaña sin alterar el formulario principal
+    const mainForm = document.getElementById('lab-order-form');
+    const tempForm = document.createElement('form');
+    tempForm.method = 'POST';
+    tempForm.action = '/lab-results/talonario/quick';
+    tempForm.target = '_blank';
+    tempForm.style.display = 'none';
 
-    form.action = '/lab-results/talonario/quick';
-    form.target = '_blank';
-    form.submit();
+    // Transferir todos los campos seleccionados (paciente, indicación, checkboxes y adicionales)
+    const formData = new FormData(mainForm);
+    for (const [name, value] of formData.entries()) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        tempForm.appendChild(input);
+    }
 
-    form.action = oldAction;
-    form.target = oldTarget;
+    document.body.appendChild(tempForm);
+    tempForm.submit();
+    setTimeout(() => {
+        if (tempForm.parentNode) {
+            tempForm.parentNode.removeChild(tempForm);
+        }
+    }, 1500);
 }
 
 // Inicializar al cargar

@@ -400,18 +400,60 @@ def create_lab_order(
     return RedirectResponse(url=f"/lab-results/orders/{new_order.id}{query_str}", status_code=303)
 
 
-@router.post("/talonario/quick")
+@router.api_route("/talonario/quick", methods=["GET", "POST"])
 def quick_talonario_lab_order(
-    patient_id: int = Form(...),
+    request: Request,
+    patient_id: int = Form(None),
     consultation_id: int = Form(None),
     clinical_indication: str = Form(None),
     tests: list[str] = Form([]),
     other_tests: str = Form(None),
     notes: str = Form(None),
+    order_id: int = Query(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
-    """Guarda la orden e inmediatamente retorna el PDF del talonario preimpreso (21.7 × 13.6 cm)."""
+    """
+    Guarda la orden e inmediatamente retorna el PDF del talonario preimpreso (21.7 × 13.6 cm).
+    Soporta POST (envío directo de formulario) y GET (reimpresión / refresco de pestaña del navegador).
+    """
+    setting = db.query(Setting).first()
+
+    # Si es petición GET (por ejemplo al recargar la pestaña del navegador o enlace directo)
+    if request.method == "GET":
+        # 1. Si especifican order_id en query params
+        if order_id:
+            order = db.query(LabOrder).filter(LabOrder.id == order_id).first()
+            if order:
+                pdf_buffer = generate_lab_order_talonario_pdf(order, setting)
+                p = order.patient
+                doc_id = p.document_id if p and p.document_id else (str(p.id) if p else "")
+                filename = f"Talonario_Laboratorio_{doc_id}_{order.id}.pdf"
+                return StreamingResponse(
+                    pdf_buffer,
+                    media_type="application/pdf",
+                    headers={"Content-Disposition": f"inline; filename={filename}"}
+                )
+
+        # 2. Si no hay parámetros, recuperar la última orden para renderizar su talonario sin error 405
+        last_order = db.query(LabOrder).order_by(LabOrder.id.desc()).first()
+        if last_order:
+            pdf_buffer = generate_lab_order_talonario_pdf(last_order, setting)
+            p = last_order.patient
+            doc_id = p.document_id if p and p.document_id else (str(p.id) if p else "")
+            filename = f"Talonario_Laboratorio_{doc_id}_{last_order.id}.pdf"
+            return StreamingResponse(
+                pdf_buffer,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"inline; filename={filename}"}
+            )
+
+        return RedirectResponse(url="/lab-results", status_code=303)
+
+    # Si es POST pero no seleccionaron paciente, volver al formulario
+    if not patient_id:
+        return RedirectResponse(url="/lab-results", status_code=303)
+
     all_tests = list(tests)
     if other_tests:
         custom_lines = [line.strip() for line in other_tests.splitlines() if line.strip()]
@@ -432,7 +474,6 @@ def quick_talonario_lab_order(
     db.commit()
     db.refresh(new_order)
 
-    setting = db.query(Setting).first()
     pdf_buffer = generate_lab_order_talonario_pdf(new_order, setting)
 
     p = new_order.patient
