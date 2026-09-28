@@ -58,6 +58,7 @@ hidden_imports = [
     'app.routers.mobile_api',
     'app.routers.services',
     'app.models.service',
+    'app.models.lab_order',
     'app.services.ars_service',
     'app.core.templates',
     'app.data.services_catalog',

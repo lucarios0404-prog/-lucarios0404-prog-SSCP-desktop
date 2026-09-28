@@ -11,8 +11,7 @@ from app.models.inventory import InventoryItem, InventoryMovement
 from app.core.deps import require_current_user
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 COMMON_CATEGORIES = [
     "Medicamento",

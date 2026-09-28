@@ -40,13 +40,17 @@
                                 {% for v in records %}
                                 <tr class="hover:bg-slate-50/80 transition-colors">
                                     <td class="py-4 px-5 whitespace-nowrap font-mono text-xs text-slate-900">
-                                        {{ v.application_date.strftime("%d/%m/%Y") }}
+                                        {{ v.application_date.strftime("%d/%m/%Y") if v.application_date else "—" }}
                                     </td>
                                     <td class="py-4 px-5 font-semibold text-slate-900">
+                                        {% if v.patient %}
                                         <a href="/patients/{{ v.patient.id }}" class="hover:text-blue-600">
                                             {{ v.patient.first_name }} {{ v.patient.last_name }}
                                         </a>
                                         <span class="block text-[11px] text-slate-400">DNI: {{ v.patient.document_id or 'N/D' }}</span>
+                                        {% else %}
+                                        <span class="text-slate-400 italic text-xs">Paciente no disponible</span>
+                                        {% endif %}
                                     </td>
                                     <td class="py-4 px-5 font-bold text-slate-800">
                                         <i class="fas fa-shield-virus text-cyan-600 mr-1.5"></i>{{ v.vaccine_name }}
@@ -60,7 +64,7 @@
                                     <td class="py-4 px-5 whitespace-nowrap">
                                         {% if v.next_due_date %}
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                                            <i class="far fa-calendar-alt mr-1"></i> {{ v.next_due_date.strftime("%d/%m/%Y") }}
+                                            <i class="far fa-calendar-alt mr-1"></i> {{ v.next_due_date.strftime("%d/%m/%Y") if v.next_due_date else "—" }}
                                         </span>
                                         {% else %}
                                         <span class="text-xs text-slate-400">Esquema completo</span>

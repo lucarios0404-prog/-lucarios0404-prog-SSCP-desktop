@@ -1,0 +1,149 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Orden de Laboratorio #{{ order.id }} — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'labs' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Orden de Laboratorio #" ~ order.id %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-4xl mx-auto space-y-6">
+                <!-- Tabs de Navegación del Módulo de Laboratorio -->
+                <div class="border-b border-slate-200 flex space-x-6">
+                    <a href="/lab-results" class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-2">
+                        <i class="fas fa-check-double text-slate-400"></i> Emitir Solicitud (Checklist)
+                    </a>
+                    <a href="/lab-results/orders" class="pb-3 text-sm font-semibold border-b-2 border-teal-600 text-teal-700 transition-colors flex items-center gap-2">
+                        <i class="fas fa-clipboard-list text-teal-600"></i> Órdenes Emitidas
+                    </a>
+                    <a href="/lab-results/results" class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-2">
+                        <i class="fas fa-flask text-slate-400"></i> Resultados Registrados
+                    </a>
+                </div>
+
+                <!-- Header con acciones -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-center space-x-3">
+                        <a href="/lab-results/orders" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100" title="Volver a la lista de órdenes">
+                            <i class="fas fa-arrow-left"></i>
+                        </a>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h1 class="text-2xl font-bold text-slate-900">Orden de Laboratorio #{{ order.id }}</h1>
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold {% if order.status == 'completado' %}bg-emerald-100 text-emerald-800 border border-emerald-200{% else %}bg-amber-100 text-amber-800 border border-amber-200{% endif %}">
+                                    {{ order.status|capitalize }}
+                                </span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">Emitida el {{ order.order_date.strftime("%d/%m/%Y") if order.order_date else "—" }} por {{ order.doctor.name if order.doctor else 'Dr. Especialista' }}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- Botón Principal: Imprimir en Talonario Físico (13.6 × 21.7 cm) -->
+                        <a href="/lab-results/orders/{{ order.id }}/talonario/pdf" target="_blank"
+                            class="inline-flex items-center px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/25 transition-all">
+                            <i class="fas fa-file-medical mr-1.5 text-sm"></i> Imprimir en Talonario (13.6 × 21.7 cm)
+                        </a>
+
+                        <!-- Botón Secundario: Descargar / Imprimir PDF Oficial Carta con Membrete -->
+                        <a href="/lab-results/orders/{{ order.id }}/pdf" target="_blank"
+                            class="inline-flex items-center px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-all">
+                            <i class="fas fa-file-pdf mr-1.5 text-red-500"></i> Volante Carta
+                        </a>
+
+                        {% if order.consultation_id %}
+                        <a href="/consultations/{{ order.consultation_id }}" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all">
+                            <i class="fas fa-notes-medical mr-1.5"></i> Ver Consulta
+                        </a>
+                        {% endif %}
+
+                        <a href="/lab-results" class="inline-flex items-center px-3 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-bold transition-all">
+                            <i class="fas fa-plus mr-1"></i> Nueva Orden
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Ficha del Paciente y Médico -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col sm:flex-row justify-between gap-4">
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Paciente</span>
+                        <a href="/patients/{{ order.patient.id }}" class="text-lg font-bold text-blue-600 hover:underline">
+                            {{ order.patient.last_name }}, {{ order.patient.first_name }}
+                        </a>
+                        <div class="text-xs text-slate-500 mt-0.5 space-x-3">
+                            <span>DNI: <strong>{{ order.patient.document_id or 'Sin DNI' }}</strong></span>
+                            <span>Tel: <strong>{{ order.patient.phone or 'N/D' }}</strong></span>
+                            <span>Edad: <strong>{{ order.patient.age if order.patient.age else 'N/D' }}</strong></span>
+                            <span>ARS: <strong>{{ order.patient.insurance_name or 'Privado' }}</strong></span>
+                        </div>
+                    </div>
+
+                    <div class="sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Médico Prescriptor</span>
+                        <p class="text-base font-bold text-slate-800">{{ order.doctor.name if order.doctor else 'Dr. Tratante' }}</p>
+                        <p class="text-xs text-slate-500">{{ order.doctor.email if order.doctor else '' }}</p>
+                    </div>
+                </div>
+
+                <!-- Detalle de la Solicitud -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
+                    {% if order.clinical_indication %}
+                    <div>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Indicación Clínica / Diagnóstico Presuntivo</span>
+                        <div class="mt-1.5 p-3.5 rounded-xl bg-slate-50 border border-slate-100 font-semibold text-sm text-slate-800">
+                            {{ order.clinical_indication }}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div>
+                        <span class="text-xs font-bold text-teal-700 uppercase tracking-wider block mb-2">
+                            <i class="fas fa-list-check mr-1.5 text-teal-600"></i> Análisis Solicitados ({{ tests_list|length }})
+                        </span>
+                        <div class="bg-teal-50/40 rounded-xl border border-teal-100 p-4">
+                            <ul class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-slate-800">
+                                {% for test in tests_list %}
+                                <li class="flex items-center space-x-2">
+                                    <span class="w-2 h-2 rounded-full bg-teal-500"></span>
+                                    <span>{{ test }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+
+                    {% if order.notes %}
+                    <div class="bg-amber-50/70 p-4 rounded-xl border border-amber-200">
+                        <span class="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                            <i class="fas fa-info-circle text-amber-600"></i> Instrucciones de Preparación
+                        </span>
+                        <p class="text-xs text-amber-950 font-medium">{{ order.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if autoprint == 'talonario' %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    window.open('/lab-results/orders/{{ order.id }}/talonario/pdf', '_blank');
+});
+</script>
+{% elif autoprint == 'pdf' %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    window.open('/lab-results/orders/{{ order.id }}/pdf', '_blank');
+});
+</script>
+{% endif %}
+{% endblock %}

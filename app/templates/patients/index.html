@@ -53,8 +53,13 @@
                             <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                                 <i class="fas fa-search"></i>
                             </span>
-                            <input type="text" name="q" value="{{ search_query }}" placeholder="Buscar por nombre, apellido, cédula/DNI, teléfono o email..." 
+                            <input type="text" id="patients_index_search" name="q" value="{{ search_query }}" autocomplete="off"
+                                placeholder="Buscar en vivo por nombre, apellido, cédula/DNI, teléfono o email..." 
                                 class="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all">
+                            <!-- Dropdown flotante de resultados en vivo -->
+                            <div id="patients_index_dropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
+                                <div id="patients_index_results" class="p-1.5 space-y-1"></div>
+                            </div>
                         </div>
                         <div class="flex items-center gap-2">
                             <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center shadow-sm">
@@ -273,4 +278,68 @@
         </main>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let pSearchTimer = null;
+const pSearchInput = document.getElementById('patients_index_search');
+const pSearchDropdown = document.getElementById('patients_index_dropdown');
+const pSearchResults = document.getElementById('patients_index_results');
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+if (pSearchInput) {
+    pSearchInput.addEventListener('input', function() {
+        const q = this.value.trim();
+        clearTimeout(pSearchTimer);
+        if (q.length < 2) {
+            if (pSearchDropdown) pSearchDropdown.classList.add('hidden');
+            return;
+        }
+        pSearchTimer = setTimeout(async () => {
+            if (!pSearchResults || !pSearchDropdown) return;
+            try {
+                const res = await fetch(`/patients/autocomplete?q=${encodeURIComponent(q)}&limit=8`);
+                if (!res.ok) return;
+                const data = await res.json();
+                pSearchResults.innerHTML = '';
+                if (data.length === 0) {
+                    pSearchResults.innerHTML = `
+                        <div class="p-3 text-center text-xs text-slate-400">
+                            No se encontraron pacientes para "<strong>${escapeHtml(q)}</strong>"
+                        </div>
+                    `;
+                } else {
+                    data.forEach(p => {
+                        const row = document.createElement('a');
+                        row.href = `/patients/${p.id}`;
+                        row.className = "px-3 py-2 hover:bg-blue-50 cursor-pointer rounded-lg transition-colors flex items-center justify-between group";
+                        row.innerHTML = `
+                            <div>
+                                <span class="text-xs font-bold text-slate-900 group-hover:text-blue-600">${escapeHtml(p.name)}</span>
+                                <div class="text-[11px] text-slate-400 font-mono">DNI: ${escapeHtml(p.document_id || 'Sin DNI')} &bull; Tel: ${escapeHtml(p.phone || 'N/D')}</div>
+                            </div>
+                            <span class="text-xs text-blue-600 font-semibold group-hover:translate-x-0.5 transition-transform">Ver Expediente &rarr;</span>
+                        `;
+                        pSearchResults.appendChild(row);
+                    });
+                }
+                pSearchDropdown.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+            }
+        }, 220);
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!pSearchInput.contains(e.target) && pSearchDropdown && !pSearchDropdown.contains(e.target)) {
+            pSearchDropdown.classList.add('hidden');
+        }
+    });
+}
+</script>
 {% endblock %}

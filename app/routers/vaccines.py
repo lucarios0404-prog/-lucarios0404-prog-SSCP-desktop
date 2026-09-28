@@ -11,8 +11,7 @@ from app.models.patient import Patient
 from app.core.deps import require_current_user
 
 router = APIRouter(prefix="/vaccines", tags=["vaccines"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 COMMON_VACCINES = [
     {"name": "Hepatitis B", "schedule": "Al nacer, 2m, 4m, 6m"},

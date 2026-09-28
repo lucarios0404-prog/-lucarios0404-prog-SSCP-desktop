@@ -47,8 +47,12 @@
                                 {% for l in licenses %}
                                 <tr class="hover:bg-slate-50/80 transition-colors">
                                     <td class="py-3.5 px-4 font-bold text-slate-900">
+                                        {% if l.patient %}
                                         {{ l.patient.first_name }} {{ l.patient.last_name }}
                                         <div class="text-[10px] text-slate-400 font-normal">DNI: {{ l.patient.document_id or 'N/D' }}</div>
+                                        {% else %}
+                                        <span class="text-slate-400 italic">Paciente no disponible</span>
+                                        {% endif %}
                                     </td>
                                     <td class="py-3.5 px-4 max-w-[200px] truncate" title="{{ l.diagnosis }}">
                                         {{ l.diagnosis }}
@@ -59,7 +63,7 @@
                                         </span>
                                     </td>
                                     <td class="py-3.5 px-4 text-slate-600">
-                                        {{ l.start_date.strftime("%d/%m/%Y") }} al {{ l.end_date.strftime("%d/%m/%Y") }}
+                                        {{ l.start_date.strftime("%d/%m/%Y") if l.start_date else "—" }} al {{ l.end_date.strftime("%d/%m/%Y") if l.end_date else "—" }}
                                     </td>
                                     <td class="py-3.5 px-4 text-slate-500">
                                         {{ l.workplace_or_school or 'General' }}

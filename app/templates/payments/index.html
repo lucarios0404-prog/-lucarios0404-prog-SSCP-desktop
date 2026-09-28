@@ -159,7 +159,7 @@
                                 <tr class="hover:bg-slate-50/80 transition-colors">
                                     <td class="py-4 px-5 whitespace-nowrap">
                                         <span class="font-mono text-xs font-bold text-slate-900">{{ p.receipt_number or ('REC-' ~ p.id) }}</span>
-                                        <span class="block text-[11px] text-slate-400">{{ p.created_at.strftime("%d/%m/%Y %H:%M") }}</span>
+                                        <span class="block text-[11px] text-slate-400">{{ p.created_at.strftime("%d/%m/%Y %H:%M") if p.created_at else "—" }}</span>
                                     </td>
                                     <td class="py-4 px-5 font-semibold text-slate-900">
                                         {% if p.patient %}

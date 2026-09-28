@@ -81,8 +81,8 @@
                                 {% for c in consultations %}
                                 <tr class="hover:bg-slate-50/80 transition-colors">
                                     <td class="py-4 px-5 whitespace-nowrap">
-                                        <div class="font-semibold text-slate-900">{{ c.created_at.strftime("%d/%m/%Y") }}</div>
-                                        <span class="text-xs text-slate-400">{{ c.created_at.strftime("%H:%M") }}</span>
+                                        <div class="font-semibold text-slate-900">{{ c.created_at.strftime("%d/%m/%Y") if c.created_at else "—" }}</div>
+                                        <span class="text-xs text-slate-400">{{ c.created_at.strftime("%H:%M") if c.created_at else "—" }}</span>
                                     </td>
                                     <td class="py-4 px-5">
                                         <div class="flex items-center space-x-2.5">
@@ -102,7 +102,19 @@
                                         </div>
                                     </td>
                                     <td class="py-4 px-5 text-slate-800 font-medium">
-                                        {{ c.reason }}
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span>{{ c.reason }}</span>
+                                            {% if c.is_first_visit %}
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                <i class="fas fa-star text-emerald-600 mr-1 text-[9px]"></i> 1ra vez
+                                            </span>
+                                            {% endif %}
+                                            {% if c.edit_version and c.edit_version > 1 %}
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                v{{ c.edit_version }}
+                                            </span>
+                                            {% endif %}
+                                        </div>
                                     </td>
                                     <td class="py-4 px-5">
                                         {% if c.diagnosis %}

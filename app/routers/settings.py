@@ -19,8 +19,7 @@ from app.services.whatsapp_service import (
 )
 
 router = APIRouter(prefix="/settings", tags=["settings"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates, BASE_DIR
 
 def get_or_create_settings(db: Session) -> Setting:
     setting = db.query(Setting).first()
@@ -129,6 +128,8 @@ def update_settings(
     sede_name: str = Form("Sede Central"),
     tailscale_ip: str = Form(None),
     sync_interval_minutes: int = Form(5),
+    station_role: str = Form("doctor_principal"),
+    central_station_url: str = Form(None),
     # Campos WhatsApp
     whatsapp_doctor_phone: str = Form(None),
     whatsapp_auto_send: bool = Form(False),
@@ -150,6 +151,8 @@ def update_settings(
     setting.sede_name = sede_name
     setting.tailscale_ip = tailscale_ip
     setting.sync_interval_minutes = sync_interval_minutes
+    setting.station_role = station_role or "doctor_principal"
+    setting.central_station_url = central_station_url.strip() if central_station_url else None
     
     # Guardar campos WhatsApp
     setting.whatsapp_doctor_phone = whatsapp_doctor_phone

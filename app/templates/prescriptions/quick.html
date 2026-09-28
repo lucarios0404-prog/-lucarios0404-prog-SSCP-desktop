@@ -93,10 +93,19 @@
                             </label>
                         </div>
 
-                        <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100">
-                            <button type="submit" class="py-3 px-6 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-lg shadow-teal-600/30 transition-all flex items-center space-x-2">
+                        <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 flex-wrap">
+                            <!-- Botón: Imprimir en Talonario Preimpreso -->
+                            <button type="button" onclick="submitTalonario()"
+                                class="py-3 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-lg shadow-blue-600/25 transition-all flex items-center gap-2"
+                                title="Genera un PDF del tamaño exacto del talonario preimpreso. Solo imprime los datos sobre el papel físico.">
+                                <i class="fas fa-file-medical"></i>
+                                <span>Imprimir en Talonario</span>
+                            </button>
+                            <!-- Botón: Receta Oficial completa (con membrete digital) -->
+                            <button type="submit"
+                                class="py-3 px-5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-lg shadow-teal-600/30 transition-all flex items-center gap-2">
                                 <i class="fas fa-print"></i>
-                                <span>Emitir y Descargar Receta Oficial (PDF)</span>
+                                <span>Emitir Receta Oficial (PDF Completo)</span>
                             </button>
                         </div>
                     </form>
@@ -108,6 +117,46 @@
 
 <script>
 let typingTimer;
+
+/**
+ * Envía los datos del formulario al endpoint de talonario preimpreso.
+ * Abre el PDF en una pestaña nueva sin afectar el formulario principal.
+ */
+function submitTalonario() {
+    const patientId = document.getElementById('patient_id').value;
+    const prescription = document.getElementById('prescription').value;
+
+    if (!patientId) {
+        alert('Por favor selecciona un paciente antes de imprimir el talonario.');
+        return;
+    }
+    if (!prescription.trim()) {
+        alert('Por favor escribe la prescripción antes de imprimir el talonario.');
+        return;
+    }
+
+    // Crear formulario temporal y enviarlo en nueva pestaña
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/prescriptions/talonario';
+    form.target = '_blank';
+
+    const fPatient = document.createElement('input');
+    fPatient.type = 'hidden';
+    fPatient.name = 'patient_id';
+    fPatient.value = patientId;
+
+    const fRx = document.createElement('input');
+    fRx.type = 'hidden';
+    fRx.name = 'prescription';
+    fRx.value = prescription;
+
+    form.appendChild(fPatient);
+    form.appendChild(fRx);
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
 
 function handlePatientChange(select) {
     const opt = select.options[select.selectedIndex];

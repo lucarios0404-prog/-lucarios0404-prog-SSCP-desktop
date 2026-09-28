@@ -23,11 +23,26 @@
             {% endif %}
         {% endif %}
 
-        <!-- Estado offline -->
-        <div class="hidden sm:inline-flex items-center px-2 py-1 rounded-md text-[11px] font-medium bg-slate-50 text-slate-500 border border-slate-200/80">
+        <!-- Indicador de Estación de Trabajo v1.2.0 -->
+        {% set header_cfg = setting if setting is defined and setting else (get_current_setting() if get_current_setting is defined else None) %}
+        {% set is_sec_station = (header_cfg.station_role == 'secretaria') if header_cfg else false %}
+        {% if is_sec_station %}
+        <span class="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300" title="Estación de Trabajo: Secretaría">
+            <i class="fas fa-headset text-amber-600 text-[11px]"></i>
+            <span class="font-medium">Estación:</span> Secretaría
+        </span>
+        {% else %}
+        <span class="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200" title="Estación de Trabajo: Consultorio Doctor Principal">
+            <i class="fas fa-stethoscope text-indigo-600 text-[11px]"></i>
+            <span class="font-medium">Estación:</span> Consultorio
+        </span>
+        {% endif %}
+
+        <!-- Estado Offline / Red Local -->
+        <a href="/sync" title="Estado de Red Local & Sincronización P2P" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition-colors">
             <span class="w-1.5 h-1.5 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-            Offline
-        </div>
+            <span class="hidden sm:inline">P2P</span> Sync
+        </a>
 
         <!-- Botón de Vinculación Rápida de WhatsApp (Accesible para Doctor, Secretaria y Admin) -->
         <button type="button" onclick="openWhatsAppModal()" id="header-wa-btn"

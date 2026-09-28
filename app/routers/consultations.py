@@ -17,7 +17,7 @@ from app.models.template import ClinicalTemplate
 from app.models.cie10 import Cie10Code
 from app.data.cie10_catalog import OFFICIAL_CIE10_CATALOG, seed_cie10_catalog
 from app.core.deps import require_current_user, require_permission
-from app.services.pdf_service import generate_prescription_pdf, generate_consultation_report_pdf
+from app.services.pdf_service import generate_prescription_pdf, generate_consultation_report_pdf, generate_talonario_overlay_pdf
 from app.services.audit_service import AuditService
 
 from app.core.templates import templates
@@ -139,6 +139,7 @@ def list_consultations(
                 Patient.first_name.ilike(search_pattern),
                 Patient.last_name.ilike(search_pattern),
                 Patient.document_id.ilike(search_pattern),
+                Consultation.clinical_history.ilike(search_pattern),
                 Consultation.diagnosis.ilike(search_pattern),
                 Consultation.reason.ilike(search_pattern),
                 Consultation.treatment.ilike(search_pattern),
@@ -189,6 +190,10 @@ def create_consultation_form(
     common_db = db.query(Cie10Code).filter(Cie10Code.is_custom == False).limit(14).all()
     dynamic_cie10 = [{"code": c.code, "description": c.description} for c in common_db] if common_db else CIE10_COMMON
 
+    now = datetime.now()
+    now_date = now.strftime("%Y-%m-%d")
+    now_time = now.strftime("%H:%M")
+
     return templates.TemplateResponse(
         request=request,
         name="consultations/create.html",
@@ -200,6 +205,8 @@ def create_consultation_form(
             "cie10_common": dynamic_cie10,
             "consultation_templates": consultation_templates,
             "prescription_templates": prescription_templates,
+            "now_date": now_date,
+            "now_time": now_time,
         }
     )
 
@@ -209,30 +216,50 @@ def create_consultation(
     patient_id: int = Form(...),
     appointment_id: int = Form(None),
     reason: str = Form(...),
+    clinical_history: str = Form(None),
+    is_first_visit: bool = Form(False),
     symptoms: str = Form(None),
     physical_exam: str = Form(None),
     diagnosis: str = Form(None),
     treatment: str = Form(None),
     prescription: str = Form(None),
     notes: str = Form(None),
+    created_date: str = Form(None),
+    created_time: str = Form(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('consultations'))
 ):
+    clean_history = clinical_history.strip() if clinical_history else None
+    clean_symptoms = symptoms.strip() if symptoms else clean_history
+    clean_diagnosis = diagnosis.strip() if diagnosis else None
+
+    creation_dt = datetime.now()
+    if created_date:
+        try:
+            t_str = created_time.strip() if created_time else creation_dt.strftime("%H:%M")
+            creation_dt = datetime.strptime(f"{created_date.strip()} {t_str}", "%Y-%m-%d %H:%M")
+        except Exception:
+            pass
+
     new_consultation = Consultation(
         patient_id=patient_id,
         doctor_id=current_user.id,
         appointment_id=appointment_id if appointment_id and appointment_id > 0 else None,
         reason=reason,
-        symptoms=symptoms,
+        clinical_history=clean_history,
+        is_first_visit=bool(is_first_visit),
+        edit_version=1,
+        symptoms=clean_symptoms,
         physical_exam=physical_exam,
-        diagnosis=diagnosis,
+        diagnosis=clean_diagnosis,
         treatment=treatment,
         prescription=prescription,
         notes=notes,
+        created_at=creation_dt,
         edit_history=json.dumps([{
             "action": "created",
             "user": current_user.email,
-            "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }])
     )
     db.add(new_consultation)
@@ -255,7 +282,7 @@ def create_consultation(
         summary=f"Consulta médica creada: {new_consultation.reason}",
         patient_id=new_consultation.patient_id,
         user_id=current_user.id if current_user else 1,
-        new_data={"reason": new_consultation.reason, "diagnosis": diagnosis}
+        new_data={"reason": new_consultation.reason, "diagnosis": diagnosis, "is_first_visit": is_first_visit}
     )
 
     return RedirectResponse(url=f"/consultations/{new_consultation.id}", status_code=303)
@@ -311,6 +338,9 @@ def edit_consultation_form(
     common_db = db.query(Cie10Code).filter(Cie10Code.is_custom == False).limit(14).all()
     dynamic_cie10 = [{"code": c.code, "description": c.description} for c in common_db] if common_db else CIE10_COMMON
 
+    now_date = consultation.created_at.strftime("%Y-%m-%d") if consultation.created_at else datetime.now().strftime("%Y-%m-%d")
+    now_time = consultation.created_at.strftime("%H:%M") if consultation.created_at else datetime.now().strftime("%H:%M")
+
     return templates.TemplateResponse(
         request=request,
         name="consultations/edit.html",
@@ -320,6 +350,8 @@ def edit_consultation_form(
             "cie10_common": dynamic_cie10,
             "consultation_templates": consultation_templates,
             "prescription_templates": prescription_templates,
+            "now_date": now_date,
+            "now_time": now_time,
         }
     )
 
@@ -328,6 +360,8 @@ def update_consultation(
     request: Request,
     consultation_id: int,
     reason: str = Form(...),
+    clinical_history: str = Form(None),
+    is_first_visit: bool = Form(False),
     symptoms: str = Form(None),
     physical_exam: str = Form(None),
     diagnosis: str = Form(None),
@@ -354,25 +388,32 @@ def update_consultation(
         "action": "edited",
         "user": current_user.email,
         "reason": edit_reason,
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        "version": (consultation.edit_version or 1) + 1,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
 
     old_data = {
         "reason": consultation.reason,
+        "clinical_history": consultation.clinical_history,
         "diagnosis": consultation.diagnosis,
         "treatment": consultation.treatment,
         "prescription": consultation.prescription
     }
 
+    clean_history = clinical_history.strip() if clinical_history else None
+
     consultation.reason = reason
-    consultation.symptoms = symptoms
+    consultation.clinical_history = clean_history
+    consultation.is_first_visit = bool(is_first_visit)
+    consultation.edit_version = (consultation.edit_version or 1) + 1
+    consultation.symptoms = clean_history or symptoms
     consultation.physical_exam = physical_exam
     consultation.diagnosis = diagnosis
     consultation.treatment = treatment
     consultation.prescription = prescription
     consultation.notes = notes
     consultation.updated_by_id = current_user.id
-    consultation.updated_at = datetime.utcnow()
+    consultation.updated_at = datetime.now()
     consultation.edit_history = json.dumps(history)
 
     db.commit()
@@ -435,3 +476,28 @@ def download_consultation_report_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"inline; filename={filename}"}
     )
+
+@router.get("/{consultation_id}/prescription/talonario/pdf")
+def download_consultation_talonario_pdf(
+    consultation_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('print_prescriptions'))
+):
+    consultation = db.query(Consultation).filter(Consultation.id == consultation_id).first()
+    if not consultation:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+    
+    setting = db.query(Setting).first()
+    pdf_buffer = generate_talonario_overlay_pdf(
+        patient=consultation.patient,
+        prescription_text=consultation.prescription or "",
+        setting=setting,
+    )
+    
+    filename = f"Talonario_Consulta_{consultation.id}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
+

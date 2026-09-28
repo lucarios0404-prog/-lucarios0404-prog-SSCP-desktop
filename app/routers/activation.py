@@ -6,8 +6,7 @@ from fastapi.templating import Jinja2Templates
 import sys
 from pathlib import Path
 
-BASE_DIR = Path(sys._MEIPASS).resolve() if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 router = APIRouter()
 
 

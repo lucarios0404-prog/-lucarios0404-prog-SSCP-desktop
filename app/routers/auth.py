@@ -14,8 +14,7 @@ import threading
 
 router = APIRouter(tags=["auth"])
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 # --- Brute-force protection (in-memory, per-IP) ---
 _login_attempts: dict[str, list[float]] = {}

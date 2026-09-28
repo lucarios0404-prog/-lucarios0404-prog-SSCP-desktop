@@ -27,13 +27,39 @@
                     <form method="post" action="/payments/create" class="space-y-6">
                         <!-- Paciente y Cita -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                    Paciente <span class="text-red-500">*</span>
-                                </label>
+                            <div class="space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                        Paciente <span class="text-red-500">*</span>
+                                    </label>
+                                    <span class="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                                        <i class="fas fa-bolt text-amber-500 text-[10px]"></i> Búsqueda en vivo
+                                    </span>
+                                </div>
+
+                                <!-- Live Search Autocompletado Flotante -->
+                                <div class="relative">
+                                    <div class="relative flex items-center">
+                                        <span class="absolute left-3.5 text-slate-400 pointer-events-none">
+                                            <i class="fas fa-search text-xs"></i>
+                                        </span>
+                                        <input type="text" id="patient_live_search" autocomplete="off"
+                                            placeholder="Buscar paciente por nombre, cédula o teléfono..." 
+                                            class="w-full pl-9 pr-10 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 text-slate-900 placeholder-slate-400 font-medium transition-all shadow-xs">
+                                        <button type="button" id="clear_patient_search_btn" onclick="clearPatientSearch()" class="hidden absolute right-3 text-slate-400 hover:text-slate-600 text-xs">
+                                            <i class="fas fa-times-circle text-sm"></i>
+                                        </button>
+                                    </div>
+
+                                    <!-- Dropdown Flotante de Resultados -->
+                                    <div id="patient_search_dropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-64 overflow-y-auto divide-y divide-slate-100">
+                                        <div id="patient_search_results" class="p-1.5 space-y-1"></div>
+                                    </div>
+                                </div>
+
                                 <select id="patient_select" name="patient_id" required onchange="onPatientChange(this)"
-                                    class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 bg-white">
-                                    <option value="">Seleccione el paciente...</option>
+                                    class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 bg-white font-medium text-slate-700">
+                                    <option value="">-- Seleccione paciente o use el buscador arriba --</option>
                                     {% for p in patients %}
                                     <option value="{{ p.id }}" data-insurance="{{ p.insurance_name or '' }}" {% if selected_patient_id == p.id %}selected{% endif %}>
                                         {{ p.last_name }}, {{ p.first_name }} ({{ p.document_id or 'Sin DNI' }}) {% if p.insurance_name %}[{{ p.insurance_name }}]{% endif %}
@@ -50,7 +76,7 @@
                                     <option value="">Ninguna / Pago directo</option>
                                     {% for a in appointments %}
                                     <option value="{{ a.id }}" {% if selected_appointment_id == a.id %}selected{% endif %}>
-                                        {{ a.date.strftime("%d/%m/%Y") }} - {{ a.reason }}
+                                        {{ a.date.strftime("%d/%m/%Y") if a.date else "Sin fecha" }} - {{ a.reason }}
                                     </option>
                                     {% endfor %}
                                 </select>
@@ -241,5 +267,125 @@ document.addEventListener('DOMContentLoaded', function() {
         onServiceSelect(svcSel);
     }
 });
+
+// --- LIVE SEARCH AUTOCOMPLETE FOR PATIENT IN PAYMENTS ---
+let patientSearchTimer = null;
+const patientSearchInput = document.getElementById('patient_live_search');
+const patientSearchDropdown = document.getElementById('patient_search_dropdown');
+const patientSearchResults = document.getElementById('patient_search_results');
+const clearPatientBtn = document.getElementById('clear_patient_search_btn');
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+if (patientSearchInput) {
+    patientSearchInput.addEventListener('input', function() {
+        const q = this.value.trim();
+        if (clearPatientBtn) clearPatientBtn.classList.toggle('hidden', !q);
+        clearTimeout(patientSearchTimer);
+        if (q.length < 2) {
+            if (patientSearchDropdown) patientSearchDropdown.classList.add('hidden');
+            return;
+        }
+        patientSearchTimer = setTimeout(() => searchPatientsAjax(q), 220);
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!patientSearchInput.contains(e.target) && patientSearchDropdown && !patientSearchDropdown.contains(e.target)) {
+            patientSearchDropdown.classList.add('hidden');
+        }
+    });
+}
+
+function clearPatientSearch() {
+    if (patientSearchInput) {
+        patientSearchInput.value = '';
+        patientSearchInput.focus();
+    }
+    if (clearPatientBtn) clearPatientBtn.classList.add('hidden');
+    if (patientSearchDropdown) patientSearchDropdown.classList.add('hidden');
+}
+
+async function searchPatientsAjax(query) {
+    if (!patientSearchResults || !patientSearchDropdown) return;
+    patientSearchResults.innerHTML = `
+        <div class="p-3 text-center text-xs text-slate-400">
+            <i class="fas fa-spinner fa-spin mr-1"></i> Buscando "${escapeHtml(query)}"...
+        </div>
+    `;
+    patientSearchDropdown.classList.remove('hidden');
+
+    try {
+        const response = await fetch(`/patients/autocomplete?q=${encodeURIComponent(query)}&limit=10`);
+        if (!response.ok) return;
+        const patients = await response.json();
+        renderPatientSearchResults(patients, query);
+    } catch (e) {
+        console.error("Error buscando pacientes:", e);
+    }
+}
+
+function renderPatientSearchResults(patients, query) {
+    if (!patientSearchResults || !patientSearchDropdown) return;
+    patientSearchResults.innerHTML = '';
+
+    if (patients.length === 0) {
+        patientSearchResults.innerHTML = `
+            <div class="p-3 text-center text-xs text-slate-500">
+                <i class="fas fa-user-slash text-slate-300 text-lg mb-1 block"></i>
+                No se encontraron pacientes para "<strong>${escapeHtml(query)}</strong>"
+            </div>
+        `;
+    } else {
+        patients.forEach(p => {
+            const item = document.createElement('div');
+            item.className = "px-3 py-2 hover:bg-emerald-50 cursor-pointer rounded-xl transition-all flex items-center justify-between group border border-transparent hover:border-emerald-100";
+            item.innerHTML = `
+                <div class="flex-1 pr-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs font-bold text-slate-900 group-hover:text-emerald-700">${escapeHtml(p.name)}</span>
+                        ${p.insurance_name ? `<span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">${escapeHtml(p.insurance_name)}</span>` : ''}
+                    </div>
+                    <div class="mt-0.5 text-[11px] text-slate-400 font-mono">DNI: ${escapeHtml(p.document_id || 'Sin DNI')}</div>
+                </div>
+                <button type="button" class="text-xs text-emerald-600 opacity-0 group-hover:opacity-100 font-bold px-2 py-1 rounded bg-white shadow-xs shrink-0 border border-emerald-200">
+                    Elegir &rarr;
+                </button>
+            `;
+            item.onclick = () => selectPatientFromLiveSearch(p);
+            patientSearchResults.appendChild(item);
+        });
+    }
+    patientSearchDropdown.classList.remove('hidden');
+}
+
+function selectPatientFromLiveSearch(p) {
+    const select = document.getElementById('patient_select');
+    if (select) {
+        let opt = select.querySelector(`option[value="${p.id}"]`);
+        if (!opt) {
+            opt = document.createElement('option');
+            opt.value = p.id;
+            opt.setAttribute('data-insurance', p.insurance_name || '');
+            opt.textContent = `${p.name} (${p.document_id || 'Sin DNI'}) ${p.insurance_name ? '[' + p.insurance_name + ']' : ''}`;
+            select.appendChild(opt);
+        }
+        select.value = p.id;
+        onPatientChange(select);
+    }
+
+    if (patientSearchInput) {
+        patientSearchInput.value = `${p.name} (DNI: ${p.document_id || 'Sin DNI'})`;
+    }
+    if (clearPatientBtn) clearPatientBtn.classList.remove('hidden');
+    if (patientSearchDropdown) patientSearchDropdown.classList.add('hidden');
+}
 </script>
 {% endblock %}

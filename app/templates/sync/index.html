@@ -55,6 +55,102 @@
                     </div>
                 </div>
 
+                <!-- FASE 5: Sincronización Directa de Estaciones (Doctor <-> Secretaría) -->
+                <div class="bg-white rounded-2xl border-2 border-indigo-100 shadow-sm p-6 space-y-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                                <i class="fas fa-network-wired text-lg"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-base font-bold text-slate-900">Sincronización Directa de Estaciones (P2P)</h2>
+                                <p class="text-xs text-slate-500">Replica pacientes, citas, pagos y órdenes de laboratorio entre el Doctor y la Secretaría en Red Local / Tailscale.</p>
+                            </div>
+                        </div>
+                        <div>
+                            {% if setting and setting.station_role == 'secretaria' %}
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                <i class="fas fa-headset text-amber-600"></i> Estación: Secretaría / Recepción
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <i class="fas fa-stethoscope text-emerald-600"></i> Estación: Consultorio Principal (Doctor)
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
+                            <span class="text-slate-500 block text-[10px] font-bold uppercase">Rol Local</span>
+                            <span class="font-bold text-slate-800 text-sm">
+                                {% if setting and setting.station_role == 'secretaria' %}Secretaría (Secundaria){% else %}Doctor (Primaria){% endif %}
+                            </span>
+                            <span class="text-[10px] text-slate-400 block">Base de datos SQLite local independiente</span>
+                        </div>
+                        <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
+                            <span class="text-slate-500 block text-[10px] font-bold uppercase">Dirección de Estación Par</span>
+                            <span class="font-mono font-bold text-indigo-700 text-xs truncate block" id="peer-station-display">
+                                {{ setting.central_station_url if setting and setting.central_station_url else "No configurada (Ir a Ajustes)" }}
+                            </span>
+                            <span class="text-[10px] text-slate-400 block">IP de red local o Tailscale con puerto :8080</span>
+                        </div>
+                        <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
+                            <span class="text-slate-500 block text-[10px] font-bold uppercase">Estado de Enlace Par</span>
+                            <div class="flex items-center space-x-1.5" id="peer-status-box">
+                                <span class="w-2 h-2 rounded-full bg-slate-400" id="peer-status-dot"></span>
+                                <span class="font-bold text-slate-700 text-xs" id="peer-status-text">Listo para comprobar</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 block">Doble vía Push & Pull atómico</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                        <form method="post" action="/sync/peer/trigger" class="w-full sm:w-auto flex-1">
+                            <input type="hidden" name="peer_url" value="{{ setting.central_station_url if setting and setting.central_station_url else '' }}">
+                            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center space-x-2">
+                                <i class="fas fa-arrows-rotate"></i>
+                                <span>Sincronizar Bidireccional con Estación Par Ahora</span>
+                            </button>
+                        </form>
+                        <button type="button" onclick="testPeerConnection()" class="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-300 transition-all flex items-center justify-center space-x-2">
+                            <i class="fas fa-network-wired text-indigo-500"></i>
+                            <span>Probar Ping de Estación</span>
+                        </button>
+                        <a href="/settings" class="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold border border-slate-300 transition-all flex items-center justify-center space-x-1.5">
+                            <i class="fas fa-sliders text-slate-500"></i>
+                            <span>Configurar IP</span>
+                        </a>
+                    </div>
+                </div>
+
+                <script>
+                async function testPeerConnection() {
+                    const dot = document.getElementById('peer-status-dot');
+                    const text = document.getElementById('peer-status-text');
+                    if (!dot || !text) return;
+                    text.innerText = "Comprobando conexión...";
+                    dot.className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
+                    try {
+                        const res = await fetch('/sync/peer/ping');
+                        const data = await res.json();
+                        if (data.online) {
+                            dot.className = "w-2 h-2 rounded-full bg-emerald-500";
+                            text.className = "font-bold text-emerald-700 text-xs";
+                            text.innerText = "En línea: " + (data.clinic_name || "Estación conectada");
+                        } else {
+                            dot.className = "w-2 h-2 rounded-full bg-rose-500";
+                            text.className = "font-bold text-rose-700 text-xs";
+                            text.innerText = "No responde: " + (data.message || "Fuera de línea");
+                        }
+                    } catch (e) {
+                        dot.className = "w-2 h-2 rounded-full bg-rose-500";
+                        text.className = "font-bold text-rose-700 text-xs";
+                        text.innerText = "Error al conectar con la estación";
+                    }
+                }
+                </script>
+
                 <!-- Opciones de Sincronización -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Tarjeta 1: Sincronización en la Nube -->

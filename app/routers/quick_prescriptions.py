@@ -12,11 +12,10 @@ from app.models.consultation import Consultation
 from app.models.template import ClinicalTemplate
 from app.models.setting import Setting
 from app.core.deps import require_current_user, require_permission
-from app.services.pdf_service import generate_quick_prescription_pdf
+from app.services.pdf_service import generate_quick_prescription_pdf, generate_talonario_overlay_pdf
 
 router = APIRouter(prefix="/prescriptions", tags=["prescriptions"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 def check_allergy_conflict(patient_allergies: str, prescription_text: str) -> list:
     """
@@ -124,6 +123,37 @@ def submit_quick_prescription(
     )
     
     filename = f"Receta_Rapida_{patient.document_id or patient.id}_{consultation.id}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
+
+
+@router.post("/talonario")
+def print_talonario(
+    patient_id: int = Form(...),
+    prescription: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('prescriptions'))
+):
+    """
+    Genera un PDF de overlay para imprimir encima del talonario preimpreso.
+    El PDF tiene exactamente el tamaño del talonario (21.7 x 13.6 cm) y
+    posiciona nombre, edad, cédula, fecha y medicamentos en coordenadas absolutas.
+    """
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+    setting = db.query(Setting).first()
+    pdf_buffer = generate_talonario_overlay_pdf(
+        patient=patient,
+        prescription_text=prescription,
+        setting=setting,
+    )
+
+    filename = f"Talonario_{patient.document_id or patient.id}.pdf"
     return StreamingResponse(
         pdf_buffer,
         media_type="application/pdf",

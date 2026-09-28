@@ -14,8 +14,7 @@ from app.core.deps import require_current_user, require_permission
 from app.services.pdf_service import generate_medical_reference_pdf
 
 router = APIRouter(prefix="/references", tags=["references"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 @router.get("/")
 def list_references(

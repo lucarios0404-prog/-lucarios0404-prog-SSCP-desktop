@@ -9,8 +9,7 @@ from app.models.template import ClinicalTemplate
 from app.core.deps import require_current_user
 
 router = APIRouter(prefix="/templates", tags=["templates"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 @router.get("/")
 def list_templates(

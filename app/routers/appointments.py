@@ -56,11 +56,12 @@ def list_appointments(
 
     for a in appointments:
         p_name = f"{a.patient.first_name} {a.patient.last_name}" if a.patient else "Paciente no registrado"
+        time_display = f"{a.start_time.strftime('%H:%M')} - " if a.start_time else ""
         calendar_events.append({
             "id": a.id,
-            "title": f"{a.start_time.strftime('%H:%M')} - {p_name} ({a.reason})",
-            "start": f"{a.date}T{a.start_time}",
-            "end": f"{a.date}T{a.end_time}",
+            "title": f"{time_display}{p_name} ({a.reason or 'Sin motivo'})",
+            "start": f"{a.date}T{a.start_time}" if a.start_time else f"{a.date}",
+            "end": f"{a.date}T{a.end_time}" if a.end_time else None,
             "status": a.status,
             "patient_name": p_name,
         })

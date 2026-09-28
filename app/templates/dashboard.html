@@ -95,7 +95,7 @@
                                 </div>
 
                                 <div class="mt-2 text-xs text-amber-700 font-medium">
-                                    <i class="far fa-clock mr-1"></i>{{ wp.start_time.strftime("%I:%M %p") }}
+                                    <i class="far fa-clock mr-1"></i>{{ wp.start_time.strftime("%I:%M %p") if wp.start_time else "—" }}
                                 </div>
 
                                 {% if wp.notes or wp.reason %}
@@ -203,7 +203,7 @@
                             <div class="px-5 py-3 flex items-center justify-between hover:bg-slate-50/70 transition-colors duration-100">
                                 <div class="min-w-0 mr-3">
                                     <p class="text-sm font-medium text-slate-900 truncate">{{ a.patient.first_name }} {{ a.patient.last_name }}</p>
-                                    <p class="text-xs text-slate-400 font-mono">{{ a.date.strftime("%d/%m/%Y") }} · {{ a.start_time.strftime("%H:%M") }}</p>
+                                    <p class="text-xs text-slate-400 font-mono">{{ a.date.strftime("%d/%m/%Y") if a.date else "—" }} · {{ a.start_time.strftime("%H:%M") if a.start_time else "—" }}</p>
                                 </div>
                                 <span class="text-[11px] px-2.5 py-1 rounded-full font-semibold shrink-0 {% if a.status == 'Confirmada' %}bg-blue-100 text-blue-700{% elif a.status == 'Completada' %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %}">
                                     {{ a.status }}
@@ -241,14 +241,14 @@
                                 <div class="min-w-0 mr-3">
                                     {% if user.has_permission('consultations') or user.has_permission('print_prescriptions') %}
                                     <a href="/consultations/{{ c.id }}" class="text-sm font-medium text-slate-900 hover:text-violet-600 truncate block">
-                                        {{ c.patient.first_name }} {{ c.patient.last_name }}
+                                        {{ c.patient.first_name ~ ' ' ~ c.patient.last_name if c.patient else 'Consulta #' ~ c.id }}
                                     </a>
                                     {% else %}
-                                    <a href="/patients/{{ c.patient.id }}" class="text-sm font-medium text-slate-900 hover:text-violet-600 truncate block">
-                                        {{ c.patient.first_name }} {{ c.patient.last_name }}
+                                    <a href="/patients/{{ c.patient.id if c.patient else '#' }}" class="text-sm font-medium text-slate-900 hover:text-violet-600 truncate block">
+                                        {{ c.patient.first_name ~ ' ' ~ c.patient.last_name if c.patient else 'Consulta #' ~ c.id }}
                                     </a>
                                     {% endif %}
-                                    <p class="text-xs text-slate-400 font-mono">{{ c.created_at.strftime("%d/%m/%Y %H:%M") }}</p>
+                                    <p class="text-xs text-slate-400 font-mono">{{ c.created_at.strftime("%d/%m/%Y %H:%M") if c.created_at else "—" }}</p>
                                 </div>
                                 <div class="flex items-center gap-2 shrink-0">
                                     {% if c.prescription and user.has_permission('print_prescriptions') %}

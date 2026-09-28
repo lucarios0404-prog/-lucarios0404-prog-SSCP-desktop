@@ -224,11 +224,36 @@
                         </div>
                     </div>
 
-                    <!-- Tarjeta 3: Multi-sede y Sincronización -->
+                    <!-- Tarjeta 3: Multi-sede, Rol de Estación & Sincronización (v1.2.0) -->
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
                         <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center">
-                            <i class="fas fa-network-wired text-indigo-600 mr-2"></i> Conectividad Multi-sede & Sincronización 
+                            <i class="fas fa-network-wired text-indigo-600 mr-2"></i> Rol de Estación, Conectividad Multi-sede & Sincronización 
                         </h2>
+
+                        <!-- Selector de Rol de Estación -->
+                        <div class="mb-5 p-4 rounded-xl bg-indigo-50/60 border border-indigo-200/80 space-y-3">
+                            <label class="block text-xs font-bold text-indigo-950 uppercase tracking-wider">
+                                <i class="fas fa-desktop text-indigo-600 mr-1.5"></i> Rol Operativo de esta Estación de Trabajo <span class="text-red-500">*</span>
+                            </label>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                <label class="flex items-start p-3 rounded-xl border {% if not setting.station_role or setting.station_role == 'doctor_principal' %}bg-white border-indigo-400 ring-2 ring-indigo-500/20 shadow-xs{% else %}bg-slate-50 border-slate-200{% endif %} cursor-pointer hover:bg-white transition-all">
+                                    <input type="radio" name="station_role" value="doctor_principal" {% if not setting.station_role or setting.station_role == 'doctor_principal' %}checked{% endif %} class="mt-0.5 text-indigo-600 focus:ring-indigo-500 mr-2.5">
+                                    <div>
+                                        <strong class="font-bold text-slate-900 block text-xs">🩺 Estación de Doctor Principal</strong>
+                                        <p class="text-[11px] text-slate-500 mt-0.5">Control clínico completo: Historias clínicas unificadas, prescripción, diagnósticos CIE-10, órdenes de laboratorio y base de datos maestra.</p>
+                                    </div>
+                                </label>
+
+                                <label class="flex items-start p-3 rounded-xl border {% if setting.station_role == 'secretaria' %}bg-white border-indigo-400 ring-2 ring-indigo-500/20 shadow-xs{% else %}bg-slate-50 border-slate-200{% endif %} cursor-pointer hover:bg-white transition-all">
+                                    <input type="radio" name="station_role" value="secretaria" {% if setting.station_role == 'secretaria' %}checked{% endif %} class="mt-0.5 text-indigo-600 focus:ring-indigo-500 mr-2.5">
+                                    <div>
+                                        <strong class="font-bold text-slate-900 block text-xs">📋 Estación de Secretaría / Recepción</strong>
+                                        <p class="text-[11px] text-slate-500 mt-0.5">Enfocada en recepción de pacientes, turnos, sala de espera inmediata, cobranza/caja y sincronización continua con el consultorio.</p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre de esta Sede</label>
@@ -239,14 +264,21 @@
                             <div>
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Intervalo de Sync Automático</label>
                                 <select name="sync_interval_minutes" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
-                                    <option value="1" {% if setting.sync_interval_minutes == 1 %}selected{% endif %}>Cada 1 minuto</option>
+                                    <option value="1" {% if setting.sync_interval_minutes == 1 %}selected{% endif %}>Cada 1 minuto (Ideal para Secretaría)</option>
                                     <option value="5" {% if setting.sync_interval_minutes == 5 %}selected{% endif %}>Cada 5 minutos (Recomendado)</option>
                                     <option value="15" {% if setting.sync_interval_minutes == 15 %}selected{% endif %}>Cada 15 minutos</option>
                                     <option value="30" {% if setting.sync_interval_minutes == 30 %}selected{% endif %}>Cada 30 minutos</option>
                                 </select>
                             </div>
 
-                            <div class="md:col-span-2">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">URL o IP de la Estación Principal / Nube</label>
+                                <input type="text" name="central_station_url" value="{{ setting.central_station_url or '' }}" placeholder="Ej: http://100.x.y.z:8080 o https://sscp.laxarusdevs.com" 
+                                    class="w-full px-3.5 py-2 text-sm font-mono border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
+                                <p class="mt-1 text-[11px] text-slate-400">Dirección para que la secretaría sincronice datos directamente con el doctor o la nube.</p>
+                            </div>
+
+                            <div>
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">IP de Tailscale (VPN Multi-sede)</label>
                                 <input type="text" name="tailscale_ip" value="{{ setting.tailscale_ip or '' }}" placeholder="Ej. 100.x.y.z (Obtenida desde la app de Tailscale)" 
                                     class="w-full px-3.5 py-2 text-sm font-mono border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">

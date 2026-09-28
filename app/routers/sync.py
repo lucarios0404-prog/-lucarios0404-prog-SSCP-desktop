@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, Request, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query, Body
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from pathlib import Path
@@ -13,8 +13,7 @@ from app.core.deps import require_admin, require_permission
 from app.services.sync_service import SyncService
 
 router = APIRouter(prefix="/sync", tags=["sync"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 def _sync_redirect(msg: str, msg_type: str = "info") -> RedirectResponse:
     query = urlencode({"msg": msg or "", "type": msg_type or "info"})
@@ -155,3 +154,103 @@ async def import_sync_package(
         msg_type = "danger"
 
     return _sync_redirect(msg, msg_type)
+
+# ==========================================
+# FASE 5: ENDPOINTS DE SINCRONIZACIÓN P2P ENTRE ESTACIONES (Doctor <-> Secretaría)
+# ==========================================
+
+@router.get("/peer/status")
+def peer_station_status(db: Session = Depends(get_db)):
+    """
+    Retorna el estado de la estación local para que otra estación en la red la reconozca.
+    """
+    setting = db.query(Setting).first()
+    return JSONResponse(content={
+        "status": "online",
+        "station_role": getattr(setting, "station_role", "doctor_principal"),
+        "clinic_name": getattr(setting, "clinic_name", "SSCP Clínica"),
+        "sede_name": getattr(setting, "sede_name", "Sede Principal"),
+        "version": "1.2.0",
+        "server_time": datetime.utcnow().isoformat()
+    })
+
+@router.get("/peer/ping")
+async def ping_peer_station(
+    peer_url: str = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Comprueba conectividad con la estación par vía HTTP.
+    """
+    setting = db.query(Setting).first()
+    target_url = (peer_url or (setting.central_station_url if setting else None) or "").strip()
+    if not target_url:
+        return JSONResponse(status_code=400, content={"online": False, "message": "No se ha configurado la dirección URL de la estación par."})
+
+    import httpx
+    clean_target = target_url.rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=3.0, verify=False) as client:
+            resp = await client.get(f"{clean_target}/sync/peer/status")
+            if resp.status_code == 200:
+                data = resp.json()
+                return JSONResponse(content={
+                    "online": True,
+                    "target_url": clean_target,
+                    "station_role": data.get("station_role"),
+                    "clinic_name": data.get("clinic_name"),
+                    "message": f"Conexión establecida con {data.get('clinic_name', 'Estación')} ({data.get('station_role', 'nodo')})."
+                })
+            else:
+                return JSONResponse(content={
+                    "online": False,
+                    "target_url": clean_target,
+                    "message": f"La estación par respondió con código HTTP {resp.status_code}."
+                })
+    except Exception as e:
+        return JSONResponse(content={
+            "online": False,
+            "target_url": clean_target,
+            "message": f"Estación par no accesible ({str(e)[:80]}). Compruebe la IP y que SSCP esté abierto."
+        })
+
+@router.get("/peer/delta")
+def export_peer_delta(
+    since: str = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Exporta delta de cambios para la estación par.
+    """
+    delta = SyncService.export_delta(db, since_iso=since)
+    return JSONResponse(content=delta)
+
+@router.post("/peer/import")
+def import_peer_delta(
+    package: dict = Body(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Recibe y reconcilia registros enviados por la otra estación sin sobrescritura destructiva.
+    """
+    result = SyncService.import_delta(db, package)
+    return JSONResponse(content=result)
+
+@router.post("/peer/trigger")
+async def trigger_peer_sync(
+    request: Request,
+    peer_url: str = Form(None),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("sync"))
+):
+    """
+    Dispara la sincronización bidireccional inmediata con la estación par (Doctor <-> Secretaría).
+    """
+    setting = db.query(Setting).first()
+    target_url = (peer_url or (setting.central_station_url if setting else None) or "").strip()
+    if not target_url:
+        return _sync_redirect("Por favor configure la dirección IP o URL de la estación par en Ajustes.", "warning")
+
+    res = await SyncService.sync_with_peer(db, target_url)
+    msg_type = "success" if res.get("success") else "warning"
+    return _sync_redirect(res.get("message", "Sincronización P2P procesada."), msg_type)

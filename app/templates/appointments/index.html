@@ -121,9 +121,9 @@
                                             </span>
                                         </div>
                                         {% endif %}
-                                        <div class="font-semibold text-slate-900 text-xs">{{ a.date.strftime("%d/%m/%Y") }}</div>
+                                        <div class="font-semibold text-slate-900 text-xs">{{ a.date.strftime("%d/%m/%Y") if a.date else "—" }}</div>
                                         <div class="text-[11px] text-blue-600 font-mono font-medium mt-0.5">
-                                            <i class="far fa-clock mr-1"></i>{{ a.start_time.strftime("%H:%M") }} - {{ a.end_time.strftime("%H:%M") }}
+                                            <i class="far fa-clock mr-1"></i>{{ a.start_time.strftime("%H:%M") if a.start_time else "—" }}{% if a.end_time %} - {{ a.end_time.strftime("%H:%M") }}{% endif %}
                                         </div>
                                     </td>
                                     <td class="py-4 px-5">

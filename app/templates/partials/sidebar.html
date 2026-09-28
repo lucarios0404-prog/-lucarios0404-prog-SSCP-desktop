@@ -167,6 +167,37 @@
 
     </div>
 
+    <!-- Indicador de Estación de Trabajo v1.2.0 -->
+    {% set current_cfg = setting if setting is defined and setting else (get_current_setting() if get_current_setting is defined else None) %}
+    {% set is_sec_station = (current_cfg.station_role == 'secretaria') if current_cfg else false %}
+    <div class="px-3 py-2 border-t border-slate-800/80 bg-slate-950/80 shrink-0">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2 min-w-0">
+                {% if is_sec_station %}
+                <span class="flex h-2 w-2 relative shrink-0">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-bold text-amber-300 truncate">Estación Secretaría</p>
+                    <p class="text-[9px] text-slate-400 truncate">Sincronización P2P</p>
+                </div>
+                {% else %}
+                <span class="flex h-2 w-2 relative shrink-0">
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-bold text-emerald-300 truncate">Estación Doctor</p>
+                    <p class="text-[9px] text-slate-400 truncate">Nodo Principal</p>
+                </div>
+                {% endif %}
+            </div>
+            <a href="/sync" title="Sincronización con estación par" class="p-1 text-slate-400 hover:text-blue-400 rounded-md hover:bg-slate-800 transition-colors">
+                <i class="fas fa-arrows-rotate text-xs"></i>
+            </a>
+        </div>
+    </div>
+
     <!-- User Profile Footer -->
     <div class="px-3 py-3 border-t border-slate-800/60 bg-slate-950/40 shrink-0">
         <div class="flex items-center justify-between">

@@ -50,6 +50,60 @@ async def check_duplicate_patient(
     )
     return {"has_duplicates": len(matches) > 0, "matches": matches}
 
+@router.get("/autocomplete")
+def autocomplete_patients(
+    q: str = Query("", min_length=0),
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    """
+    Búsqueda en tiempo real de pacientes para autocompletado rápido (Fase 2 v1.2.0).
+    Filtra por nombre, apellidos, cédula o teléfono. Excluye archivados.
+    """
+    search_term = (q or "").strip()
+    if not search_term:
+        return []
+
+    pattern = f"%{search_term}%"
+    patients = db.query(Patient).filter(
+        Patient.is_active == True,
+        or_(
+            Patient.first_name.ilike(pattern),
+            Patient.last_name.ilike(pattern),
+            Patient.document_id.ilike(pattern),
+            Patient.phone.ilike(pattern),
+            (Patient.first_name + " " + Patient.last_name).ilike(pattern),
+            (Patient.last_name + " " + Patient.first_name).ilike(pattern)
+        )
+    ).order_by(Patient.last_name.asc(), Patient.first_name.asc()).limit(limit).all()
+
+    today = date.today()
+    results = []
+    for p in patients:
+        calc_age = None
+        if p.date_of_birth:
+            try:
+                calc_age = today.year - p.date_of_birth.year - ((today.month, today.day) < (p.date_of_birth.month, p.date_of_birth.day))
+            except Exception:
+                calc_age = None
+
+        results.append({
+            "id": p.id,
+            "name": f"{p.last_name}, {p.first_name}",
+            "first_name": p.first_name,
+            "last_name": p.last_name,
+            "document_id": p.document_id or "",
+            "phone": p.phone or "",
+            "age": calc_age,
+            "gender": p.gender or "N/D",
+            "insurance_name": p.insurance_name or "Privado",
+            "insurance_number": p.insurance_number or "",
+            "allergies": p.allergies or ""
+        })
+
+    return results
+
 @router.get("/")
 def list_patients(
     request: Request,

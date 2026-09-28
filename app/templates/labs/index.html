@@ -4,7 +4,7 @@
 
 {% block body %}
 <div class="flex h-screen bg-slate-50 overflow-hidden">
-    {% set active_menu = 'consultations' %}
+    {% set active_menu = 'labs' %}
     {% include "partials/sidebar.html" %}
 
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -15,11 +15,29 @@
             <div class="max-w-7xl mx-auto space-y-6">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 class="text-2xl font-bold text-slate-900">Resultados de Laboratorio & Diagnósticos</h1>
-                        <p class="text-xs text-slate-500 mt-0.5">Control de analíticas, perfiles bioquímicos, alertas de valores fuera de rango y archivo.</p>
+                        <h1 class="text-2xl font-bold text-slate-900">Módulo de Laboratorio Clínico</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Control de analíticas, solicitudes digitales en PDF con paneles clínicos y archivo de resultados.</p>
                     </div>
-                    <a href="/lab-results/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-md shadow-teal-500/20 transition-all">
-                        <i class="fas fa-vial mr-2"></i> Registrar Resultado
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a href="/lab-results" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-md shadow-blue-500/20 transition-all">
+                            <i class="fas fa-check-double mr-2"></i> Emitir Solicitud (Checklist)
+                        </a>
+                        <a href="/lab-results/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-all border border-slate-200">
+                            <i class="fas fa-vial mr-2 text-slate-500"></i> Registrar Resultado
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Tabs Navigation -->
+                <div class="border-b border-slate-200 flex space-x-6">
+                    <a href="/lab-results" class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-2">
+                        <i class="fas fa-check-double text-slate-400"></i> Emitir Solicitud (Checklist)
+                    </a>
+                    <a href="/lab-results/orders" class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-2">
+                        <i class="fas fa-clipboard-list text-slate-400"></i> Órdenes Emitidas
+                    </a>
+                    <a href="/lab-results/results" class="pb-3 text-sm font-semibold border-b-2 border-teal-600 text-teal-700 transition-colors flex items-center gap-2">
+                        <i class="fas fa-flask text-teal-600"></i> Resultados Registrados
                     </a>
                 </div>
 
@@ -40,13 +58,17 @@
                                 {% for r in results %}
                                 <tr class="hover:bg-slate-50/80 transition-colors">
                                     <td class="py-4 px-5 whitespace-nowrap font-mono text-xs text-slate-900">
-                                        {{ r.result_date.strftime("%d/%m/%Y") }}
+                                        {{ r.result_date.strftime("%d/%m/%Y") if r.result_date else "—" }}
                                     </td>
                                     <td class="py-4 px-5 font-semibold text-slate-900">
+                                        {% if r.patient %}
                                         <a href="/patients/{{ r.patient.id }}" class="hover:text-blue-600">
                                             {{ r.patient.first_name }} {{ r.patient.last_name }}
                                         </a>
                                         <span class="block text-[11px] text-slate-400">DNI: {{ r.patient.document_id or 'N/D' }}</span>
+                                        {% else %}
+                                        <span class="text-slate-400 italic">Paciente no disponible</span>
+                                        {% endif %}
                                     </td>
                                     <td class="py-4 px-5 font-semibold text-slate-800">{{ r.test_name }}</td>
                                     <td class="py-4 px-5 text-xs text-slate-500">{{ r.test_category }}</td>

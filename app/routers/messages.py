@@ -12,8 +12,7 @@ from app.models.patient import Patient
 from app.core.deps import require_current_user
 
 router = APIRouter(prefix="/messages", tags=["messages"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 @router.get("/")
 def list_messages(

@@ -153,7 +153,7 @@
                                 <tbody class="divide-y divide-slate-100">
                                     {% for v in vitals %}
                                     <tr class="hover:bg-slate-50">
-                                        <td class="py-2.5 px-3 font-semibold text-slate-900">{{ v.recorded_at.strftime("%d/%m/%Y %H:%M") }}</td>
+                                        <td class="py-2.5 px-3 font-semibold text-slate-900">{{ v.recorded_at.strftime("%d/%m/%Y %H:%M") if v.recorded_at else "—" }}</td>
                                         <td class="py-2.5 px-3 font-mono">
                                             {% if v.systolic_bp and v.diastolic_bp %}
                                             <span class="font-bold {% if v.systolic_bp >= 140 or v.diastolic_bp >= 90 %}text-rose-600{% else %}text-slate-900{% endif %}">

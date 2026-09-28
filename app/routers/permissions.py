@@ -19,9 +19,9 @@ from app.core.permissions import (
     invalidate_permissions_cache,
 )
 
+from app.core.templates import templates
+
 router = APIRouter(prefix="/permissions", tags=["permissions"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
 
 @router.get("/")

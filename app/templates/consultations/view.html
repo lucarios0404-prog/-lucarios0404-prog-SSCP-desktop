@@ -20,8 +20,23 @@
                             <i class="fas fa-arrow-left"></i>
                         </a>
                         <div>
-                            <h1 class="text-2xl font-bold text-slate-900">Nota de Consulta #{{ consultation.id }}</h1>
-                            <p class="text-xs text-slate-500">{{ consultation.created_at.strftime("%d de %B de %Y, %H:%M") }}</p>
+                            <div class="flex items-center flex-wrap gap-2">
+                                <h1 class="text-2xl font-bold text-slate-900">Nota de Consulta #{{ consultation.id }}</h1>
+                                {% if consultation.is_first_visit %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    <i class="fas fa-star text-emerald-600 mr-1 text-[10px]"></i> Primera Consulta
+                                </span>
+                                {% endif %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                    v{{ consultation.edit_version or 1 }}
+                                </span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                {{ consultation.created_at.strftime("%d de %B de %Y, %H:%M") if consultation.created_at else "—" }}
+                                {% if consultation.updated_at and consultation.updated_at != consultation.created_at %}
+                                &bull; <span class="text-amber-700 font-medium">Modificada: {{ consultation.updated_at.strftime("%d/%m/%Y %H:%M") if consultation.updated_at else "—" }}</span>
+                                {% endif %}
+                            </p>
                         </div>
                     </div>
 
@@ -35,13 +50,20 @@
                         <!-- Botón Receta PDF -->
                         {% if user.has_permission('print_prescriptions') %}
                         <a href="/consultations/{{ consultation.id }}/prescription/pdf" target="_blank" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md shadow-teal-600/20 transition-all" title="Descargar o imprimir receta oficial en PDF">
-                            <i class="fas fa-print mr-1.5"></i> Imprimir Receta (PDF)
+                            <i class="fas fa-print mr-1.5"></i> Receta Completa
+                        </a>
+                        <a href="/consultations/{{ consultation.id }}/prescription/talonario/pdf" target="_blank" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md shadow-amber-600/20 transition-all" title="Imprimir texto sobre talonario físico preimpreso (21.7 × 13.6 cm)">
+                            <i class="fas fa-file-medical mr-1.5"></i> Talonario (21.7×13.6)
                         </a>
                         {% endif %}
                         <!-- Botón Informe Clínico PDF -->
                         {% if user.has_permission('consultations') %}
                         <a href="/consultations/{{ consultation.id }}/report/pdf" target="_blank" class="inline-flex items-center px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-all">
                             <i class="fas fa-file-pdf mr-1.5"></i> Informe Clínico (PDF)
+                        </a>
+                        <!-- Botón Solicitud de Laboratorio (Fase 3 v1.2.0) -->
+                        <a href="/lab-results/orders/new?patient_id={{ consultation.patient_id }}&consultation_id={{ consultation.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-sm transition-all" title="Emitir orden de análisis de laboratorio en PDF">
+                            <i class="fas fa-flask mr-1.5"></i> Solicitar Laboratorio
                         </a>
                         {% endif %}
                         <button onclick="window.print()" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold shadow-sm transition-all">
@@ -56,15 +78,21 @@
                         <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Paciente Atendido</span>
                         <div class="mt-1">
                             <a href="/patients/{{ consultation.patient.id }}" class="text-lg font-bold text-blue-600 hover:underline">
-                                {{ consultation.patient.first_name }} {{ consultation.patient.last_name }}
+                                {{ consultation.patient.last_name }}, {{ consultation.patient.first_name }}
                             </a>
                             <div class="text-xs text-slate-500 mt-0.5 space-x-3">
                                 <span>DNI: <strong>{{ consultation.patient.document_id or 'N/D' }}</strong></span>
-                                <span>Tel: <strong>{{ consultation.patient.phone or 'N/D' }}</strong></span>
+                                <span>Tel: <strong>{{ consultation.patient.phone or consultation.patient.mobile or 'N/D' }}</strong></span>
+                                <span>Edad: <strong>{{ consultation.patient.age if consultation.patient.age else 'N/D' }}</strong></span>
                                 <span>Sangre: <strong>{{ consultation.patient.blood_type or 'N/D' }}</strong></span>
                             </div>
-                            <div class="mt-2 flex items-center gap-2">
+                            <div class="mt-2 flex items-center flex-wrap gap-2">
                                 {{ consultation.patient.insurance_name|ars_badge(consultation.patient.insurance_number)|safe }}
+                                {% if consultation.patient.allergies %}
+                                <span class="text-red-700 font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg text-[11px] inline-flex items-center">
+                                    <i class="fas fa-allergies mr-1 text-red-500"></i> Alergias: {{ consultation.patient.allergies }}
+                                </span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -86,45 +114,34 @@
                         </p>
                     </div>
 
-                    <!-- Síntomas y Examen -->
-                    <div class="grid grid-cols-1 {% if consultation.physical_exam %}md:grid-cols-2{% endif %} gap-6">
-                        <div>
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                    {% if consultation.sede_origen == 'import_consulta_practica' %}
-                                    Evolución Clínica / Anamnesis
-                                    {% else %}
-                                    Anamnesis / Síntomas
-                                    {% endif %}
-                                </h3>
-                                {% if consultation.sede_origen == 'import_consulta_practica' %}
-                                <span class="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
-                                    <i class="fas fa-history mr-1"></i> Consulta Práctica
-                                </span>
-                                {% endif %}
-                            </div>
-                            <div class="mt-1.5 text-sm text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100 min-h-[90px] whitespace-pre-line leading-relaxed">
-                                {{ consultation.symptoms or 'Sin detalles adicionales registrados.' }}
-                            </div>
+                    <!-- Historia Clínica / Evolución Médica Unificada -->
+                    <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                        <div class="bg-gradient-to-r from-blue-50/90 to-slate-50 px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+                            <h3 class="text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-2">
+                                <i class="fas fa-file-medical text-blue-600"></i> Historia Clínica &bull; Evolución Médica
+                            </h3>
+                            {% if consultation.sede_origen == 'import_consulta_practica' %}
+                            <span class="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                                <i class="fas fa-history mr-1"></i> Consulta Práctica
+                            </span>
+                            {% endif %}
                         </div>
-                        {% if consultation.physical_exam %}
-                        <div>
-                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Examen Físico</h3>
-                            <div class="mt-1.5 text-sm text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100 min-h-[90px] whitespace-pre-line leading-relaxed">
-                                {{ consultation.physical_exam }}
-                            </div>
+                        <div class="p-5 bg-white text-sm md:text-base text-slate-800 whitespace-pre-line leading-relaxed font-sans min-h-[120px]">
+                            {{ consultation.display_clinical_history }}
                         </div>
-                        {% endif %}
                     </div>
 
-                    <!-- Diagnóstico CIE-10 -->
+                    <!-- Diagnóstico CIE-10 (Si está presente) -->
+                    {% if consultation.diagnosis %}
                     <div>
-                        <h3 class="text-xs font-bold text-violet-700 uppercase tracking-wider">Diagnóstico Clínico (CIE-10)</h3>
+                        <h3 class="text-xs font-bold text-violet-700 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fas fa-stethoscope text-violet-600"></i> Diagnóstico Clínico (CIE-10)
+                        </h3>
                         <div class="mt-1.5 p-3.5 rounded-xl bg-violet-50/80 border border-violet-200 text-violet-900 font-semibold text-sm">
-                            <i class="fas fa-stethoscope mr-2 text-violet-600"></i>
-                            {{ consultation.diagnosis or 'Pendiente de diagnóstico definitivo.' }}
+                            {{ consultation.diagnosis }}
                         </div>
                     </div>
+                    {% endif %}
 
                     <!-- Tratamiento -->
                     <div>
@@ -150,7 +167,7 @@
                     <!-- Notas Adicionales -->
                     {% if consultation.notes and (consultation.notes | trim) != ((consultation.symptoms or '') | trim) %}
                     <div>
-                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Notas Adicionales</h3>
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Notas Adicionales / Confidenciales</h3>
                         <div class="mt-1.5 text-xs text-slate-500 italic bg-slate-50 p-3 rounded-lg whitespace-pre-line">
                             {{ consultation.notes }}
                         </div>
@@ -181,7 +198,7 @@
                             <span class="text-[11px] font-mono text-slate-500">{{ h.timestamp }}</span>
                         </div>
                         {% else %}
-                        <p class="text-slate-500 italic">Registrada originalmente el {{ consultation.created_at.strftime("%d/%m/%Y %H:%M") }}.</p>
+                        <p class="text-slate-500 italic">Registrada originalmente el {{ consultation.created_at.strftime("%d/%m/%Y %H:%M") if consultation.created_at else "—" }}.</p>
                         {% endfor %}
                     </div>
                 </div>

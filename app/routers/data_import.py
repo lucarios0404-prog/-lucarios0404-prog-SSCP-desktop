@@ -18,8 +18,7 @@ from app.core.deps import require_current_user, require_permission
 from app.services.data_importer import DataImporterService
 
 router = APIRouter(prefix="/patients/import", tags=["import"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 # Temporary in-memory session cache for large import payloads during preview
 # Each value is (created_at_epoch, records) — expires after 30 minutes

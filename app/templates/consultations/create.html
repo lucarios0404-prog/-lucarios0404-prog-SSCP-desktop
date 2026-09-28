@@ -43,32 +43,126 @@
                         <input type="hidden" name="appointment_id" value="{{ selected_appointment_id }}">
                         {% endif %}
 
-                        <!-- Paciente Select -->
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                Paciente <span class="text-red-500">*</span>
-                            </label>
-                            <select name="patient_id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 bg-white">
-                                <option value="">Seleccione el paciente...</option>
-                                {% for p in patients %}
-                                <option value="{{ p.id }}" {% if selected_patient and selected_patient.id == p.id %}selected{% endif %}>
-                                    {{ p.last_name }}, {{ p.first_name }} ({{ p.document_id or 'Sin DNI' }})
-                                </option>
-                                {% endfor %}
-                            </select>
-                            {% if selected_patient %}
-                            <div class="mt-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between flex-wrap gap-2 text-xs">
-                                <div class="flex items-center space-x-2">
-                                    <span class="font-bold text-slate-700">Aseguradora del Paciente:</span>
-                                    {{ selected_patient.insurance_name|ars_badge(selected_patient.insurance_number)|safe }}
+                        <!-- Barra Superior: Identificación del Paciente (Estilo Ficha Médica) -->
+                        <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                            <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+                                <div class="flex items-center space-x-2.5">
+                                    <span class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-bold border border-emerald-500/30">
+                                        <i class="fas fa-id-card-clip"></i>
+                                    </span>
+                                    <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">Identificación del Paciente</span>
                                 </div>
-                                {% if selected_patient.allergies %}
-                                <span class="text-red-700 font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg text-[11px]">
-                                    <i class="fas fa-allergies mr-1"></i> {{ selected_patient.allergies }}
-                                </span>
-                                {% endif %}
+                                <span class="text-[11px] text-slate-300 font-medium">Expediente Clínico &bull; SSCP</span>
                             </div>
-                            {% endif %}
+
+                            <div class="p-4 sm:p-5 bg-white space-y-4">
+                                <div class="space-y-2">
+                                    <div class="flex items-center justify-between">
+                                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                            Paciente <span class="text-red-500">*</span>
+                                        </label>
+                                        <span class="text-[11px] text-blue-600 font-semibold flex items-center gap-1">
+                                            <i class="fas fa-bolt text-amber-500 text-[10px]"></i> Búsqueda en vivo (DNI, Nombre, Teléfono)
+                                        </span>
+                                    </div>
+
+                                    <!-- Campo Live Search con Autocompletado Flotante -->
+                                    <div class="relative">
+                                        <div class="relative flex items-center">
+                                            <span class="absolute left-3.5 text-slate-400 pointer-events-none">
+                                                <i class="fas fa-search text-xs"></i>
+                                            </span>
+                                            <input type="text" id="patient_live_search" autocomplete="off"
+                                                placeholder="Escribe para buscar paciente en tiempo real (ej. Juan Pérez, 001-..., 809-...)" 
+                                                class="w-full pl-9 pr-10 py-2.5 text-sm border border-slate-300 rounded-xl bg-slate-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 text-slate-900 placeholder-slate-400 font-medium transition-all shadow-2xs">
+                                            <button type="button" id="clear_patient_search_btn" onclick="clearPatientSearch()" class="hidden absolute right-3 text-slate-400 hover:text-slate-600 text-xs">
+                                                <i class="fas fa-times-circle text-sm"></i>
+                                            </button>
+                                        </div>
+
+                                        <!-- Dropdown Flotante de Resultados de Búsqueda -->
+                                        <div id="patient_search_dropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
+                                            <div id="patient_search_results" class="p-1.5 space-y-1"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Selector clásico / fallback y almacenamiento del valor seleccionado -->
+                                    <div class="flex items-center gap-2">
+                                        <select id="patient_select" name="patient_id" required onchange="updatePatientIdentity(this)" 
+                                            class="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white font-medium text-slate-700">
+                                            <option value="">-- O seleccionar manualmente del listado --</option>
+                                            {% for p in patients %}
+                                            <option value="{{ p.id }}" 
+                                                {% if selected_patient and selected_patient.id == p.id %}selected{% endif %}
+                                                data-name="{{ p.last_name }}, {{ p.first_name }}"
+                                                data-gender="{{ p.gender or 'N/D' }}"
+                                                data-birth="{{ p.birth_date or '' }}"
+                                                data-doc="{{ p.document_id or 'Sin DNI' }}"
+                                                data-phone="{{ p.phone or p.mobile or 'N/D' }}"
+                                                data-insurance="{{ p.insurance_name or 'Privado' }}"
+                                                data-insurance-num="{{ p.insurance_number or '' }}"
+                                                data-allergies="{{ p.allergies or '' }}">
+                                                {{ p.last_name }}, {{ p.first_name }} ({{ p.document_id or 'Sin DNI' }})
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Ficha Dinámica de Datos del Paciente -->
+                                <div id="patient_identity_card" class="{% if not selected_patient %}hidden{% endif %} p-4 rounded-xl bg-slate-50 border border-slate-200">
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5 text-xs">
+                                        <div class="space-y-0.5">
+                                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Nombre del Paciente</span>
+                                            <p id="ident_name" class="font-extrabold text-slate-900 text-sm truncate">
+                                                {% if selected_patient %}{{ selected_patient.last_name }}, {{ selected_patient.first_name }}{% else %}-{% endif %}
+                                            </p>
+                                        </div>
+                                        <div class="space-y-0.5">
+                                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Sexo</span>
+                                            <p id="ident_gender" class="font-bold text-slate-800">
+                                                {% if selected_patient %}{{ selected_patient.gender or 'N/D' }}{% else %}-{% endif %}
+                                            </p>
+                                        </div>
+                                        <div class="space-y-0.5">
+                                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Edad</span>
+                                            <p id="ident_age" class="font-bold text-slate-800">
+                                                {% if selected_patient and selected_patient.birth_date %}
+                                                    {{ selected_patient.age if selected_patient.age else 'N/D' }}
+                                                {% else %}-{% endif %}
+                                            </p>
+                                        </div>
+                                        <div class="space-y-0.5">
+                                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">ID / Cédula</span>
+                                            <p id="ident_doc" class="font-mono font-bold text-slate-800">
+                                                {% if selected_patient %}{{ selected_patient.document_id or 'Sin DNI' }}{% else %}-{% endif %}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3 pt-3 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-slate-500 font-semibold">Teléfono:</span>
+                                            <strong id="ident_phone" class="text-slate-800 font-mono">
+                                                {% if selected_patient %}{{ selected_patient.phone or selected_patient.mobile or 'N/D' }}{% else %}-{% endif %}
+                                            </strong>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-slate-500 font-semibold">Aseguradora:</span>
+                                            <span id="ident_insurance" class="font-bold text-slate-800">
+                                                {% if selected_patient %}
+                                                    {{ selected_patient.insurance_name|ars_badge(selected_patient.insurance_number)|safe }}
+                                                {% else %}Privado{% endif %}
+                                            </span>
+                                        </div>
+                                        <div id="ident_allergies_container" class="{% if not (selected_patient and selected_patient.allergies) %}hidden{% endif %}">
+                                            <span class="text-red-700 font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg text-[11px] inline-flex items-center">
+                                                <i class="fas fa-allergies mr-1 text-red-500"></i> Alergias: <span id="ident_allergies" class="ml-1">{% if selected_patient %}{{ selected_patient.allergies }}{% endif %}</span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Motivo de consulta -->
@@ -77,131 +171,152 @@
                                 Motivo de la Consulta <span class="text-red-500">*</span>
                             </label>
                             <input type="text" name="reason" required placeholder="Ej. Dolor abdominal agudo de 2 días de evolución, fiebre y náuseas" 
-                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">
+                                class="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 font-medium text-slate-800">
                         </div>
 
-                        <!-- Selector de Plantilla de Consulta -->
-                        <div class="p-3.5 bg-violet-50/80 border border-violet-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div class="flex items-center space-x-2">
-                                <span class="w-7 h-7 rounded-lg bg-violet-200 text-violet-700 flex items-center justify-center text-xs shrink-0">
-                                    <i class="fas fa-magic"></i>
-                                </span>
-                                <div>
-                                    <span class="text-xs font-bold text-violet-950 uppercase tracking-wide block">Plantilla de Consulta</span>
-                                    <span class="text-[11px] text-violet-700">Autocompleta Anamnesis / Síntomas con un solo clic</span>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <select id="consultation-template-select" onchange="applyConsultationTemplate(this)" class="text-xs py-1.5 px-3 border border-violet-300 rounded-lg bg-white text-slate-800 focus:ring-2 focus:ring-violet-500 font-medium">
-                                    <option value="">-- Seleccionar Plantilla de Consulta --</option>
-                                    {% for t in consultation_templates %}
-                                    <option value="{{ t.id }}" data-content="{{ t.content }}">{{ t.title }}</option>
-                                    {% endfor %}
-                                </select>
-                                <a href="/templates?category=consultation" target="_blank" class="p-1.5 text-violet-600 hover:text-violet-800 hover:bg-violet-100 rounded-lg text-xs" title="Crear o gestionar plantillas">
-                                    <i class="fas fa-cog"></i>
-                                </a>
-                            </div>
-                        </div>
-
-                        <!-- Síntomas y Examen Físico -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                    Anamnesis / Síntomas Subjetivos
-                                </label>
-                                <textarea id="symptoms_textarea" name="symptoms" rows="4" placeholder="Descripción detallada de síntomas relatados por el paciente..." 
-                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500"></textarea>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                    Examen Físico / Signos Observados
-                                </label>
-                                <textarea name="physical_exam" rows="4" placeholder="Inspección, palpación, auscultación, signos vitales..." 
-                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500"></textarea>
-                            </div>
-                        </div>
-
-                        <!-- Diagnóstico Clínico y Catálogo Oficial CIE-10 -->
-                        <div class="bg-violet-50/50 p-4 sm:p-5 rounded-2xl border border-violet-200/80 space-y-3.5 relative">
-                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <label class="block text-xs font-bold text-violet-950 uppercase tracking-wider">
-                                    <i class="fas fa-stethoscope mr-1 text-violet-600"></i> Diagnóstico Clínico y Código CIE-10 Oficial
-                                </label>
-                                <button type="button" onclick="openCustomCie10Modal()" 
-                                    class="inline-flex items-center px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-sm transition-all self-start sm:self-auto">
-                                    <i class="fas fa-plus-circle mr-1.5"></i> Agregar Diagnóstico / Código Personalizado
-                                </button>
-                            </div>
-
-                            <!-- Campo con Autocompletado / Buscador Inteligente -->
-                            <div class="relative">
-                                <div class="relative flex items-center">
-                                    <span class="absolute left-3.5 text-slate-400 pointer-events-none">
-                                        <i class="fas fa-search text-xs"></i>
+                        <!-- SECCIÓN PRINCIPAL: HISTORIA CLÍNICA (CUADRO GRANDE UNIFICADO) -->
+                        <div class="border border-slate-300 rounded-2xl overflow-hidden shadow-sm">
+                            <!-- Cabecera de Control de Historia Clínica -->
+                            <div class="bg-gradient-to-r from-blue-50/90 via-slate-50 to-indigo-50/70 p-3.5 border-b border-slate-300 flex flex-wrap items-center justify-between gap-3">
+                                <div class="flex items-center flex-wrap gap-2.5">
+                                    <span class="px-3 py-1.5 rounded-xl bg-blue-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center gap-1.5">
+                                        <i class="fas fa-file-medical"></i> Historia Clínica
                                     </span>
-                                    <input type="text" id="diagnosis_input" name="diagnosis" autocomplete="off"
-                                        placeholder="Escribe para buscar código oficial (ej. I10, J00, E11) o diagnóstico (ej. hipertensión, gripe, cefalea)..." 
-                                        class="w-full pl-9 pr-24 py-2.5 text-sm border border-violet-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-slate-800 placeholder-slate-400 shadow-2xs">
-                                    <div class="absolute right-2 flex items-center space-x-1">
-                                        <button type="button" id="cie10_clear_btn" onclick="clearDiagnosis()" class="hidden text-slate-400 hover:text-slate-600 px-2 py-1 text-xs">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                        <span class="text-[10px] bg-violet-100 text-violet-800 font-bold px-2 py-0.5 rounded-full border border-violet-200">
-                                            CIE-10
-                                        </span>
+                                    <div class="flex items-center gap-1.5 text-xs text-slate-600 font-semibold bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                                        <span class="text-slate-400">Fecha:</span>
+                                        <input type="date" name="created_date" value="{{ now_date }}" class="text-xs bg-transparent border-0 font-bold text-slate-800 p-0 focus:ring-0">
+                                    </div>
+                                    <div class="flex items-center gap-1.5 text-xs text-slate-600 font-semibold bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                                        <span class="text-slate-400">Hora:</span>
+                                        <input type="time" name="created_time" value="{{ now_time }}" class="text-xs bg-transparent border-0 font-bold text-slate-800 p-0 focus:ring-0">
                                     </div>
                                 </div>
 
-                                <!-- Dropdown de Resultados de Búsqueda CIE-10 -->
-                                <div id="cie10_results_dropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
-                                    <div id="cie10_results_list" class="p-1.5 space-y-1">
-                                        <!-- Resultados inyectados por AJAX -->
+                                <div class="flex items-center flex-wrap gap-2">
+                                    <!-- Checkbox: Primera vez -->
+                                    <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-blue-950 bg-blue-100/70 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200 transition-colors shadow-2xs">
+                                        <input type="checkbox" name="is_first_visit" value="true" class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
+                                        <span>¿Primera vez? (Apertura)</span>
+                                    </label>
+                                    
+                                    <!-- Versión de edición -->
+                                    <span class="text-xs font-semibold text-slate-600 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                                        Versión Ed: <strong class="text-blue-700">1</strong>
+                                    </span>
+
+                                    <!-- Selector de Plantilla de Consulta -->
+                                    <select id="consultation-template-select" onchange="applyConsultationTemplate(this)" class="text-xs py-1.5 px-3 border border-blue-300 rounded-xl bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 font-semibold shadow-2xs">
+                                        <option value="">-- Cargar Plantilla --</option>
+                                        {% for t in consultation_templates %}
+                                        <option value="{{ t.id }}" data-content="{{ t.content }}">{{ t.title }}</option>
+                                        {% endfor %}
+                                    </select>
+
+                                    <!-- Botón Asistente CIE-10 (Colapsable / No Invasivo) -->
+                                    <button type="button" onclick="toggleCie10Panel()" id="btn_toggle_cie10" 
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-sm transition-all">
+                                        <i class="fas fa-stethoscope"></i>
+                                        <span id="cie10_btn_text">+ Asociar CIE-10</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Panel Asistente CIE-10 (Colapsable / Opcional) -->
+                            <div id="cie10_collapsible_panel" class="hidden p-4 bg-violet-50/70 border-b border-violet-200 space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold text-violet-950 uppercase tracking-wide flex items-center gap-1.5">
+                                        <i class="fas fa-stethoscope text-violet-600"></i> Asistente de Codificación CIE-10
+                                    </span>
+                                    <button type="button" onclick="openCustomCie10Modal()" class="text-xs font-bold text-violet-700 hover:text-violet-900 bg-white px-2.5 py-1 rounded-lg border border-violet-200 shadow-2xs">
+                                        <i class="fas fa-plus-circle mr-1"></i> Nuevo Código Propio
+                                    </button>
+                                </div>
+
+                                <div class="relative">
+                                    <div class="relative flex items-center">
+                                        <span class="absolute left-3.5 text-slate-400 pointer-events-none">
+                                            <i class="fas fa-search text-xs"></i>
+                                        </span>
+                                        <input type="text" id="diagnosis_input" name="diagnosis" autocomplete="off"
+                                            placeholder="Buscar código oficial (ej. I10, J00) o nombre de diagnóstico..." 
+                                            class="w-full pl-9 pr-24 py-2 text-sm border border-violet-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-800 placeholder-slate-400">
+                                        <div class="absolute right-2 flex items-center space-x-1">
+                                            <button type="button" id="cie10_clear_btn" onclick="clearDiagnosis()" class="hidden text-slate-400 hover:text-slate-600 px-2 py-1 text-xs">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                            <span class="text-[10px] bg-violet-100 text-violet-800 font-bold px-2 py-0.5 rounded-full border border-violet-200">
+                                                CIE-10
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div class="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                                        <span>¿No encuentras el código oficial?</span>
-                                        <button type="button" onclick="openCustomCie10ModalFromSearch()" class="text-violet-700 hover:text-violet-900 font-bold hover:underline">
-                                            <i class="fas fa-plus mr-1"></i> Crear diagnóstico personalizado
+
+                                    <!-- Dropdown de Resultados de Búsqueda CIE-10 -->
+                                    <div id="cie10_results_dropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                                        <div id="cie10_results_list" class="p-1.5 space-y-1"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Frecuentes -->
+                                <div>
+                                    <span class="text-[11px] font-bold text-violet-900 block mb-1">Diagnósticos frecuentes:</span>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        {% for item in cie10_common %}
+                                        <button type="button" onclick="setDiagnosis('{{ item.code }} - {{ item.description }}')" 
+                                            class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-white text-violet-700 border border-violet-200 hover:bg-violet-600 hover:text-white transition-all shadow-2xs">
+                                            <strong>{{ item.code }}</strong> {{ item.description }}
                                         </button>
+                                        {% endfor %}
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Diagnósticos Frecuentes Oficiales (Pills) -->
-                            <div>
-                                <p class="text-[11px] font-semibold text-violet-900 mb-1.5 flex items-center">
-                                    <i class="fas fa-star text-amber-500 text-[10px] mr-1.5"></i> Diagnósticos Frecuentes Oficiales:
-                                </p>
-                                <div class="flex flex-wrap gap-1.5">
-                                    {% for item in cie10_common %}
-                                    <button type="button" onclick="setDiagnosis('{{ item.code }} - {{ item.description }}')" 
-                                        class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white text-violet-700 border border-violet-200 hover:bg-violet-600 hover:text-white transition-all shadow-2xs">
-                                        <strong>{{ item.code }}</strong> {{ item.description }}
-                                    </button>
-                                    {% endfor %}
+                            <!-- CUADRO GRANDE UNIFICADO DE HISTORIA CLÍNICA -->
+                            <div class="relative bg-amber-50/15">
+                                <textarea id="clinical_history" name="clinical_history" rows="15" required
+                                    oninput="updateWordCount()"
+                                    placeholder="Redacte aquí la anamnesis, evolución clínica, exploración física, hallazgos y consideraciones médicas del paciente de forma continua y fluida..." 
+                                    class="w-full px-5 py-4 text-sm md:text-base border-0 focus:outline-none focus:ring-0 bg-transparent font-sans leading-relaxed text-slate-800 placeholder-slate-400 resize-y"
+                                    style="min-height: 320px;"></textarea>
+
+                                <!-- Barra de herramientas inferior del cuadro -->
+                                <div class="px-5 py-2.5 bg-slate-50/80 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                                    <div class="flex items-center space-x-3">
+                                        <span id="ch_word_count" class="font-medium text-slate-400">0 palabras &bull; 0 caracteres</span>
+                                    </div>
+                                    <div class="flex items-center space-x-1.5">
+                                        <span class="text-[11px] text-slate-400 font-semibold mr-1">Insertar sección rápida:</span>
+                                        <button type="button" onclick="insertSectionTitle('EXAMEN FÍSICO:')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition-colors shadow-2xs">
+                                            + Examen Físico
+                                        </button>
+                                        <button type="button" onclick="insertSectionTitle('DIAGNÓSTICO:')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition-colors shadow-2xs">
+                                            + Diagnóstico
+                                        </button>
+                                        <button type="button" onclick="insertSectionTitle('EVOLUCIÓN:')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition-colors shadow-2xs">
+                                            + Evolución
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Plan y Tratamiento -->
+                        <!-- Plan Terapéutico y Conducta Médica -->
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                 Plan Terapéutico y Conducta Médica
                             </label>
                             <textarea name="treatment" rows="3" placeholder="Recomendaciones generales, reposo, dieta, estudios complementarios solicitados..." 
-                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500"></textarea>
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white"></textarea>
                         </div>
 
                         <!-- Prescripción / Receta -->
                         <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5">
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                 <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-                                    <i class="fas fa-pills text-blue-600 mr-1"></i> Indicaciones Farmacológicas / Receta Médica
+                                    <i class="fas fa-pills text-teal-600 mr-1"></i> Indicaciones Farmacológicas / Receta Médica
                                 </label>
                                 {% if prescription_templates %}
                                 <div class="flex items-center gap-2">
-                                    <select onchange="applyPrescriptionTemplate(this)" class="text-xs py-1 px-2.5 border border-slate-300 rounded-lg bg-white text-slate-700 focus:ring-2 focus:ring-blue-500 font-medium">
+                                    <select onchange="applyPrescriptionTemplate(this)" class="text-xs py-1 px-2.5 border border-slate-300 rounded-lg bg-white text-slate-700 focus:ring-2 focus:ring-teal-500 font-medium">
                                         <option value="">-- Cargar Plantilla de Receta --</option>
                                         {% for t in prescription_templates %}
                                         <option value="{{ t.id }}" data-content="{{ t.content }}">{{ t.title }}</option>
@@ -211,7 +326,7 @@
                                 {% endif %}
                             </div>
                             <textarea id="prescription_textarea" name="prescription" rows="3" placeholder="Medicamento, Dosis, Vía, Frecuencia y Duración (ej. Amoxicilina 500mg VO cada 8 horas por 7 días)..." 
-                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"></textarea>
                         </div>
 
                         <!-- Notas confidenciales -->
@@ -220,13 +335,13 @@
                                 Notas Confidenciales / Observaciones Internas
                             </label>
                             <textarea name="notes" rows="2" placeholder="Notas internas para el equipo médico..." 
-                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500"></textarea>
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white"></textarea>
                         </div>
 
                         <div class="border-t border-slate-100 pt-5 flex items-center justify-end space-x-3">
-                            <a href="/consultations" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">Cancelar</a>
-                            <button type="submit" class="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-violet-500/20 transition-all">
-                                <i class="fas fa-save mr-1.5"></i> Guardar Historia Clínica
+                            <a href="/consultations" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">Cancelar</a>
+                            <button type="submit" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/25 transition-all flex items-center">
+                                <i class="fas fa-save mr-2"></i> Guardar Historia Clínica
                             </button>
                         </div>
                     </form>
@@ -393,6 +508,325 @@ function renderCie10Results(items, query) {
     resultsDropdown.classList.remove('hidden');
 }
 
+// --- ACTUALIZACIÓN DINÁMICA DE FICHA DE PACIENTE ---
+function updatePatientIdentity(selectEl) {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    const card = document.getElementById('patient_identity_card');
+    if (!opt || !opt.value) {
+        if (card) card.classList.add('hidden');
+        return;
+    }
+    if (card) card.classList.remove('hidden');
+
+    const nameEl = document.getElementById('ident_name');
+    const genderEl = document.getElementById('ident_gender');
+    const ageEl = document.getElementById('ident_age');
+    const docEl = document.getElementById('ident_doc');
+    const phoneEl = document.getElementById('ident_phone');
+    const insEl = document.getElementById('ident_insurance');
+    const allergiesContainer = document.getElementById('ident_allergies_container');
+    const allergiesEl = document.getElementById('ident_allergies');
+
+    if (nameEl) nameEl.textContent = opt.getAttribute('data-name') || '-';
+    if (genderEl) genderEl.textContent = opt.getAttribute('data-gender') || 'N/D';
+    if (docEl) docEl.textContent = opt.getAttribute('data-doc') || 'Sin DNI';
+    if (phoneEl) phoneEl.textContent = opt.getAttribute('data-phone') || 'N/D';
+
+    // Cálculo de edad
+    const birth = opt.getAttribute('data-birth');
+    let ageText = 'N/D';
+    if (birth) {
+        try {
+            const bDate = new Date(birth);
+            const today = new Date();
+            let age = today.getFullYear() - bDate.getFullYear();
+            const m = today.getMonth() - bDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) {
+                age--;
+            }
+            if (!isNaN(age) && age >= 0) ageText = age + ' años';
+        } catch (e) {
+            ageText = 'N/D';
+        }
+    }
+    if (ageEl) ageEl.textContent = ageText;
+
+    const ins = opt.getAttribute('data-insurance') || 'Privado';
+    const insNum = opt.getAttribute('data-insurance-num');
+    if (insEl) insEl.textContent = ins + (insNum ? ' (' + insNum + ')' : '');
+
+    const allergies = opt.getAttribute('data-allergies');
+    if (allergies && allergies.trim()) {
+        if (allergiesEl) allergiesEl.textContent = allergies.trim();
+        if (allergiesContainer) allergiesContainer.classList.remove('hidden');
+    } else {
+        if (allergiesContainer) allergiesContainer.classList.add('hidden');
+    }
+}
+
+// --- PANEL COLAPSABLE CIE-10 ---
+function toggleCie10Panel() {
+    const panel = document.getElementById('cie10_collapsible_panel');
+    const btnText = document.getElementById('cie10_btn_text');
+    if (!panel) return;
+    const isHidden = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !isHidden);
+    if (btnText) {
+        btnText.textContent = isHidden ? '✕ Cerrar Asistente CIE-10' : '+ Asociar CIE-10';
+    }
+    if (isHidden) {
+        setTimeout(() => {
+            const input = document.getElementById('diagnosis_input');
+            if (input) input.focus();
+        }, 100);
+    }
+}
+
+// --- CONTADOR DE PALABRAS Y CARACTERES ---
+function updateWordCount() {
+    const textarea = document.getElementById('clinical_history');
+    const counter = document.getElementById('ch_word_count');
+    if (!textarea || !counter) return;
+    const text = textarea.value.trim();
+    const chars = textarea.value.length;
+    const words = text ? text.split(/\s+/).length : 0;
+    counter.textContent = `${words} palabras • ${chars} caracteres`;
+}
+
+// --- INSERTAR SECCIÓN RÁPIDA ---
+function insertSectionTitle(title) {
+    const textarea = document.getElementById('clinical_history');
+    if (!textarea) return;
+    const prefix = textarea.value.trim() ? '\n\n' : '';
+    textarea.value = textarea.value + prefix + title + '\n';
+    textarea.focus();
+    updateWordCount();
+}
+
+// --- LIVE SEARCH Y AUTOCOMPLETADO DE PACIENTES (FASE 2) ---
+let patientSearchTimer = null;
+const patientSearchInput = document.getElementById('patient_live_search');
+const patientSearchDropdown = document.getElementById('patient_search_dropdown');
+const patientSearchResults = document.getElementById('patient_search_results');
+const clearPatientBtn = document.getElementById('clear_patient_search_btn');
+
+if (patientSearchInput) {
+    patientSearchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        if (clearPatientBtn) clearPatientBtn.classList.toggle('hidden', !query);
+
+        clearTimeout(patientSearchTimer);
+        if (query.length >= 1) {
+            patientSearchTimer = setTimeout(() => fetchPatientSearchResults(query), 220);
+        } else {
+            if (patientSearchDropdown) patientSearchDropdown.classList.add('hidden');
+        }
+    });
+
+    patientSearchInput.addEventListener('focus', function() {
+        const query = this.value.trim();
+        if (query.length >= 1) {
+            fetchPatientSearchResults(query);
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (patientSearchDropdown && !patientSearchInput.contains(e.target) && !patientSearchDropdown.contains(e.target)) {
+            patientSearchDropdown.classList.add('hidden');
+        }
+    });
+}
+
+function clearPatientSearch() {
+    if (!patientSearchInput) return;
+    patientSearchInput.value = '';
+    if (clearPatientBtn) clearPatientBtn.classList.add('hidden');
+    if (patientSearchDropdown) patientSearchDropdown.classList.add('hidden');
+    patientSearchInput.focus();
+}
+
+async function fetchPatientSearchResults(query) {
+    try {
+        const response = await fetch(`/patients/autocomplete?q=${encodeURIComponent(query)}&limit=10`);
+        if (!response.ok) return;
+        const patients = await response.json();
+        renderPatientSearchResults(patients, query);
+    } catch (e) {
+        console.error("Error buscando pacientes:", e);
+    }
+}
+
+function renderPatientSearchResults(patients, query) {
+    if (!patientSearchResults || !patientSearchDropdown) return;
+    patientSearchResults.innerHTML = '';
+
+    if (patients.length === 0) {
+        patientSearchResults.innerHTML = `
+            <div class="p-3 text-center text-xs text-slate-500">
+                <i class="fas fa-user-slash text-slate-300 text-lg mb-1 block"></i>
+                No se encontraron pacientes para "<strong>${escapeHtml(query)}</strong>"
+            </div>
+        `;
+    } else {
+        patients.forEach(p => {
+            const item = document.createElement('div');
+            item.className = "px-3.5 py-2.5 hover:bg-blue-50 cursor-pointer rounded-xl transition-all flex items-center justify-between group border border-transparent hover:border-blue-100";
+            item.innerHTML = `
+                <div class="flex-1 pr-3">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                            ${escapeHtml(p.first_name ? p.first_name[0] : '')}${escapeHtml(p.last_name ? p.last_name[0] : '')}
+                        </span>
+                        <span class="text-xs font-bold text-slate-900 group-hover:text-blue-700">${escapeHtml(p.name)}</span>
+                        ${p.age ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">${p.age} años</span>` : ''}
+                    </div>
+                    <div class="mt-1 flex items-center space-x-3 text-[11px] text-slate-500">
+                        <span>DNI: <strong class="font-mono text-slate-700">${escapeHtml(p.document_id || 'Sin DNI')}</strong></span>
+                        ${p.phone ? `<span>Tel: <strong class="text-slate-700">${escapeHtml(p.phone)}</strong></span>` : ''}
+                        <span>ARS: <strong class="text-slate-700">${escapeHtml(p.insurance_name || 'Privado')}</strong></span>
+                        ${p.allergies ? `<span class="text-red-600 font-bold bg-red-50 px-1 rounded text-[10px]"><i class="fas fa-allergies"></i> Alergia</span>` : ''}
+                    </div>
+                </div>
+                <button type="button" class="text-xs text-blue-600 opacity-0 group-hover:opacity-100 font-bold px-2 py-1 rounded-lg bg-white shadow-xs shrink-0 border border-blue-200">
+                    Seleccionar &rarr;
+                </button>
+            `;
+            item.onclick = () => selectPatientFromLiveSearch(p);
+            patientSearchResults.appendChild(item);
+        });
+    }
+    patientSearchDropdown.classList.remove('hidden');
+}
+
+function selectPatientFromLiveSearch(p) {
+    const select = document.getElementById('patient_select');
+    if (select) {
+        let opt = select.querySelector(`option[value="${p.id}"]`);
+        if (!opt) {
+            opt = document.createElement('option');
+            opt.value = p.id;
+            opt.setAttribute('data-name', p.name);
+            opt.setAttribute('data-gender', p.gender || 'N/D');
+            opt.setAttribute('data-doc', p.document_id || 'Sin DNI');
+            opt.setAttribute('data-phone', p.phone || 'N/D');
+            opt.setAttribute('data-insurance', p.insurance_name || 'Privado');
+            opt.setAttribute('data-insurance-num', p.insurance_number || '');
+            opt.setAttribute('data-allergies', p.allergies || '');
+            opt.textContent = `${p.name} (${p.document_id || 'Sin DNI'})`;
+            select.appendChild(opt);
+        }
+        select.value = p.id;
+        updatePatientIdentity(select);
+    }
+
+    if (patientSearchInput) {
+        patientSearchInput.value = `${p.name} (DNI: ${p.document_id || 'Sin DNI'})`;
+    }
+    if (clearPatientBtn) clearPatientBtn.classList.remove('hidden');
+    if (patientSearchDropdown) patientSearchDropdown.classList.add('hidden');
+}
+
+// --- INICIALIZACIÓN ---
+document.addEventListener('DOMContentLoaded', function() {
+    updateWordCount();
+    const select = document.getElementById('patient_select');
+    if (select && select.value) {
+        updatePatientIdentity(select);
+    }
+});
+
+// --- BUSCADOR Y AUTOCOMPLETADO CIE-10 ---
+let cie10SearchTimer = null;
+const diagInput = document.getElementById('diagnosis_input');
+const resultsDropdown = document.getElementById('cie10_results_dropdown');
+const resultsList = document.getElementById('cie10_results_list');
+const clearBtn = document.getElementById('cie10_clear_btn');
+
+if (diagInput) {
+    diagInput.addEventListener('input', function() {
+        const val = this.value.trim();
+        if (clearBtn) clearBtn.classList.toggle('hidden', !val);
+        
+        clearTimeout(cie10SearchTimer);
+        if (val.length >= 1) {
+            cie10SearchTimer = setTimeout(() => fetchCie10Results(val), 180);
+        } else {
+            resultsDropdown.classList.add('hidden');
+        }
+    });
+
+    diagInput.addEventListener('focus', function() {
+        if (this.value.trim().length >= 1) {
+            fetchCie10Results(this.value.trim());
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!diagInput.contains(e.target) && !resultsDropdown.contains(e.target)) {
+            resultsDropdown.classList.add('hidden');
+        }
+    });
+}
+
+function clearDiagnosis() {
+    diagInput.value = '';
+    clearBtn.classList.add('hidden');
+    resultsDropdown.classList.add('hidden');
+    diagInput.focus();
+}
+
+async function fetchCie10Results(query) {
+    try {
+        const response = await fetch(`/consultations/cie10/search?q=${encodeURIComponent(query)}&limit=15`);
+        if (!response.ok) return;
+        const items = await response.json();
+        renderCie10Results(items, query);
+    } catch (e) {
+        console.error("Error buscando CIE-10:", e);
+    }
+}
+
+function renderCie10Results(items, query) {
+    resultsList.innerHTML = '';
+    if (items.length === 0) {
+        resultsList.innerHTML = `
+            <div class="p-3 text-center text-xs text-slate-500">
+                <p>No se encontraron códigos oficiales para "<strong>${escapeHtml(query)}</strong>"</p>
+                <button type="button" onclick="openCustomCie10ModalFromSearch('${escapeHtml(query)}')" class="mt-2 px-3 py-1.5 bg-violet-100 hover:bg-violet-200 text-violet-800 rounded-lg font-bold text-xs inline-flex items-center">
+                    <i class="fas fa-plus mr-1.5"></i> Agregar "${escapeHtml(query)}" como diagnóstico personalizado
+                </button>
+            </div>
+        `;
+    } else {
+        items.forEach(item => {
+            const row = document.createElement('div');
+            row.className = "px-3 py-2 hover:bg-violet-50 cursor-pointer rounded-lg transition-colors flex items-center justify-between group";
+            const customBadge = item.is_custom 
+                ? `<span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full border border-amber-300 shrink-0">Personalizado</span>`
+                : `<span class="text-[10px] bg-blue-100 text-blue-800 font-mono font-bold px-2 py-0.5 rounded-full shrink-0">${escapeHtml(item.code)}</span>`;
+            
+            row.innerHTML = `
+                <div class="flex-1 pr-2">
+                    <div class="flex items-center space-x-2">
+                        ${customBadge}
+                        <span class="text-xs font-bold text-slate-900 group-hover:text-violet-900">${escapeHtml(item.description)}</span>
+                    </div>
+                    ${item.chapter ? `<span class="text-[10px] text-slate-400 block mt-0.5">${escapeHtml(item.chapter)}</span>` : ''}
+                </div>
+                <button type="button" class="text-xs text-violet-600 opacity-0 group-hover:opacity-100 font-semibold px-2 py-1 rounded bg-white shadow-xs shrink-0">
+                    Seleccionar &rarr;
+                </button>
+            `;
+            row.onclick = () => {
+                selectCie10Item(item);
+                resultsDropdown.classList.add('hidden');
+            };
+            resultsList.appendChild(row);
+        });
+    }
+    resultsDropdown.classList.remove('hidden');
+}
+
 function selectCie10Item(item) {
     const formatted = `${item.code} - ${item.description}`;
     setDiagnosis(formatted);
@@ -473,19 +907,20 @@ function escapeHtml(str) {
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// --- PLANTILLAS CLÍNICAS ---
+// --- PLANTILLAS CLÍNICAS (INYECCIÓN EN HISTORIA CLÍNICA) ---
 function applyConsultationTemplate(selectEl) {
     const selected = selectEl.options[selectEl.selectedIndex];
     const content = selected.getAttribute('data-content');
     if (!content) return;
-    const symptomsEl = document.getElementById('symptoms_textarea');
-    if (symptomsEl) {
-        if (symptomsEl.value.trim() && !confirm('¿Desea reemplazar el texto actual en Anamnesis / Síntomas con el contenido de la plantilla? (Cancelar para anexar al final)')) {
-            symptomsEl.value += '\n\n' + content;
+    const historyEl = document.getElementById('clinical_history');
+    if (historyEl) {
+        if (historyEl.value.trim() && !confirm('¿Desea reemplazar el texto actual en Historia Clínica con el contenido de la plantilla? (Cancelar para anexar al final)')) {
+            historyEl.value += '\n\n' + content;
         } else {
-            symptomsEl.value = content;
+            historyEl.value = content;
         }
-        symptomsEl.focus();
+        historyEl.focus();
+        updateWordCount();
     }
 }
 

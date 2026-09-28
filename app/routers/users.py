@@ -14,8 +14,7 @@ from app.core.security import get_password_hash
 from app.core.permissions import AVAILABLE_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, ROLE_LABELS, get_available_permissions
 
 router = APIRouter(prefix="/users", tags=["users"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 @router.get("/")
 def list_users(

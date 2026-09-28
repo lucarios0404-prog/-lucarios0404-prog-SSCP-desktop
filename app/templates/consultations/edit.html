@@ -13,42 +13,104 @@
 
         <main class="flex-1 overflow-y-auto p-6 md:p-8">
             <div class="max-w-4xl mx-auto space-y-6">
+                <!-- Encabezado superior -->
                 <div class="flex items-center justify-between">
                     <div>
                         <h1 class="text-2xl font-bold text-slate-900">Editar Consulta #{{ consultation.id }}</h1>
-                        <p class="text-xs text-slate-500 mt-0.5">Modificación autorizada de historia clínica (Queda constancia en registro de auditoría).</p>
+                        <p class="text-xs text-slate-500 mt-0.5">Modificación de evolución clínica, diagnóstico y tratamiento con trazabilidad médica.</p>
                     </div>
-                    <a href="/consultations/{{ consultation.id }}" class="text-xs text-slate-500 hover:text-slate-800 font-medium">
-                        &larr; Volver al detalle
+                    <a href="/consultations/{{ consultation.id }}" class="text-xs text-slate-500 hover:text-slate-800 font-medium inline-flex items-center gap-1.5">
+                        <i class="fas fa-arrow-left"></i> Volver al detalle
                     </a>
                 </div>
 
-                <!-- Alert Notice -->
-                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start space-x-3 text-amber-800 text-xs">
-                    <i class="fas fa-exclamation-triangle text-amber-600 text-base mt-0.5 shrink-0"></i>
+                <!-- Aviso de Auditoría Médica -->
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start space-x-3 text-amber-900 text-xs shadow-2xs">
+                    <i class="fas fa-shield-alt text-amber-600 text-lg mt-0.5 shrink-0"></i>
                     <div>
-                        <strong class="font-bold">Aviso de Auditoría Médica:</strong> Todos los cambios realizados a esta consulta quedarán grabados permanentemente con tu usuario, fecha, hora y el motivo de cambio que especifiques abajo.
+                        <strong class="font-bold text-amber-950">Aviso de Auditoría Médica:</strong> Esta consulta pasará de la 
+                        <span class="font-mono font-bold bg-amber-100 px-1.5 py-0.5 rounded text-amber-900">Versión {{ consultation.edit_version or 1 }}</span> a la 
+                        <span class="font-mono font-bold bg-amber-200 px-1.5 py-0.5 rounded text-amber-950">Versión {{ (consultation.edit_version or 1) + 1 }}</span>.
+                        Todos los cambios quedarán registrados con fecha, hora, usuario y el motivo especificado.
                     </div>
                 </div>
 
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
                     <form method="post" action="/consultations/{{ consultation.id }}/edit" class="space-y-6">
-                        <!-- Paciente Fijo -->
-                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex items-center justify-between">
-                            <div>
-                                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Paciente</span>
-                                <h3 class="text-base font-bold text-slate-900">{{ consultation.patient.first_name }} {{ consultation.patient.last_name }}</h3>
+                        <!-- Barra Superior: Identificación del Paciente (Ficha Médica) -->
+                        <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                            <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+                                <div class="flex items-center space-x-2.5">
+                                    <span class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-bold border border-emerald-500/30">
+                                        <i class="fas fa-id-card-clip"></i>
+                                    </span>
+                                    <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">Identificación del Paciente</span>
+                                </div>
+                                <span class="text-[11px] text-slate-300 font-medium">Expediente Clínico &bull; SSCP</span>
                             </div>
-                            <span class="text-xs text-slate-500 font-mono">DNI: {{ consultation.patient.document_id or 'N/D' }}</span>
+
+                            <div class="p-4 sm:p-5 bg-white space-y-3">
+                                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5 text-xs">
+                                        <div class="space-y-0.5">
+                                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Nombre del Paciente</span>
+                                            <p class="font-extrabold text-slate-900 text-sm truncate">
+                                                {{ consultation.patient.last_name }}, {{ consultation.patient.first_name }}
+                                            </p>
+                                        </div>
+                                        <div class="space-y-0.5">
+                                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Sexo</span>
+                                            <p class="font-bold text-slate-800">
+                                                {{ consultation.patient.gender or 'N/D' }}
+                                            </p>
+                                        </div>
+                                        <div class="space-y-0.5">
+                                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Edad</span>
+                                            <p class="font-bold text-slate-800">
+                                                {{ consultation.patient.age if consultation.patient.age else 'N/D' }}
+                                            </p>
+                                        </div>
+                                        <div class="space-y-0.5">
+                                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">ID / Cédula</span>
+                                            <p class="font-mono font-bold text-slate-800">
+                                                {{ consultation.patient.document_id or 'Sin DNI' }}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3 pt-3 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-slate-500 font-semibold">Teléfono:</span>
+                                            <strong class="text-slate-800 font-mono">
+                                                {{ consultation.patient.phone or consultation.patient.mobile or 'N/D' }}
+                                            </strong>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-slate-500 font-semibold">Aseguradora:</span>
+                                            <span class="font-bold text-slate-800">
+                                                {{ consultation.patient.insurance_name|ars_badge(consultation.patient.insurance_number)|safe }}
+                                            </span>
+                                        </div>
+                                        {% if consultation.patient.allergies %}
+                                        <div>
+                                            <span class="text-red-700 font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg text-[11px] inline-flex items-center">
+                                                <i class="fas fa-allergies mr-1 text-red-500"></i> Alergias: <span class="ml-1">{{ consultation.patient.allergies }}</span>
+                                            </span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Motivo de la modificación -->
-                        <div class="bg-amber-50/50 p-4 rounded-xl border border-amber-200">
-                            <label class="block text-xs font-bold text-amber-950 uppercase tracking-wider mb-1.5">
-                                Motivo de la Modificación (Requerido para Auditoría) <span class="text-red-500">*</span>
+                        <!-- Motivo de la Modificación (Requerido para Auditoría) -->
+                        <div class="bg-amber-50/70 p-4 sm:p-5 rounded-2xl border border-amber-300 shadow-2xs">
+                            <label class="block text-xs font-bold text-amber-950 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                <i class="fas fa-edit text-amber-700"></i> Motivo de la Modificación (Auditoría Médica) <span class="text-red-500">*</span>
                             </label>
-                            <input type="text" name="edit_reason" required placeholder="Ej. Corrección de posología, actualización de notas o diagnóstico" 
-                                class="w-full px-3.5 py-2 text-sm border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            <input type="text" name="edit_reason" required placeholder="Ej. Corrección de posología, ampliación de anamnesis o actualización diagnóstica..." 
+                                class="w-full px-4 py-2.5 text-sm border border-amber-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-900 shadow-2xs">
+                            <p class="text-[11px] text-amber-800 mt-1">Este motivo quedará registrado en la bitácora médica para fines legales e institucionales.</p>
                         </div>
 
                         <!-- Motivo de la consulta -->
@@ -57,131 +119,154 @@
                                 Motivo de la Consulta <span class="text-red-500">*</span>
                             </label>
                             <input type="text" name="reason" value="{{ consultation.reason }}" required 
-                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">
+                                class="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 font-medium text-slate-800">
                         </div>
 
-                        <!-- Selector de Plantilla de Consulta -->
-                        <div class="p-3.5 bg-violet-50/80 border border-violet-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div class="flex items-center space-x-2">
-                                <span class="w-7 h-7 rounded-lg bg-violet-200 text-violet-700 flex items-center justify-center text-xs shrink-0">
-                                    <i class="fas fa-magic"></i>
-                                </span>
-                                <div>
-                                    <span class="text-xs font-bold text-violet-950 uppercase tracking-wide block">Plantilla de Consulta</span>
-                                    <span class="text-[11px] text-violet-700">Autocompleta Anamnesis / Síntomas con un solo clic</span>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <select id="consultation-template-select" onchange="applyConsultationTemplate(this)" class="text-xs py-1.5 px-3 border border-violet-300 rounded-lg bg-white text-slate-800 focus:ring-2 focus:ring-violet-500 font-medium">
-                                    <option value="">-- Seleccionar Plantilla de Consulta --</option>
-                                    {% for t in consultation_templates %}
-                                    <option value="{{ t.id }}" data-content="{{ t.content }}">{{ t.title }}</option>
-                                    {% endfor %}
-                                </select>
-                                <a href="/templates?category=consultation" target="_blank" class="p-1.5 text-violet-600 hover:text-violet-800 hover:bg-violet-100 rounded-lg text-xs" title="Crear o gestionar plantillas">
-                                    <i class="fas fa-cog"></i>
-                                </a>
-                            </div>
-                        </div>
-
-                        <!-- Síntomas y Examen Físico -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                    Anamnesis / Síntomas Subjetivos
-                                </label>
-                                <textarea id="symptoms_textarea" name="symptoms" rows="4" 
-                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">{{ consultation.symptoms or '' }}</textarea>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                    Examen Físico / Signos Observados
-                                </label>
-                                <textarea name="physical_exam" rows="4" 
-                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">{{ consultation.physical_exam or '' }}</textarea>
-                            </div>
-                        </div>
-
-                        <!-- Diagnóstico Clínico y Catálogo Oficial CIE-10 -->
-                        <div class="bg-violet-50/50 p-4 sm:p-5 rounded-2xl border border-violet-200/80 space-y-3.5 relative">
-                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <label class="block text-xs font-bold text-violet-950 uppercase tracking-wider">
-                                    <i class="fas fa-stethoscope mr-1 text-violet-600"></i> Diagnóstico Clínico y Código CIE-10 Oficial
-                                </label>
-                                <button type="button" onclick="openCustomCie10Modal()" 
-                                    class="inline-flex items-center px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-sm transition-all self-start sm:self-auto">
-                                    <i class="fas fa-plus-circle mr-1.5"></i> Agregar Diagnóstico / Código Personalizado
-                                </button>
-                            </div>
-
-                            <!-- Campo con Autocompletado / Buscador Inteligente -->
-                            <div class="relative">
-                                <div class="relative flex items-center">
-                                    <span class="absolute left-3.5 text-slate-400 pointer-events-none">
-                                        <i class="fas fa-search text-xs"></i>
+                        <!-- SECCIÓN PRINCIPAL: HISTORIA CLÍNICA UNIFICADA (CUADRO AMPLIO) -->
+                        <div class="border border-slate-300 rounded-2xl overflow-hidden shadow-sm">
+                            <!-- Cabecera de Control de Historia Clínica -->
+                            <div class="bg-gradient-to-r from-blue-50/90 via-slate-50 to-indigo-50/70 p-3.5 border-b border-slate-300 flex flex-wrap items-center justify-between gap-3">
+                                <div class="flex items-center flex-wrap gap-2.5">
+                                    <span class="px-3 py-1.5 rounded-xl bg-blue-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center gap-1.5">
+                                        <i class="fas fa-file-medical"></i> Historia Clínica
                                     </span>
-                                    <input type="text" id="diagnosis_input" name="diagnosis" value="{{ consultation.diagnosis or '' }}" autocomplete="off"
-                                        placeholder="Escribe para buscar código oficial (ej. I10, J00, E11) o diagnóstico (ej. hipertensión, gripe, cefalea)..." 
-                                        class="w-full pl-9 pr-24 py-2.5 text-sm border border-violet-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-slate-800 placeholder-slate-400 shadow-2xs">
-                                    <div class="absolute right-2 flex items-center space-x-1">
-                                        <button type="button" id="cie10_clear_btn" onclick="clearDiagnosis()" class="{% if not consultation.diagnosis %}hidden{% endif %} text-slate-400 hover:text-slate-600 px-2 py-1 text-xs">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                        <span class="text-[10px] bg-violet-100 text-violet-800 font-bold px-2 py-0.5 rounded-full border border-violet-200">
-                                            CIE-10
-                                        </span>
+                                    <div class="flex items-center gap-1.5 text-xs text-slate-600 font-semibold bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                                        <span class="text-slate-400">Fecha:</span>
+                                        <span class="font-bold text-slate-800">{{ now_date }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 text-xs text-slate-600 font-semibold bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                                        <span class="text-slate-400">Hora:</span>
+                                        <span class="font-bold text-slate-800">{{ now_time }}</span>
                                     </div>
                                 </div>
 
-                                <!-- Dropdown de Resultados de Búsqueda CIE-10 -->
-                                <div id="cie10_results_dropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
-                                    <div id="cie10_results_list" class="p-1.5 space-y-1">
-                                        <!-- Resultados inyectados por AJAX -->
+                                <div class="flex items-center flex-wrap gap-2">
+                                    <!-- Checkbox: Primera vez -->
+                                    <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-blue-950 bg-blue-100/70 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200 transition-colors shadow-2xs">
+                                        <input type="checkbox" name="is_first_visit" value="true" {% if consultation.is_first_visit %}checked{% endif %} class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
+                                        <span>¿Primera vez? (Apertura)</span>
+                                    </label>
+                                    
+                                    <!-- Insignia de Versión -->
+                                    <span class="text-xs font-semibold text-slate-700 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-2xs flex items-center gap-1.5">
+                                        <span>Versión: <strong class="text-blue-700">{{ consultation.edit_version or 1 }}</strong></span>
+                                        <i class="fas fa-arrow-right text-[10px] text-slate-400"></i>
+                                        <strong class="text-amber-700 font-bold">{{ (consultation.edit_version or 1) + 1 }}</strong>
+                                    </span>
+
+                                    <!-- Selector de Plantilla de Consulta -->
+                                    <select id="consultation-template-select" onchange="applyConsultationTemplate(this)" class="text-xs py-1.5 px-3 border border-blue-300 rounded-xl bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 font-semibold shadow-2xs">
+                                        <option value="">-- Cargar Plantilla --</option>
+                                        {% for t in consultation_templates %}
+                                        <option value="{{ t.id }}" data-content="{{ t.content }}">{{ t.title }}</option>
+                                        {% endfor %}
+                                    </select>
+
+                                    <!-- Botón Asistente CIE-10 (Colapsable / No Invasivo) -->
+                                    <button type="button" onclick="toggleCie10Panel()" id="btn_toggle_cie10" 
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-sm transition-all">
+                                        <i class="fas fa-stethoscope"></i>
+                                        <span id="cie10_btn_text">{% if consultation.diagnosis %}Ver CIE-10 ({{ consultation.diagnosis[:15] }}...){% else %}+ Asociar CIE-10{% endif %}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Panel Asistente CIE-10 (Colapsable / Opcional) -->
+                            <div id="cie10_collapsible_panel" class="{% if not consultation.diagnosis %}hidden{% endif %} p-4 bg-violet-50/70 border-b border-violet-200 space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold text-violet-950 uppercase tracking-wide flex items-center gap-1.5">
+                                        <i class="fas fa-stethoscope text-violet-600"></i> Asistente de Codificación CIE-10
+                                    </span>
+                                    <button type="button" onclick="openCustomCie10Modal()" class="text-xs font-bold text-violet-700 hover:text-violet-900 bg-white px-2.5 py-1 rounded-lg border border-violet-200 shadow-2xs">
+                                        <i class="fas fa-plus-circle mr-1"></i> Nuevo Código Propio
+                                    </button>
+                                </div>
+
+                                <div class="relative">
+                                    <div class="relative flex items-center">
+                                        <span class="absolute left-3.5 text-slate-400 pointer-events-none">
+                                            <i class="fas fa-search text-xs"></i>
+                                        </span>
+                                        <input type="text" id="diagnosis_input" name="diagnosis" value="{{ consultation.diagnosis or '' }}" autocomplete="off"
+                                            placeholder="Buscar código oficial (ej. I10, J00) o nombre de diagnóstico..." 
+                                            class="w-full pl-9 pr-24 py-2 text-sm border border-violet-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-800 placeholder-slate-400">
+                                        <div class="absolute right-2 flex items-center space-x-1">
+                                            <button type="button" id="cie10_clear_btn" onclick="clearDiagnosis()" class="{% if not consultation.diagnosis %}hidden{% endif %} text-slate-400 hover:text-slate-600 px-2 py-1 text-xs">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                            <span class="text-[10px] bg-violet-100 text-violet-800 font-bold px-2 py-0.5 rounded-full border border-violet-200">
+                                                CIE-10
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div class="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                                        <span>¿No encuentras el código oficial?</span>
-                                        <button type="button" onclick="openCustomCie10ModalFromSearch()" class="text-violet-700 hover:text-violet-900 font-bold hover:underline">
-                                            <i class="fas fa-plus mr-1"></i> Crear diagnóstico personalizado
+
+                                    <!-- Dropdown de Resultados de Búsqueda CIE-10 -->
+                                    <div id="cie10_results_dropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                                        <div id="cie10_results_list" class="p-1.5 space-y-1"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Frecuentes -->
+                                <div>
+                                    <span class="text-[11px] font-bold text-violet-900 block mb-1">Diagnósticos frecuentes:</span>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        {% for item in cie10_common %}
+                                        <button type="button" onclick="setDiagnosis('{{ item.code }} - {{ item.description }}')" 
+                                            class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-white text-violet-700 border border-violet-200 hover:bg-violet-600 hover:text-white transition-all shadow-2xs">
+                                            <strong>{{ item.code }}</strong> {{ item.description }}
                                         </button>
+                                        {% endfor %}
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Diagnósticos Frecuentes Oficiales (Pills) -->
-                            <div>
-                                <p class="text-[11px] font-semibold text-violet-900 mb-1.5 flex items-center">
-                                    <i class="fas fa-star text-amber-500 text-[10px] mr-1.5"></i> Diagnósticos Frecuentes Oficiales:
-                                </p>
-                                <div class="flex flex-wrap gap-1.5">
-                                    {% for item in cie10_common %}
-                                    <button type="button" onclick="setDiagnosis('{{ item.code }} - {{ item.description }}')" 
-                                        class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white text-violet-700 border border-violet-200 hover:bg-violet-600 hover:text-white transition-all shadow-2xs">
-                                        <strong>{{ item.code }}</strong> {{ item.description }}
-                                    </button>
-                                    {% endfor %}
+                            <!-- CUADRO GRANDE UNIFICADO DE HISTORIA CLÍNICA -->
+                            <div class="relative bg-amber-50/15">
+                                <textarea id="clinical_history" name="clinical_history" rows="15" required
+                                    oninput="updateWordCount()"
+                                    placeholder="Redacte aquí la evolución clínica, anamnesis, exploración física, hallazgos y consideraciones médicas del paciente..." 
+                                    class="w-full px-5 py-4 text-sm md:text-base border-0 focus:outline-none focus:ring-0 bg-transparent font-sans leading-relaxed text-slate-800 placeholder-slate-400 resize-y"
+                                    style="min-height: 320px;">{{ consultation.display_clinical_history }}</textarea>
+
+                                <!-- Barra de herramientas inferior del cuadro -->
+                                <div class="px-5 py-2.5 bg-slate-50/80 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                                    <div class="flex items-center space-x-3">
+                                        <span id="ch_word_count" class="font-medium text-slate-500">0 palabras &bull; 0 caracteres</span>
+                                    </div>
+                                    <div class="flex items-center space-x-1.5">
+                                        <span class="text-[11px] text-slate-400 font-semibold mr-1">Insertar sección rápida:</span>
+                                        <button type="button" onclick="insertSectionTitle('EXAMEN FÍSICO:')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition-colors shadow-2xs">
+                                            + Examen Físico
+                                        </button>
+                                        <button type="button" onclick="insertSectionTitle('DIAGNÓSTICO:')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition-colors shadow-2xs">
+                                            + Diagnóstico
+                                        </button>
+                                        <button type="button" onclick="insertSectionTitle('EVOLUCIÓN:')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition-colors shadow-2xs">
+                                            + Evolución
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Plan y Tratamiento -->
+                        <!-- Plan Terapéutico y Conducta Médica -->
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                 Plan Terapéutico y Conducta Médica
                             </label>
-                            <textarea name="treatment" rows="3" 
-                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">{{ consultation.treatment or '' }}</textarea>
+                            <textarea name="treatment" rows="3" placeholder="Recomendaciones generales, reposo, dieta, estudios complementarios solicitados..." 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white">{{ consultation.treatment or '' }}</textarea>
                         </div>
 
                         <!-- Prescripción / Receta -->
                         <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5">
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                 <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-                                    <i class="fas fa-pills text-blue-600 mr-1"></i> Prescripción Farmacológica / Receta
+                                    <i class="fas fa-pills text-teal-600 mr-1"></i> Indicaciones Farmacológicas / Receta Médica
                                 </label>
                                 {% if prescription_templates %}
                                 <div class="flex items-center gap-2">
-                                    <select onchange="applyPrescriptionTemplate(this)" class="text-xs py-1 px-2.5 border border-slate-300 rounded-lg bg-white text-slate-700 focus:ring-2 focus:ring-blue-500 font-medium">
+                                    <select onchange="applyPrescriptionTemplate(this)" class="text-xs py-1 px-2.5 border border-slate-300 rounded-lg bg-white text-slate-700 focus:ring-2 focus:ring-teal-500 font-medium">
                                         <option value="">-- Cargar Plantilla de Receta --</option>
                                         {% for t in prescription_templates %}
                                         <option value="{{ t.id }}" data-content="{{ t.content }}">{{ t.title }}</option>
@@ -190,23 +275,24 @@
                                 </div>
                                 {% endif %}
                             </div>
-                            <textarea id="prescription_textarea" name="prescription" rows="3" 
-                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">{{ consultation.prescription or '' }}</textarea>
+                            <textarea id="prescription_textarea" name="prescription" rows="3" placeholder="Medicamento, Dosis, Vía, Frecuencia y Duración..." 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-teal-500">{{ consultation.prescription or '' }}</textarea>
                         </div>
 
                         <!-- Notas confidenciales -->
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                Notas Confidenciales
+                                Notas Confidenciales / Observaciones Internas
                             </label>
-                            <textarea name="notes" rows="2" 
-                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500">{{ consultation.notes or '' }}</textarea>
+                            <textarea name="notes" rows="2" placeholder="Notas internas para el equipo médico..." 
+                                class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white">{{ consultation.notes or '' }}</textarea>
                         </div>
 
+                        <!-- Botones de Acción -->
                         <div class="border-t border-slate-100 pt-5 flex items-center justify-end space-x-3">
-                            <a href="/consultations/{{ consultation.id }}" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">Cancelar</a>
-                            <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold shadow-md shadow-amber-500/20 transition-all">
-                                <i class="fas fa-check mr-1.5"></i> Guardar Cambios y Registrar Auditoría
+                            <a href="/consultations/{{ consultation.id }}" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">Cancelar</a>
+                            <button type="submit" class="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold shadow-md shadow-amber-600/25 transition-all flex items-center">
+                                <i class="fas fa-check-circle mr-2"></i> Guardar Cambios y Registrar Auditoría
                             </button>
                         </div>
                     </form>
@@ -222,7 +308,7 @@
                                 <i class="fas fa-notes-medical"></i>
                             </div>
                             <div>
-                                <h3 class="text-base font-bold text-slate-900">Agregar Diagnóstico / Código Personalizado</h3>
+                                <h3 class="text-base font-bold text-slate-900">Nuevo Diagnóstico / Código Propio</h3>
                                 <p class="text-xs text-slate-500">Registra un diagnóstico clínico propio para usarlo en tus consultas.</p>
                             </div>
                         </div>
@@ -234,7 +320,7 @@
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                 Descripción / Nombre del Diagnóstico <span class="text-red-500">*</span>
                             </label>
-                            <input type="text" id="custom_desc_input" required placeholder="Ej. Síndrome post-COVID con fatiga crónica / Secuela de fractura en tibia" 
+                            <input type="text" id="custom_desc_input" required placeholder="Ej. Síndrome post-viral / Secuela de fractura" 
                                 class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500">
                         </div>
 
@@ -252,14 +338,14 @@
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                     Capítulo / Especialidad (Opcional)
                                 </label>
-                                <input type="text" id="custom_chapter_input" placeholder="Ej. Medicina Interna / Traumatología" 
+                                <input type="text" id="custom_chapter_input" placeholder="Ej. Medicina Interna" 
                                     class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500">
                             </div>
                         </div>
 
                         <div class="p-3 bg-violet-50 border border-violet-200 rounded-xl text-xs text-violet-800 flex items-start space-x-2">
                             <i class="fas fa-info-circle text-violet-600 mt-0.5 shrink-0"></i>
-                            <span>Este diagnóstico quedará guardado en tu catálogo y aparecerá en las búsquedas para futuras consultas médicas.</span>
+                            <span>Este diagnóstico quedará guardado en tu catálogo local y aparecerá en las búsquedas para futuras consultas médicas.</span>
                         </div>
 
                         <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
@@ -280,6 +366,53 @@
 
 {% block scripts %}
 <script>
+// --- CONTADOR DE PALABRAS Y CARACTERES ---
+function updateWordCount() {
+    const ch = document.getElementById('clinical_history');
+    const label = document.getElementById('ch_word_count');
+    if (!ch || !label) return;
+    const text = ch.value.trim();
+    const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+    const chars = text.length;
+    label.textContent = `${words} palabra${words === 1 ? '' : 's'} • ${chars} caráctere${chars === 1 ? '' : 's'}`;
+}
+
+// Inicializar conteo al cargar
+document.addEventListener('DOMContentLoaded', () => {
+    updateWordCount();
+});
+
+// --- INSERTAR SECCIONES RÁPIDAS EN HISTORIA CLÍNICA ---
+function insertSectionTitle(title) {
+    const ch = document.getElementById('clinical_history');
+    if (!ch) return;
+    const current = ch.value;
+    const prefix = current.length > 0 && !current.endsWith('\n\n') ? (current.endsWith('\n') ? '\n' : '\n\n') : '';
+    ch.value = current + prefix + '--- ' + title + ' ---\n';
+    ch.focus();
+    updateWordCount();
+}
+
+// --- COLAPSIBLE ASISTENTE CIE-10 ---
+function toggleCie10Panel() {
+    const panel = document.getElementById('cie10_collapsible_panel');
+    const btnText = document.getElementById('cie10_btn_text');
+    if (!panel) return;
+    const isHidden = panel.classList.contains('hidden');
+    if (isHidden) {
+        panel.classList.remove('hidden');
+        if (btnText) btnText.textContent = 'Ocultar CIE-10';
+        const diagInput = document.getElementById('diagnosis_input');
+        if (diagInput) diagInput.focus();
+    } else {
+        panel.classList.add('hidden');
+        const diagVal = document.getElementById('diagnosis_input')?.value;
+        if (btnText) {
+            btnText.textContent = diagVal ? 'Ver CIE-10 (' + diagVal.substring(0, 15) + '...)' : '+ Asociar CIE-10';
+        }
+    }
+}
+
 // --- BUSCADOR Y AUTOCOMPLETADO CIE-10 ---
 let cie10SearchTimer = null;
 const diagInput = document.getElementById('diagnosis_input');
@@ -296,7 +429,7 @@ if (diagInput) {
         if (val.length >= 1) {
             cie10SearchTimer = setTimeout(() => fetchCie10Results(val), 180);
         } else {
-            resultsDropdown.classList.add('hidden');
+            if (resultsDropdown) resultsDropdown.classList.add('hidden');
         }
     });
 
@@ -306,18 +439,18 @@ if (diagInput) {
         }
     });
 
-    // Cerrar dropdown al hacer click fuera
     document.addEventListener('click', function(e) {
-        if (!diagInput.contains(e.target) && !resultsDropdown.contains(e.target)) {
+        if (resultsDropdown && !diagInput.contains(e.target) && !resultsDropdown.contains(e.target)) {
             resultsDropdown.classList.add('hidden');
         }
     });
 }
 
 function clearDiagnosis() {
+    if (!diagInput) return;
     diagInput.value = '';
-    clearBtn.classList.add('hidden');
-    resultsDropdown.classList.add('hidden');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (resultsDropdown) resultsDropdown.classList.add('hidden');
     diagInput.focus();
 }
 
@@ -333,6 +466,7 @@ async function fetchCie10Results(query) {
 }
 
 function renderCie10Results(items, query) {
+    if (!resultsList || !resultsDropdown) return;
     resultsList.innerHTML = '';
     if (items.length === 0) {
         resultsList.innerHTML = `
@@ -379,17 +513,16 @@ function selectCie10Item(item) {
 }
 
 function setDiagnosis(text) {
-    const input = document.getElementById('diagnosis_input');
-    if (!input) return;
-    if (input.value && input.value.trim() !== '') {
-        if (!input.value.includes(text)) {
-            input.value = input.value + '; ' + text;
+    if (!diagInput) return;
+    if (diagInput.value && diagInput.value.trim() !== '') {
+        if (!diagInput.value.includes(text)) {
+            diagInput.value = diagInput.value + '; ' + text;
         }
     } else {
-        input.value = text;
+        diagInput.value = text;
     }
     if (clearBtn) clearBtn.classList.remove('hidden');
-    input.focus();
+    diagInput.focus();
 }
 
 // --- MODAL DE DIAGNÓSTICO PERSONALIZADO ---
@@ -458,14 +591,15 @@ function applyConsultationTemplate(selectEl) {
     const selected = selectEl.options[selectEl.selectedIndex];
     const content = selected.getAttribute('data-content');
     if (!content) return;
-    const symptomsEl = document.getElementById('symptoms_textarea');
-    if (symptomsEl) {
-        if (symptomsEl.value.trim() && !confirm('¿Desea reemplazar el texto actual en Anamnesis / Síntomas con el contenido de la plantilla? (Cancelar para anexar al final)')) {
-            symptomsEl.value += '\n\n' + content;
+    const historyEl = document.getElementById('clinical_history');
+    if (historyEl) {
+        if (historyEl.value.trim() && !confirm('¿Desea anexar esta plantilla a la historia clínica actual? (Aceptar para anexar, Cancelar para reemplazar todo)')) {
+            historyEl.value = content;
         } else {
-            symptomsEl.value = content;
+            historyEl.value = (historyEl.value.trim() ? historyEl.value + '\n\n' : '') + content;
         }
-        symptomsEl.focus();
+        historyEl.focus();
+        updateWordCount();
     }
 }
 
@@ -475,10 +609,10 @@ function applyPrescriptionTemplate(selectEl) {
     if (!content) return;
     const rxEl = document.getElementById('prescription_textarea');
     if (rxEl) {
-        if (rxEl.value.trim() && !confirm('¿Desea reemplazar la receta actual con el contenido de la plantilla? (Cancelar para anexar al final)')) {
-            rxEl.value += '\n' + content;
-        } else {
+        if (rxEl.value.trim() && !confirm('¿Desea anexar esta receta? (Aceptar para anexar, Cancelar para reemplazar)')) {
             rxEl.value = content;
+        } else {
+            rxEl.value = (rxEl.value.trim() ? rxEl.value + '\n' : '') + content;
         }
         rxEl.focus();
     }

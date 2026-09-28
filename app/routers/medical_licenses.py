@@ -15,8 +15,7 @@ from app.core.deps import require_permission
 from app.services.pdf_service import generate_medical_license_pdf
 
 router = APIRouter(prefix="/licenses", tags=["licenses"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 @router.get("/")
 def list_licenses(

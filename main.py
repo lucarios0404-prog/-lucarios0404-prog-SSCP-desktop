@@ -58,6 +58,24 @@ async def run_periodic_sync():
         except Exception as e:
             print(f"[Auto-Sync Background] Error no crítico: {e}")
 
+async def run_peer_continuous_sync():
+    """Tarea en segundo plano: sincronización P2P desatendida entre Doctor y Secretaría cada 45s."""
+    while True:
+        try:
+            await asyncio.sleep(45)
+            from app.services.sync_service import SyncService
+            from app.models.setting import Setting
+            with SessionLocal() as db:
+                setting = db.query(Setting).first()
+                if setting and setting.central_station_url and setting.central_station_url.strip():
+                    peer_url = setting.central_station_url.strip()
+                    await SyncService.sync_with_peer(db, peer_url)
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            pass
+
+
 def ensure_schema_migrations(engine):
     """Garantiza la adición segura e idempotente de nuevas columnas a SQLite."""
     try:
@@ -98,6 +116,10 @@ def ensure_schema_migrations(engine):
                 conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_gateway_status TEXT DEFAULT 'disconnected'"))
             if "whatsapp_connected_phone" not in s_cols:
                 conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_connected_phone TEXT"))
+            if "station_role" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN station_role TEXT DEFAULT 'doctor_principal'"))
+            if "central_station_url" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN central_station_url TEXT"))
 
             # 3. Migraciones en appointments (Turnos, Servicios, WhatsApp)
             res_a = conn.execute(text("PRAGMA table_info(appointments)")).fetchall()
@@ -120,6 +142,20 @@ def ensure_schema_migrations(engine):
                 conn.execute(text("ALTER TABLE payments ADD COLUMN insurance_name TEXT DEFAULT 'Privado'"))
             if "service_id" not in p_cols:
                 conn.execute(text("ALTER TABLE payments ADD COLUMN service_id INTEGER"))
+
+            # 5. Migraciones en consultations (Historia Clínica Unificada v1.2.0)
+            res_c = conn.execute(text("PRAGMA table_info(consultations)")).fetchall()
+            c_cols = [r[1] for r in res_c]
+            if "clinical_history" not in c_cols:
+                conn.execute(text("ALTER TABLE consultations ADD COLUMN clinical_history TEXT"))
+            if "is_first_visit" not in c_cols:
+                conn.execute(text("ALTER TABLE consultations ADD COLUMN is_first_visit BOOLEAN DEFAULT 0"))
+            if "edit_version" not in c_cols:
+                conn.execute(text("ALTER TABLE consultations ADD COLUMN edit_version INTEGER DEFAULT 1"))
+
+            # 6. Tabla lab_orders (Solicitud de Laboratorios Digital v1.2.0)
+            from app.models.lab_order import LabOrder
+            LabOrder.__table__.create(bind=conn, checkfirst=True)
 
             conn.commit()
     except Exception as e:
@@ -197,12 +233,18 @@ async def lifespan(app: FastAPI):
         print(f"[Startup Database] Aviso: {e}")
 
     sync_task = asyncio.create_task(run_periodic_sync())
+    peer_sync_task = asyncio.create_task(run_peer_continuous_sync())
     wa_task = asyncio.create_task(run_whatsapp_scheduled_reminders())
     yield
     sync_task.cancel()
+    peer_sync_task.cancel()
     wa_task.cancel()
     try:
         await sync_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await peer_sync_task
     except asyncio.CancelledError:
         pass
     try:
@@ -278,6 +320,40 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             status_code=200,
         )
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept or "*/*" in accept:
+            return templates.TemplateResponse(
+                request=request,
+                name="errors/404.html",
+                context={"request": request},
+                status_code=404
+            )
+        return JSONResponse(status_code=404, content={"detail": exc.detail})
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    traceback.print_exc()
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept or "*/*" in accept:
+        return templates.TemplateResponse(
+            request=request,
+            name="errors/500.html",
+            context={
+                "request": request,
+                "error_detail": str(exc) if "NoneType" in str(exc) or "database" in str(exc).lower() else "Ocurrió un error inesperado al procesar la solicitud."
+            },
+            status_code=500
+        )
+    return JSONResponse(status_code=500, content={"detail": "Error interno del servidor", "error": str(exc)})
+
 
 @app.middleware("http")
 async def license_gate_middleware(request: Request, call_next):

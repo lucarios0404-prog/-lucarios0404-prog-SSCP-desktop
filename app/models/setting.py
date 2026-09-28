@@ -18,6 +18,10 @@ class Setting(Base):
     sync_interval_minutes = Column(Integer, default=5)
     doctor_logo_path = Column(String, nullable=True)  # Ruta local del logo/membrete del doctor
 
+    # Rol de Estación y Topología de Red (v1.2.0)
+    station_role = Column(String, default="doctor_principal")  # doctor_principal, secretaria
+    central_station_url = Column(String, nullable=True)        # URL / IP del nodo central o Tailscale
+
     # Integración WhatsApp (1-Clic + Gateway Autónomo)
     whatsapp_doctor_phone = Column(String, nullable=True)  # Teléfono del médico para avisos de sala de espera
     whatsapp_auto_send = Column(Boolean, default=False)    # Habilitar envíos automáticos en background

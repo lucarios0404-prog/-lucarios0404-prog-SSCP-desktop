@@ -88,13 +88,13 @@
                                         <span class="text-[10px] bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded">URGENTE</span>
                                         {% endif %}
                                     </div>
-                                    <span class="text-[11px] text-slate-400 font-mono">{{ m.created_at.strftime("%d/%m/%Y %H:%M") }}</span>
+                                    <span class="text-[11px] text-slate-400 font-mono">{{ m.created_at.strftime("%d/%m/%Y %H:%M") if m.created_at else "—" }}</span>
                                 </div>
 
                                 <p class="text-xs text-slate-700 mt-2 whitespace-pre-line">{{ m.content }}</p>
 
                                 <div class="mt-3 pt-2 border-t border-slate-200/50 flex items-center justify-between text-[11px] text-slate-500">
-                                    <span>De: <strong>{{ m.sender.name or m.sender.email }}</strong> ({{ m.sender.role }})</span>
+                                    <span>De: <strong>{{ (m.sender.name or m.sender.email) if m.sender else 'Usuario' }}</strong> ({{ m.sender.role if m.sender else 'Personal' }})</span>
                                     {% if m.patient %}
                                     <span>Ref Paciente: <a href="/patients/{{ m.patient.id }}" class="text-blue-600 font-semibold hover:underline">{{ m.patient.first_name }} {{ m.patient.last_name }}</a></span>
                                     {% endif %}

@@ -22,8 +22,7 @@ from app.core.deps import require_current_user, require_permission
 from app.services.pdf_service import generate_executive_report_pdf, generate_secretary_daily_report_pdf
 
 router = APIRouter(prefix="/reports", tags=["reports"])
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+from app.core.templates import templates
 
 def calculate_age(dob: date) -> int:
     if not dob:

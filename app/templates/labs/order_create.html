@@ -1,0 +1,493 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Laboratorios — Solicitud y Checklist Clínico — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'labs' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Laboratorios y Análisis Clínicos" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
+            <div class="max-w-[1360px] mx-auto space-y-3.5">
+                <!-- Header con Título, Contexto y Acciones -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div>
+                        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                            <span class="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center text-sm shadow-xs">
+                                <i class="fas fa-list-check"></i>
+                            </span>
+                            <span>Solicitud de Laboratorios Clínicos</span>
+                        </h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Selección rápida de análisis para imprimir sobre el talonario físico preimpreso (13.6 × 21.7 cm) o generar volante digital.</p>
+                    </div>
+                    {% if selected_patient %}
+                    <div class="flex items-center gap-2">
+                        <a href="/patients/{{ selected_patient.id }}" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
+                            <i class="fas fa-user-circle mr-1.5 text-teal-600"></i> Expediente del Paciente
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Tabs de Navegación del Módulo de Laboratorio -->
+                <div class="border-b border-slate-200 flex space-x-6 text-xs sm:text-sm">
+                    <a href="/lab-results" class="pb-2.5 font-bold border-b-2 border-teal-600 text-teal-700 transition-colors flex items-center gap-1.5">
+                        <i class="fas fa-check-double text-teal-600"></i> Emitir Solicitud (Checklist)
+                    </a>
+                    <a href="/lab-results/orders" class="pb-2.5 font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-1.5">
+                        <i class="fas fa-clipboard-list text-slate-400"></i> Órdenes Emitidas
+                    </a>
+                    <a href="/lab-results/results" class="pb-2.5 font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-1.5">
+                        <i class="fas fa-flask text-slate-400"></i> Resultados Registrados
+                    </a>
+                </div>
+
+                <!-- Formulario Principal -->
+                <form id="lab-order-form" method="post" action="/lab-results/orders/new" class="bg-white rounded-xl border border-slate-200 shadow-xs p-4 sm:p-5 space-y-4">
+                    {% if consultation_id %}
+                    <input type="hidden" name="consultation_id" value="{{ consultation_id }}">
+                    {% endif %}
+
+                    <!-- SECCIÓN COMPACTA: PACIENTE + INDICACIÓN CLÍNICA -->
+                    <div class="bg-slate-50/80 border border-slate-200/90 rounded-xl p-3 sm:p-3.5">
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+                            <!-- Paciente (7 columnas) -->
+                            <div class="lg:col-span-7">
+                                {% if selected_patient %}
+                                <input type="hidden" id="patient_id" name="patient_id" value="{{ selected_patient.id }}">
+                                <div class="flex items-center justify-between bg-white px-3.5 py-2 rounded-lg border border-slate-200">
+                                    <div class="flex items-center gap-2.5 min-w-0">
+                                        <div class="w-7 h-7 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-xs font-bold shrink-0">
+                                            <i class="fas fa-user"></i>
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <h3 class="text-xs sm:text-sm font-bold text-slate-900 truncate">{{ selected_patient.last_name }}, {{ selected_patient.first_name }}</h3>
+                                                <span class="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-mono">DNI: {{ selected_patient.document_id or 'Sin DNI' }}</span>
+                                                <span class="text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">Edad: {{ selected_patient.age if selected_patient.age else 'N/D' }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        {% if selected_patient.allergies %}
+                                        <span class="text-rose-700 font-bold bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[11px] inline-flex items-center">
+                                            <i class="fas fa-allergies mr-1 text-rose-500"></i> {{ selected_patient.allergies }}
+                                        </span>
+                                        {% endif %}
+                                        <a href="/lab-results" class="text-xs text-teal-600 hover:text-teal-800 font-bold hover:underline" title="Cambiar paciente">
+                                            <i class="fas fa-arrows-rotate mr-1"></i> Cambiar
+                                        </a>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                        1. Paciente <span class="text-rose-500">*</span>
+                                    </label>
+                                    <select id="patient_id" name="patient_id" required onchange="handlePatientSelection(this)"
+                                        class="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-white font-medium text-slate-800">
+                                        <option value="">-- Seleccionar paciente de la lista --</option>
+                                        {% for p in patients %}
+                                        <option value="{{ p.id }}"
+                                            data-name="{{ p.last_name }}, {{ p.first_name }}"
+                                            data-doc="{{ p.document_id or 'Sin DNI' }}"
+                                            data-age="{{ p.age or 'N/D' }}"
+                                            data-insurance="{{ p.insurance_name or 'Privado' }}"
+                                            data-allergies="{{ p.allergies or '' }}">
+                                            {{ p.last_name }}, {{ p.first_name }} — DNI: {{ p.document_id or 'Sin DNI' }} (Edad: {{ p.age or 'N/D' }})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+
+                                    <!-- Ficha dinámica si selecciona paciente -->
+                                    <div id="dynamic-patient-card" class="hidden mt-2 px-3 py-1.5 rounded-lg bg-teal-50/70 border border-teal-200/80 flex items-center justify-between text-xs text-slate-700">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-check-circle text-teal-600"></i>
+                                            <span id="dyn-p-name" class="font-bold text-slate-900"></span>
+                                            <span class="text-slate-400">|</span>
+                                            <span>DNI: <strong id="dyn-p-doc" class="font-mono"></strong></span>
+                                            <span class="text-slate-400">|</span>
+                                            <span>Edad: <strong id="dyn-p-age"></strong></span>
+                                        </div>
+                                        <div id="dyn-p-allergies-badge" class="hidden">
+                                            <span class="text-rose-700 font-bold bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[10px]">
+                                                Alergia: <span id="dyn-p-allergies-text"></span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Indicación Clínica (5 columnas) -->
+                            <div class="lg:col-span-5">
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                                    <span>2. Indicación / Dx Presuntivo</span>
+                                    <span class="text-[10px] text-slate-400 font-normal">Aparece en talonario</span>
+                                </label>
+                                <input type="text" name="clinical_indication" value="{{ default_indication or '' }}" 
+                                    placeholder="Ej. Chequeo de rutina / Sospecha de Anemia / Control DM2" 
+                                    class="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-white font-medium text-slate-800">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BARRA DE CONTROL DEL CHECKLIST DE LABORATORIOS -->
+                    <div class="space-y-2.5">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pb-2 border-b border-slate-200">
+                            <!-- Izquierda: Título y Contador -->
+                            <div class="flex items-center gap-2.5">
+                                <span class="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5 uppercase tracking-wide">
+                                    <i class="fas fa-check-double text-teal-600"></i> 3. Selección de Análisis
+                                </span>
+                                <span id="test_counter" class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold text-xs transition-colors">
+                                    0 seleccionados
+                                </span>
+                            </div>
+
+                            <!-- Centro: Buscador / Filtro Rápido en Vivo -->
+                            <div class="relative w-full md:w-80">
+                                <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                <input type="text" id="test-filter-input" oninput="filterTests(this.value)" 
+                                    placeholder="Buscar análisis (ej. Glucosa, TSH, Orina)..." 
+                                    class="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-slate-50/50">
+                                <button type="button" id="clear-filter-btn" onclick="clearFilter()" 
+                                    class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-0.5" title="Limpiar filtro">
+                                    <i class="fas fa-times-circle"></i>
+                                </button>
+                            </div>
+
+                            <!-- Derecha: Acciones Rápidas -->
+                            <div class="flex items-center space-x-3 text-xs shrink-0">
+                                <button type="button" onclick="selectAllTests(true)" class="text-teal-700 hover:text-teal-900 font-bold hover:underline inline-flex items-center gap-1">
+                                    <i class="fas fa-check-square"></i> Marcar Todo
+                                </button>
+                                <span class="text-slate-300">|</span>
+                                <button type="button" onclick="selectAllTests(false)" class="text-slate-500 hover:text-slate-700 font-medium hover:underline inline-flex items-center gap-1">
+                                    <i class="fas fa-square"></i> Limpiar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- PERFILES RÁPIDOS (PRESETS MÉDICOS DE 1-CLIC) -->
+                        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] text-slate-600 no-scrollbar">
+                            <span class="font-bold text-slate-400 uppercase tracking-wider text-[10px] shrink-0 mr-1">
+                                <i class="fas fa-bolt text-amber-500 mr-0.5"></i> Perfiles Rápidos:
+                            </span>
+                            <button type="button" onclick="applyPreset('rutina')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                🩺 Rutina General
+                            </button>
+                            <button type="button" onclick="applyPreset('diabetico')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                🍬 Control Diabético
+                            </button>
+                            <button type="button" onclick="applyPreset('lipidico')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                🩸 Perfil Lipídico
+                            </button>
+                            <button type="button" onclick="applyPreset('tiroideo')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                🦋 Perfil Tiroideo
+                            </button>
+                            <button type="button" onclick="applyPreset('prequirurgico')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                🩹 Pre-Quirúrgico
+                            </button>
+                            <button type="button" onclick="applyPreset('prenatal')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                🤰 Prenatal
+                            </button>
+                            <button type="button" onclick="applyPreset('hepato_renal')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                🧪 Hepático / Renal
+                            </button>
+                        </div>
+
+                        <!-- GRID COMPACTO DE PANELES DE LABORATORIO (DISTRIBUCIÓN INTELIGENTE) -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5 pt-1">
+                            {% for panel in panels %}
+                            {% set panel_idx = loop.index %}
+                            {% set is_large_panel = (panel.tests|length > 18) %}
+                            <div class="panel-card p-3 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50/90 transition-all shadow-2xs flex flex-col {% if is_large_panel %}md:col-span-2 xl:col-span-3 bg-slate-50/40{% endif %}" id="panel_card_{{ panel_idx }}">
+                                <!-- Cabecera del Panel -->
+                                <div class="flex items-center justify-between border-b border-slate-200/70 pb-1.5 mb-1.5">
+                                    <h4 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                        <i class="fas {{ panel.icon }} text-teal-600 text-xs"></i>
+                                        <span>{{ panel.category }}</span>
+                                        <span class="panel-count text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded" id="panel_badge_{{ panel_idx }}">
+                                            0/{{ panel.tests|length }}
+                                        </span>
+                                    </h4>
+                                    <button type="button" onclick="togglePanel('{{ panel_idx }}')" class="text-[10px] font-bold text-teal-600 hover:text-teal-800 hover:underline">
+                                        Seleccionar todo
+                                    </button>
+                                </div>
+
+                                <!-- Lista de Estudios en Múltiples Columnas Densas -->
+                                <div class="{% if is_large_panel %}grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-2 gap-y-0.5{% else %}grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-0.5{% endif %}" id="panel_group_{{ panel_idx }}">
+                                    {% for test in panel.tests %}
+                                    <label class="test-item group flex items-start gap-1.5 px-2 py-0.5 rounded text-[11px] leading-tight text-slate-700 hover:bg-white cursor-pointer select-none transition-colors border border-transparent has-checked:border-teal-200 has-checked:bg-teal-50/90 has-checked:text-teal-900 has-checked:font-semibold" data-name="{{ test|lower }}">
+                                        <input type="checkbox" name="tests" value="{{ test }}" onchange="updateSelectedCount()"
+                                            class="panel-checkbox-{{ panel_idx }} test-checkbox rounded text-teal-600 focus:ring-teal-500 w-3.5 h-3.5 mt-0.5 shrink-0 border-slate-300">
+                                        <span class="leading-tight" title="{{ test }}">{{ test }}</span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 4: OTROS ANÁLISIS NO LISTADOS (COMPACTO) -->
+                    <div class="pt-1">
+                        <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                            <span>4. Otros Análisis Especiales No Listados</span>
+                            <span class="text-[10px] text-slate-400 font-normal">Un estudio por línea (se agregan a la lista de impresión)</span>
+                        </label>
+                        <textarea name="other_tests" id="other_tests" rows="1" oninput="updateSelectedCount()"
+                            placeholder="Ej. Troponina I ultrasensible, Dímero D cuantitativo, Panel genético..." 
+                            class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-white font-mono"></textarea>
+                    </div>
+
+                    <!-- BARRA DE ACCIÓN INFERIOR FIJA / STICKY CON BOTONES DE TALONARIO -->
+                    <div class="sticky bottom-0 z-20 bg-white/95 backdrop-blur-sm border-t border-slate-200 pt-3 pb-1 -mx-4 px-4 sm:-mx-5 sm:px-5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm rounded-b-xl">
+                        <!-- Contador en barra inferior -->
+                        <div class="flex items-center gap-2 text-xs text-slate-600">
+                            <span class="font-bold text-slate-800">Total en Orden:</span>
+                            <span id="footer_counter" class="font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full text-xs">
+                                0 estudios
+                            </span>
+                            <button type="button" onclick="selectAllTests(false)" class="text-[11px] text-slate-400 hover:text-slate-600 hover:underline ml-2">
+                                Limpiar todo
+                            </button>
+                        </div>
+
+                        <!-- Botones de Impresión y Guardado -->
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                            <!-- Botón Opcional: Formato Carta -->
+                            <button type="submit" name="print_format" value="letter"
+                                class="px-3 py-2 border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5"
+                                title="Genera un volante oficial con membrete digital completo en formato Carta/A4.">
+                                <i class="fas fa-file-pdf text-red-500"></i>
+                                <span>Volante Carta</span>
+                            </button>
+
+                            <!-- Botón Secundario: Guardar en Historial -->
+                            <button type="submit" name="print_format" value="talonario"
+                                class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all flex items-center gap-1.5"
+                                title="Guarda la orden en el sistema y abre el PDF oficial.">
+                                <i class="fas fa-save"></i>
+                                <span>Guardar Orden</span>
+                            </button>
+
+                            <!-- Botón Principal: Imprimir en Talonario Físico (Abre en nueva pestaña de inmediato) -->
+                            <button type="button" onclick="submitTalonarioDirect()"
+                                class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-blue-600/25 transition-all flex items-center gap-2"
+                                title="Genera e imprime el PDF con el formato exacto para el papel preimpreso físico de 13.6 × 21.7 cm.">
+                                <i class="fas fa-file-medical text-sm"></i>
+                                <span>Imprimir en Talonario (13.6 × 21.7 cm)</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Diccionario de Perfiles Clínicos Rápidos
+const PRESETS = {
+    rutina: ["Hemograma Completo", "Exámen de orina", "Glicemia en ayuna", "Creatinina", "Colesterol Total", "Trigliceridos"],
+    diabetico: ["Glicemia en ayuna", "Glicemia Post Pandrial", "Hemoglobina Glicosilada", "Exámen de orina", "Creatinina", "Microalbuminuria"],
+    lipidico: ["Colesterol Total", "HDL", "LDL", "VLDL", "Trigliceridos"],
+    tiroideo: ["TSH", "T3 libre", "T4 libre", "T3", "T4"],
+    prequirurgico: ["Hemograma Completo", "PT", "TPT", "Tipificación Sanguínea", "Glicemia en ayuna", "Exámen de orina", "Creatinina"],
+    prenatal: ["Hemograma Completo", "Tipificación Sanguínea", "Exámen de orina", "V.D.R.L.", "HIV", "Glicemia en ayuna", "Toxoplasmosis IgG - IgM"],
+    hepato_renal: ["SGOT", "SGPT", "Bilirrubina", "Fosfatasa Alcalina", "Proteinas totales", "Albumina", "Bun", "Creatinina", "Acido Urico"]
+};
+
+function selectAllTests(check) {
+    document.querySelectorAll('.test-checkbox').forEach(cb => {
+        // Si hay filtro activo, solo modificar los visibles
+        const item = cb.closest('.test-item');
+        if (!item || !item.classList.contains('hidden')) {
+            cb.checked = check;
+        }
+    });
+    updateSelectedCount();
+}
+
+function togglePanel(panelIdx) {
+    const checkboxes = document.querySelectorAll('.panel-checkbox-' + panelIdx);
+    const anyUnchecked = Array.from(checkboxes).some(cb => !cb.checked);
+    checkboxes.forEach(cb => {
+        cb.checked = anyUnchecked;
+    });
+    updateSelectedCount();
+}
+
+function applyPreset(key) {
+    const tests = PRESETS[key] || [];
+    if (!tests.length) return;
+
+    // Normalizar para comparación flexible
+    const normalize = str => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const normalizedTests = tests.map(normalize);
+
+    document.querySelectorAll('.test-checkbox').forEach(cb => {
+        const val = normalize(cb.value);
+        if (normalizedTests.some(t => val.includes(t) || t.includes(val))) {
+            cb.checked = true;
+        }
+    });
+    updateSelectedCount();
+}
+
+function filterTests(query) {
+    const q = (query || '').toLowerCase().trim();
+    const clearBtn = document.getElementById('clear-filter-btn');
+    if (clearBtn) {
+        clearBtn.classList.toggle('hidden', !q);
+    }
+
+    const normalize = str => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const normQ = normalize(q);
+
+    document.querySelectorAll('.test-item').forEach(el => {
+        const name = normalize(el.getAttribute('data-name') || '');
+        if (!normQ || name.includes(normQ)) {
+            el.classList.remove('hidden');
+        } else {
+            el.classList.add('hidden');
+        }
+    });
+
+    // Ocultar tarjetas de paneles sin ningún estudio coincidente
+    document.querySelectorAll('.panel-card').forEach(card => {
+        if (!normQ) {
+            card.classList.remove('hidden');
+        } else {
+            const hasVisible = card.querySelectorAll('.test-item:not(.hidden)').length > 0;
+            card.classList.toggle('hidden', !hasVisible);
+        }
+    });
+}
+
+function clearFilter() {
+    const input = document.getElementById('test-filter-input');
+    if (input) {
+        input.value = '';
+        filterTests('');
+        input.focus();
+    }
+}
+
+function updateSelectedCount() {
+    const checked = document.querySelectorAll('.test-checkbox:checked').length;
+    const otherText = document.getElementById('other_tests') ? document.getElementById('other_tests').value.trim() : '';
+    const otherCount = otherText ? otherText.split('\n').filter(l => l.trim().length > 0).length : 0;
+    const total = checked + otherCount;
+
+    const counter = document.getElementById('test_counter');
+    const footerCounter = document.getElementById('footer_counter');
+
+    if (counter) {
+        counter.textContent = `${total} seleccionado${total === 1 ? '' : 's'}`;
+        if (total > 0) {
+            counter.className = "px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 font-bold text-xs";
+        } else {
+            counter.className = "px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold text-xs";
+        }
+    }
+
+    if (footerCounter) {
+        footerCounter.textContent = `${total} estudio${total === 1 ? '' : 's'}`;
+        if (total > 0) {
+            footerCounter.className = "font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full text-xs";
+        } else {
+            footerCounter.className = "font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full text-xs";
+        }
+    }
+
+    // Actualizar badges por panel
+    document.querySelectorAll('[id^="panel_badge_"]').forEach(badge => {
+        const panelIdx = badge.id.replace('panel_badge_', '');
+        const panelCheckboxes = document.querySelectorAll('.panel-checkbox-' + panelIdx);
+        const panelChecked = document.querySelectorAll('.panel-checkbox-' + panelIdx + ':checked').length;
+        badge.textContent = `${panelChecked}/${panelCheckboxes.length}`;
+        if (panelChecked > 0) {
+            badge.className = "panel-count text-[10px] font-bold text-teal-700 bg-teal-100 px-1.5 py-0.2 rounded";
+        } else {
+            badge.className = "panel-count text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded";
+        }
+    });
+}
+
+function handlePatientSelection(selectEl) {
+    const selectedOpt = selectEl.options[selectEl.selectedIndex];
+    const card = document.getElementById('dynamic-patient-card');
+    if (!card) return;
+
+    if (!selectEl.value) {
+        card.classList.add('hidden');
+        return;
+    }
+
+    document.getElementById('dyn-p-name').textContent = selectedOpt.getAttribute('data-name') || '';
+    document.getElementById('dyn-p-doc').textContent = selectedOpt.getAttribute('data-doc') || 'Sin DNI';
+    document.getElementById('dyn-p-age').textContent = selectedOpt.getAttribute('data-age') || 'N/D';
+
+    const allergies = selectedOpt.getAttribute('data-allergies');
+    const badge = document.getElementById('dyn-p-allergies-badge');
+    const badgeText = document.getElementById('dyn-p-allergies-text');
+    if (allergies && allergies.trim().length > 0) {
+        badgeText.textContent = allergies;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+
+    card.classList.remove('hidden');
+}
+
+function submitTalonarioDirect() {
+    const patientSelect = document.getElementById('patient_id');
+    const patientId = patientSelect ? patientSelect.value : '';
+
+    if (!patientId) {
+        alert('Por favor seleccione un paciente antes de emitir e imprimir el talonario.');
+        if (patientSelect) patientSelect.focus();
+        return;
+    }
+
+    const checkedBoxes = document.querySelectorAll('input[name="tests"]:checked');
+    const otherTests = document.getElementById('other_tests') ? document.getElementById('other_tests').value.trim() : '';
+
+    if (checkedBoxes.length === 0 && !otherTests) {
+        alert('Por favor marque al menos un estudio en el checklist o escriba un estudio adicional.');
+        return;
+    }
+
+    const form = document.getElementById('lab-order-form');
+    const oldAction = form.action;
+    const oldTarget = form.target;
+
+    form.action = '/lab-results/talonario/quick';
+    form.target = '_blank';
+    form.submit();
+
+    form.action = oldAction;
+    form.target = oldTarget;
+}
+
+// Inicializar al cargar
+document.addEventListener('DOMContentLoaded', () => {
+    updateSelectedCount();
+    const pSelect = document.getElementById('patient_id');
+    if (pSelect && pSelect.tagName === 'SELECT' && pSelect.value) {
+        handlePatientSelection(pSelect);
+    }
+});
+</script>
+{% endblock %}
