@@ -80,7 +80,9 @@ def run():
     import uvicorn
     from main import app
 
-    server_port = find_available_port(SERVER_HOST, 8080)
+    env_port = os.environ.get("SSCP_PORT")
+    default_port = int(env_port) if env_port and env_port.isdigit() else 8080
+    server_port = find_available_port(SERVER_HOST, default_port)
     server_url = f"http://{CLIENT_HOST}:{server_port}"
 
     config = uvicorn.Config(
@@ -101,6 +103,16 @@ def run():
     server_ready = wait_for_server(CLIENT_HOST, server_port, timeout=25.0)
     if not server_ready:
         wait_for_server(CLIENT_HOST, server_port, timeout=5.0)
+
+    # Si se pasa --server-only o --headless, servir en segundo plano para Electron sin abrir ventana GUI
+    if "--server-only" in sys.argv or "--headless" in sys.argv:
+        try:
+            while server_thread.is_alive():
+                time.sleep(1)
+        except (KeyboardInterrupt, SystemExit):
+            pass
+        server.should_exit = True
+        sys.exit(0)
 
     # Intentar abrir con ventana nativa de escritorio (PyWebView)
     opened_native = False

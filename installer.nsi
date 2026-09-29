@@ -55,8 +55,8 @@ Section "MainSection" SEC01
   SetOutPath "$INSTDIR"
   SetOverwrite try
 
-  ; Copiar todos los archivos binarios generados por PyInstaller
-  File /r "dist\SSCP-Desktop\*.*"
+  ; Copiar todos los archivos de la distribución Electron (Shell Chromium + App + Backend Python)
+  File /r "dist\SSCP-Desktop-Electron\*.*"
 
   ; Crear directorio local para base de datos SQLite persistente
   CreateDirectory "$INSTDIR\data"
@@ -89,6 +89,8 @@ Section Uninstall
   RMDir "$SMPROGRAMS\${PRODUCT_NAME}"
 
   ; Eliminar archivos de la aplicación
+  RMDir /r "$INSTDIR\resources"
+  RMDir /r "$INSTDIR\locales"
   RMDir /r "$INSTDIR\_internal"
   Delete "$INSTDIR\*.*"
 

@@ -36,7 +36,29 @@ class ServerManager {
 
   // Prepara el directorio de datos
   setupDataDirectory() {
+    const { app } = require('electron');
     const baseConfigDir = path.resolve(__dirname, '../../');
+
+    // Si está empaquetado en producción con electron-builder o NSIS (resources/backend)
+    if (process.resourcesPath && fs.existsSync(path.join(process.resourcesPath, 'backend'))) {
+      const installDataDir = path.resolve(process.resourcesPath, '../data');
+      try {
+        if (!fs.existsSync(installDataDir)) {
+          fs.mkdirSync(installDataDir, { recursive: true });
+        }
+        fs.accessSync(installDataDir, fs.constants.W_OK);
+        console.log(`[ServerManager] Directorio de datos en producción: ${installDataDir}`);
+        return installDataDir;
+      } catch (err) {
+        const userAppDir = path.join(app.getPath('userData'), 'data');
+        if (!fs.existsSync(userAppDir)) {
+          fs.mkdirSync(userAppDir, { recursive: true });
+        }
+        console.log(`[ServerManager] Directorio de datos en AppData: ${userAppDir}`);
+        return userAppDir;
+      }
+    }
+
     const backendDir = path.isAbsolute(this.config.backendDir)
       ? this.config.backendDir
       : path.resolve(baseConfigDir, this.config.backendDir);
@@ -140,9 +162,45 @@ class ServerManager {
 
     const dataDir = this.setupDataDirectory();
 
-    console.log(`[ServerManager] Levantando backend Python en puerto ${this.port}...`);
-    console.log(`[ServerManager] Python: ${pythonExe}`);
-    console.log(`[ServerManager] CWD: ${backendDir}`);
+    // Detección inteligente del ejecutable del backend:
+    // 1. Recursos empaquetados por electron-builder (process.resourcesPath/backend/SSCP-Desktop.exe)
+    // 2. Ejecutable local en dist/SSCP-Desktop/SSCP-Desktop.exe
+    // 3. Intérprete Python en entorno virtual (desarrollo)
+    const packagedExe = process.resourcesPath ? path.join(process.resourcesPath, 'backend', 'SSCP-Desktop.exe') : null;
+    const localDistExe = path.resolve(baseConfigDir, '../dist/SSCP-Desktop/SSCP-Desktop.exe');
+
+    let exeToRun = pythonExe;
+    let args = [
+      '-m',
+      'uvicorn',
+      'main:app',
+      '--host',
+      '127.0.0.1',
+      '--port',
+      String(this.port),
+      '--log-level',
+      'warning'
+    ];
+    let cwdToUse = backendDir;
+
+    if (packagedExe && fs.existsSync(packagedExe)) {
+      exeToRun = packagedExe;
+      args = ['--server-only'];
+      cwdToUse = path.dirname(packagedExe);
+      console.log(`[ServerManager] Ejecutando backend empaquetado en producción: ${exeToRun}`);
+    } else if (fs.existsSync(pythonExe)) {
+      exeToRun = pythonExe;
+      console.log(`[ServerManager] Ejecutando backend en modo desarrollo con Python: ${pythonExe}`);
+    } else if (fs.existsSync(localDistExe)) {
+      exeToRun = localDistExe;
+      args = ['--server-only'];
+      cwdToUse = path.dirname(localDistExe);
+      console.log(`[ServerManager] Ejecutando backend compilado local: ${exeToRun}`);
+    }
+
+    console.log(`[ServerManager] Levantando backend en puerto ${this.port}...`);
+    console.log(`[ServerManager] Comando: ${exeToRun} ${args.join(' ')}`);
+    console.log(`[ServerManager] CWD: ${cwdToUse}`);
     console.log(`[ServerManager] SSCP_DATA_DIR: ${dataDir}`);
 
     const env = {
@@ -154,20 +212,8 @@ class ServerManager {
       PYTHONUNBUFFERED: '1'
     };
 
-    const args = [
-      '-m',
-      'uvicorn',
-      'main:app',
-      '--host',
-      '127.0.0.1',
-      '--port',
-      String(this.port),
-      '--log-level',
-      'warning'
-    ];
-
-    this.process = spawn(pythonExe, args, {
-      cwd: backendDir,
+    this.process = spawn(exeToRun, args, {
+      cwd: cwdToUse,
       env: env,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true
