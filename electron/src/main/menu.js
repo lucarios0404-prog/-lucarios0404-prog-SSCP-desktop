@@ -104,11 +104,6 @@ function buildAppMenu(mainWindow, baseUrl, getAppIcon) {
           label: 'Pantalla Completa',
           accelerator: 'F11',
           click: () => mainWindow.setFullScreen(!mainWindow.isFullScreen())
-        },
-        {
-          label: 'Herramientas de Desarrollador (DevTools)',
-          accelerator: 'CmdOrCtrl+Shift+I',
-          click: () => mainWindow.webContents.toggleDevTools()
         }
       ]
     },

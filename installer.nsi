@@ -38,7 +38,13 @@ RequestExecutionLevel admin
 
 
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_RUN "$INSTDIR\${PRODUCT_EXE}"
+
+Function LaunchApp
+  ExecShell "" "$INSTDIR\${PRODUCT_EXE}"
+FunctionEnd
+
+!define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_FUNCTION LaunchApp
 !define MUI_FINISHPAGE_RUN_TEXT "Ejecutar ${PRODUCT_NAME} ahora"
 !insertmacro MUI_PAGE_FINISH
 
@@ -57,9 +63,6 @@ Section "MainSection" SEC01
 
   ; Copiar todos los archivos de la distribución Electron (Shell Chromium + App + Backend Python)
   File /r "dist\SSCP-Desktop-Electron\*.*"
-
-  ; Crear directorio local para base de datos SQLite persistente
-  CreateDirectory "$INSTDIR\data"
 
   
   ; Crear Accesos Directos
@@ -94,10 +97,7 @@ Section Uninstall
   RMDir /r "$INSTDIR\_internal"
   Delete "$INSTDIR\*.*"
 
-  ; Conservar la base de datos data\sscp.db para no perder historiales clínicos por accidente
-  ; Si se desea eliminar por completo, descomentar la siguiente línea:
-  ; RMDir /r "$INSTDIR\data"
-
+  ; Los datos clínicos persisten de forma segura en %APPDATA%\SSCP Desktop\data para no perder historiales
   Delete "$INSTDIR\uninst.exe"
   RMDir "$INSTDIR"
 

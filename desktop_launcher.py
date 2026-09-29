@@ -37,9 +37,23 @@ else:
     BASE_DIR = Path(__file__).resolve().parent
     APP_DIR = BASE_DIR
 
-# Asegurar que la carpeta 'data' exista en el directorio de la aplicación
-data_dir = APP_DIR / "data"
-data_dir.mkdir(parents=True, exist_ok=True)
+# Determinar directorio de datos garantizando permisos de escritura en Windows
+if os.environ.get("SSCP_DATA_DIR"):
+    data_dir = Path(os.environ["SSCP_DATA_DIR"])
+else:
+    if getattr(sys, "frozen", False) and not (APP_DIR / "portable.flag").exists():
+        local_app_data = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        if local_app_data:
+            data_dir = Path(local_app_data) / "SSCP" / "data"
+        else:
+            data_dir = Path.home() / "AppData" / "Local" / "SSCP" / "data"
+    else:
+        data_dir = APP_DIR / "data"
+
+try:
+    data_dir.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 
 SERVER_HOST = os.environ.get("SSCP_HOST", "0.0.0.0")
 CLIENT_HOST = "127.0.0.1"

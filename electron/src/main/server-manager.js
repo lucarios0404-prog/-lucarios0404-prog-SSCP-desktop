@@ -39,24 +39,57 @@ class ServerManager {
     const { app } = require('electron');
     const baseConfigDir = path.resolve(__dirname, '../../');
 
-    // Si está empaquetado en producción con electron-builder o NSIS (resources/backend)
+    // 1. Si está empaquetado en producción con electron-builder o NSIS (resources/backend)
     if (process.resourcesPath && fs.existsSync(path.join(process.resourcesPath, 'backend'))) {
-      const installDataDir = path.resolve(process.resourcesPath, '../data');
-      try {
-        if (!fs.existsSync(installDataDir)) {
-          fs.mkdirSync(installDataDir, { recursive: true });
+      const appInstallDir = path.resolve(process.resourcesPath, '..');
+      const isPortable = fs.existsSync(path.join(appInstallDir, 'portable.flag')) || process.env.SSCP_PORTABLE === '1';
+
+      if (isPortable) {
+        const portableDataDir = path.join(appInstallDir, 'data');
+        if (!fs.existsSync(portableDataDir)) {
+          fs.mkdirSync(portableDataDir, { recursive: true });
         }
-        fs.accessSync(installDataDir, fs.constants.W_OK);
-        console.log(`[ServerManager] Directorio de datos en producción: ${installDataDir}`);
-        return installDataDir;
-      } catch (err) {
-        const userAppDir = path.join(app.getPath('userData'), 'data');
-        if (!fs.existsSync(userAppDir)) {
-          fs.mkdirSync(userAppDir, { recursive: true });
-        }
-        console.log(`[ServerManager] Directorio de datos en AppData: ${userAppDir}`);
-        return userAppDir;
+        console.log(`[ServerManager] Modo portátil activo: ${portableDataDir}`);
+        return portableDataDir;
       }
+
+      // En Windows instalado (e.g. C:\Program Files\SSCP Desktop), los datos DEBEN residir en
+      // %APPDATA%\SSCP Desktop\data para garantizar permisos completos de lectura/escritura en SQLite y logs
+      // sin requerir privilegios de Administrador.
+      const userAppDir = path.join(app.getPath('userData'), 'data');
+      if (!fs.existsSync(userAppDir)) {
+        fs.mkdirSync(userAppDir, { recursive: true });
+      }
+
+      // Migrar base de datos o licencias previas si existen en otras ubicaciones
+      const candidateSourceDirs = [
+        path.join(appInstallDir, 'data'),
+        path.join(app.getPath('appData'), 'sscp-electron', 'data'),
+        path.join(app.getPath('appData'), 'SSCP', 'data'),
+        path.join(process.env.LOCALAPPDATA || '', 'SSCP', 'data')
+      ];
+
+      const filesToMigrate = ['sscp.db', 'sscp_local.db', 'license_mode.txt', '.secret_key'];
+      for (const file of filesToMigrate) {
+        const dst = path.join(userAppDir, file);
+        if (!fs.existsSync(dst)) {
+          for (const srcDir of candidateSourceDirs) {
+            const src = path.join(srcDir, file);
+            if (fs.existsSync(src)) {
+              try {
+                fs.copyFileSync(src, dst);
+                console.log(`[ServerManager] Archivo migrado exitosamente a AppData: ${file} (desde ${src})`);
+                break;
+              } catch (migErr) {
+                console.warn(`[ServerManager] No se pudo migrar ${file} desde ${src}:`, migErr.message);
+              }
+            }
+          }
+        }
+      }
+
+      console.log(`[ServerManager] Directorio de datos en AppData del usuario: ${userAppDir}`);
+      return userAppDir;
     }
 
     const backendDir = path.isAbsolute(this.config.backendDir)
@@ -220,16 +253,28 @@ class ServerManager {
     });
 
     const logFile = path.resolve(dataDir, 'backend.log');
-    const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+    let logStream = null;
+    try {
+      logStream = fs.createWriteStream(logFile, { flags: 'a' });
+      logStream.on('error', (err) => {
+        console.warn(`[ServerManager] Advertencia en stream de log: ${err.message}`);
+      });
+    } catch (logErr) {
+      console.warn(`[ServerManager] No se pudo abrir logStream en ${logFile}:`, logErr.message);
+    }
 
     this.process.stdout.on('data', (data) => {
       const msg = data.toString();
-      logStream.write(`[STDOUT] ${msg}`);
+      if (logStream && logStream.writable) {
+        try { logStream.write(`[STDOUT] ${msg}`); } catch (e) {}
+      }
     });
 
     this.process.stderr.on('data', (data) => {
       const msg = data.toString();
-      logStream.write(`[STDERR] ${msg}`);
+      if (logStream && logStream.writable) {
+        try { logStream.write(`[STDERR] ${msg}`); } catch (e) {}
+      }
       // Solo advertir en consola si es un error grave
       if (msg.toLowerCase().includes('error') || msg.toLowerCase().includes('critical')) {
         console.error(`[Python Backend Error] ${msg}`);

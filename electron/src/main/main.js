@@ -3,6 +3,18 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 
+// Configurar nombre consistente de la aplicación en Windows
+app.setName('SSCP Desktop');
+
+// Prevenir caídas no controladas del proceso principal
+process.on('uncaughtException', (error) => {
+  console.error('[Main] Excepción no capturada:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Main] Rechazo no controlado en promesa:', reason);
+});
+
 const ServerManager = require('./server-manager');
 const { buildAppMenu } = require('./menu');
 const { openPrintConfigurator } = require('./print-configurator');

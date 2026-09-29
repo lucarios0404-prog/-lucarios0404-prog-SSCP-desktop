@@ -62,8 +62,6 @@ def build_electron_dist():
     print("[3/4] Copiando backend Python compilado en resources/backend...")
     shutil.copytree(backend_src, backend_dest)
 
-    # 5. Crear data directory
-    (dist_electron / "data").mkdir(exist_ok=True)
 
     print("[4/4] Verificando empaquetado...")
     assert target_exe.exists(), "Falta ejecutable principal"
