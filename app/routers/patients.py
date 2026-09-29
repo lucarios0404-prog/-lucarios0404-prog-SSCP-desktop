@@ -410,6 +410,10 @@ def create_patient(
 
     return RedirectResponse(url=f"/patients/{new_patient.id}?new_patient=1", status_code=303)
 
+@router.get("/new", include_in_schema=False)
+def new_patient_alias():
+    return RedirectResponse(url="/patients/create", status_code=307)
+
 @router.get("/{patient_id}")
 def view_patient(
     request: Request,

@@ -32,6 +32,8 @@ def list_appointments(
     view: str = Query("list", pattern="^(list|calendar)$"),
     filter_date: str = Query(None),
     status: str = Query(None),
+    doctor_id: Optional[int] = Query(None),
+    month: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
@@ -47,23 +49,46 @@ def list_appointments(
     if status:
         query = query.filter(Appointment.status == status)
 
+    if doctor_id:
+        query = query.filter(Appointment.doctor_id == doctor_id)
+
     appointments = query.all()
     
-    # Pre-organizar citas por fecha para el calendario y recopilar datos WhatsApp
+    # Pre-organizar citas para el calendario enriquecido y recopilar datos WhatsApp
     calendar_events = []
     whatsapp_info = {}
     unsent_reminders_count = 0
 
     for a in appointments:
         p_name = f"{a.patient.first_name} {a.patient.last_name}" if a.patient else "Paciente no registrado"
+        p_phone = a.patient.phone if a.patient else ""
+        p_ars = a.patient.insurance_name if a.patient else ""
+        p_ars_num = a.patient.insurance_number if a.patient else ""
+        doc_name = a.doctor.name if a.doctor else "Doctor Principal"
         time_display = f"{a.start_time.strftime('%H:%M')} - " if a.start_time else ""
+        
         calendar_events.append({
             "id": a.id,
             "title": f"{time_display}{p_name} ({a.reason or 'Sin motivo'})",
             "start": f"{a.date}T{a.start_time}" if a.start_time else f"{a.date}",
             "end": f"{a.date}T{a.end_time}" if a.end_time else None,
+            "date": str(a.date) if a.date else "",
+            "start_time": a.start_time.strftime("%H:%M") if a.start_time else "",
+            "end_time": a.end_time.strftime("%H:%M") if a.end_time else "",
             "status": a.status,
+            "patient_id": a.patient_id,
             "patient_name": p_name,
+            "patient_phone": p_phone,
+            "patient_insurance": p_ars,
+            "patient_insurance_num": p_ars_num,
+            "doctor_id": a.doctor_id,
+            "doctor_name": doc_name,
+            "reason": a.reason or "",
+            "notes": a.notes or "",
+            "queue_number": a.queue_number,
+            "service_name": a.service.name if a.service else "",
+            "price": float(a.price or 0.0),
+            "whatsapp_sent": bool(a.whatsapp_reminder_sent),
         })
         
         # Información de WhatsApp para 1-clic y Gateway
@@ -74,6 +99,7 @@ def list_appointments(
 
     today_str = date.today().strftime("%Y-%m-%d")
     all_patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.last_name).all()
+    doctors = db.query(User).filter(User.role.in_(['doctor', 'admin']), User.is_active == True).order_by(User.name).all()
     waiting_count = db.query(Appointment).filter(
         Appointment.date == date.today(),
         Appointment.status == "En Espera"
@@ -89,6 +115,7 @@ def list_appointments(
             "user": current_user,
             "appointments": appointments,
             "all_patients": all_patients,
+            "doctors": doctors,
             "services": services,
             "waiting_count": waiting_count,
             "waiting_success": request.query_params.get("waiting_success"),
@@ -97,11 +124,94 @@ def list_appointments(
             "today_str": today_str,
             "filter_date": filter_date or "",
             "status_filter": status or "all",
+            "selected_doctor_id": doctor_id or "",
             "whatsapp_info": whatsapp_info,
             "unsent_reminders_count": unsent_reminders_count,
             "gateway_status": gateway_status,
         }
     )
+
+@router.get("/api/events")
+def get_calendar_events_api(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    month: Optional[str] = Query(None),
+    doctor_id: Optional[int] = Query(None),
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    """Devuelve las citas en formato JSON para el calendario interactivo."""
+    query = db.query(Appointment).order_by(Appointment.date.asc(), Appointment.start_time.asc())
+    
+    if start_date:
+        try:
+            s_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            query = query.filter(Appointment.date >= s_date)
+        except ValueError:
+            pass
+            
+    if end_date:
+        try:
+            e_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+            query = query.filter(Appointment.date <= e_date)
+        except ValueError:
+            pass
+            
+    if month and not (start_date and end_date):
+        try:
+            m_parts = month.split("-")
+            year = int(m_parts[0])
+            m = int(m_parts[1])
+            first_day = date(year, m, 1)
+            if m == 12:
+                next_m_first = date(year + 1, 1, 1)
+            else:
+                next_m_first = date(year, m + 1, 1)
+            query = query.filter(Appointment.date >= first_day, Appointment.date < next_m_first)
+        except Exception:
+            pass
+
+    if doctor_id:
+        query = query.filter(Appointment.doctor_id == doctor_id)
+
+    if status and status != "all":
+        query = query.filter(Appointment.status == status)
+
+    appointments = query.all()
+    events = []
+    for a in appointments:
+        p_name = f"{a.patient.first_name} {a.patient.last_name}" if a.patient else "Paciente no registrado"
+        p_phone = a.patient.phone if a.patient else ""
+        p_ars = a.patient.insurance_name if a.patient else ""
+        p_ars_num = a.patient.insurance_number if a.patient else ""
+        doc_name = a.doctor.name if a.doctor else "Doctor Principal"
+        time_display = f"{a.start_time.strftime('%H:%M')} - " if a.start_time else ""
+        events.append({
+            "id": a.id,
+            "title": f"{time_display}{p_name}",
+            "start": f"{a.date}T{a.start_time}" if a.start_time else f"{a.date}",
+            "end": f"{a.date}T{a.end_time}" if a.end_time else None,
+            "date": str(a.date) if a.date else "",
+            "start_time": a.start_time.strftime("%H:%M") if a.start_time else "",
+            "end_time": a.end_time.strftime("%H:%M") if a.end_time else "",
+            "status": a.status,
+            "patient_id": a.patient_id,
+            "patient_name": p_name,
+            "patient_phone": p_phone,
+            "patient_insurance": p_ars,
+            "patient_insurance_num": p_ars_num,
+            "doctor_id": a.doctor_id,
+            "doctor_name": doc_name,
+            "reason": a.reason or "",
+            "notes": a.notes or "",
+            "queue_number": a.queue_number,
+            "service_name": a.service.name if a.service else "",
+            "price": float(a.price or 0.0),
+            "whatsapp_sent": bool(a.whatsapp_reminder_sent),
+        })
+
+    return JSONResponse(content={"events": events, "count": len(events)})
 
 @router.get("/create")
 def create_appointment_form(
@@ -516,3 +626,37 @@ def send_all_daily_reminders(
     })
 
 
+
+
+@router.get("/waiting-count")
+def get_waiting_count(
+    db: Session = Depends(get_db)
+):
+    """Retorna la cantidad y lista de pacientes actualmente en sala de espera hoy para notificaciones nativas."""
+    today = date.today()
+    waiting_appts = db.query(Appointment).filter(
+        Appointment.date == today,
+        Appointment.status == "En Espera"
+    ).order_by(Appointment.queue_number.asc()).all()
+
+    patients_list = []
+    for a in waiting_appts:
+        p_name = f"{a.patient.first_name} {a.patient.last_name}" if a.patient else "Paciente"
+        patients_list.append({
+            "appointment_id": a.id,
+            "patient_id": a.patient_id,
+            "patient_name": p_name,
+            "queue_number": a.queue_number or 0,
+            "reason": a.reason or "",
+            "start_time": a.start_time.strftime("%H:%M") if a.start_time else ""
+        })
+
+    return {
+        "count": len(patients_list),
+        "patients": patients_list
+    }
+
+
+@router.get("/new", include_in_schema=False)
+def new_appointment_alias():
+    return RedirectResponse(url="/appointments/create", status_code=307)

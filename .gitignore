@@ -78,3 +78,9 @@ data/.*
 # Scratch and test files
 scratch/
 scratch_*.py
+
+# Node.js & Electron
+node_modules/
+electron/node_modules/
+electron/data/
+

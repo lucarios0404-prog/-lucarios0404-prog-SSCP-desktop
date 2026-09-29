@@ -1038,9 +1038,24 @@ def generate_talonario_overlay_pdf(patient, prescription_text: str, setting=None
     PAGE_W = 21.7 * mm
     PAGE_H = 13.6 * mm   # <- se ajusta a cm; ReportLab trabaja en puntos (1cm = 28.35pt)
 
-    # Corregido a puntos reales:
-    PAGE_W_pt = 217 * mm   # 21.7 cm -> 217 mm -> en puntos
-    PAGE_H_pt = 136 * mm   # 13.6 cm -> 136 mm -> en puntos
+    # Leer configuración dinámica de talonario si existe en DB
+    cfg = {}
+    if setting and getattr(setting, "print_template_config", None):
+        try:
+            if isinstance(setting.print_template_config, str):
+                cfg = json.loads(setting.print_template_config)
+            elif isinstance(setting.print_template_config, dict):
+                cfg = setting.print_template_config
+        except Exception:
+            cfg = {}
+
+    fields = cfg.get("fields", {}) if cfg else {}
+
+    # Dimensiones: Por defecto Media Carta Vertical (136 mm ancho × 217 mm alto)
+    paper_w = float(cfg.get("paper_width_mm", 136.0) if cfg else 136.0)
+    paper_h = float(cfg.get("paper_height_mm", 217.0) if cfg else 217.0)
+    PAGE_W_pt = paper_w * mm
+    PAGE_H_pt = paper_h * mm
 
     buffer = io.BytesIO()
     c = rl_canvas.Canvas(buffer, pagesize=(PAGE_W_pt, PAGE_H_pt))
@@ -1061,58 +1076,76 @@ def generate_talonario_overlay_pdf(patient, prescription_text: str, setting=None
                 birth = datetime.strptime(birth, "%Y-%m-%d").date()
             td = today.date() if hasattr(today, "date") else today
             age = td.year - birth.year - ((td.month, td.day) < (birth.month, birth.day))
-            age_str = str(age)
+            age_str = f"{age} años"
         except Exception:
             age_str = ""
 
-    # ── Configuración de fuentes ───────────────────────────────────────────────
-    c.setFont("Helvetica", 9)
-    c.setFillColor(colors.HexColor("#1e293b"))
+    # ── Configuración de fuentes y color oscuro ────────────────────────────────
+    c.setFillColor(colors.HexColor("#0f172a"))
 
     # ── ZONA Rp. — Cuerpo de la prescripción ──────────────────────────────────
-    # El área en blanco del talonario va desde ~95mm hasta ~55mm del fondo
-    # (medida desde abajo: entre y=55mm y y=95mm del papel de 136mm de alto)
-    rx_x = 12 * mm        # margen izquierdo del área Rp.
-    rx_y_top = 95 * mm    # posición Y superior del área de prescripción
-    rx_line_h = 5 * mm    # interlineado entre líneas de texto
-    rx_max_w = PAGE_W_pt - (rx_x + 8 * mm)   # ancho máximo del texto
+    f_med = fields.get("medications", {})
+    rx_x = float(f_med.get("x", 16.0)) * mm
+    rx_y_top = PAGE_H_pt - (float(f_med.get("y", 72.0)) * mm)
+    rx_max_w = float(f_med.get("width", 108.0)) * mm
+    rx_font = float(f_med.get("fontSize", 9.5))
+    rx_line_h = (rx_font + 3.0) * (mm / 2.83)
 
-    c.setFont("Helvetica", 9)
+    c.setFont("Helvetica", rx_font)
     lines = (prescription_text or "").split("\n")
     y_cursor = rx_y_top
+    y_limit = PAGE_H_pt - (float(fields.get("patient_name", {}).get("y", 178.5)) * mm) + 5 * mm
+
     for line in lines:
-        if y_cursor < 57 * mm:   # no sobrepasar la línea PACIENTE
+        if y_cursor < y_limit:
             break
-        # Salto de línea automático si la línea es larga
         words = line.split(" ")
         current_line = ""
         for word in words:
             test = f"{current_line} {word}".strip()
-            if c.stringWidth(test, "Helvetica", 9) < rx_max_w:
+            if c.stringWidth(test, "Helvetica", rx_font) < rx_max_w:
                 current_line = test
             else:
                 if current_line:
                     c.drawString(rx_x, y_cursor, str(current_line or ""))
                     y_cursor -= rx_line_h
-                    if y_cursor < 57 * mm:
+                    if y_cursor < y_limit:
                         break
                 current_line = word
-        if current_line and y_cursor >= 57 * mm:
+        if current_line and y_cursor >= y_limit:
             c.drawString(rx_x, y_cursor, str(current_line or ""))
             y_cursor -= rx_line_h
 
     # ── LÍNEA PACIENTE ─────────────────────────────────────────────────────────
-    # En el talonario: "PACIENTE: _______________"
-    # La línea está a ~22mm del fondo del papel (y=22mm desde abajo)
-    c.setFont("Helvetica", 9)
-    c.drawString(28 * mm, 22 * mm, str(patient_name or ""))
+    f_p = fields.get("patient_name", {})
+    px = float(f_p.get("x", 28.0)) * mm
+    py = PAGE_H_pt - (float(f_p.get("y", 178.5)) * mm)
+    p_font = float(f_p.get("fontSize", 10.5))
+    p_only = f_p.get("onlyValue", True)
+    c.setFont("Helvetica-Bold", p_font)
+    c.drawString(px, py, str(patient_name if p_only else f"PACIENTE: {patient_name}"))
 
     # ── LÍNEA EDAD / CED. / FECHA ──────────────────────────────────────────────
-    # "EDAD: ___ CED.: ___________________ FECHA: ___________"
-    # La línea está a ~12mm del fondo
-    c.drawString(15 * mm, 12 * mm, str(age_str or ""))        # valor de EDAD
-    c.drawString(50 * mm, 12 * mm, str(doc_id or ""))          # valor de CED.
-    c.drawString(140 * mm, 12 * mm, str(fecha_str or ""))      # valor de FECHA
+    f_age = fields.get("age", {})
+    ax = float(f_age.get("x", 16.0)) * mm
+    ay = PAGE_H_pt - (float(f_age.get("y", 187.0)) * mm)
+    a_font = float(f_age.get("fontSize", 10.0))
+    c.setFont("Helvetica", a_font)
+    c.drawString(ax, ay, str(age_str or ""))
+
+    f_id = fields.get("id_card", {})
+    idx = float(f_id.get("x", 52.0)) * mm
+    idy = PAGE_H_pt - (float(f_id.get("y", 187.0)) * mm)
+    id_font = float(f_id.get("fontSize", 10.0))
+    c.setFont("Helvetica", id_font)
+    c.drawString(idx, idy, str(doc_id or ""))
+
+    f_date = fields.get("date", {})
+    dx = float(f_date.get("x", 102.0)) * mm
+    dy = PAGE_H_pt - (float(f_date.get("y", 187.0)) * mm)
+    d_font = float(f_date.get("fontSize", 10.0))
+    c.setFont("Helvetica", d_font)
+    c.drawString(dx, dy, str(fecha_str or ""))
 
     c.save()
     buffer.seek(0)

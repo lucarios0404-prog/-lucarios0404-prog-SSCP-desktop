@@ -368,3 +368,113 @@ async def restore_backup(
 
     return RedirectResponse(url="/settings?backup_restored=1", status_code=303)
 
+
+
+@router.get("/print-config")
+def get_print_config(
+    db: Session = Depends(get_db)
+):
+    setting = get_or_create_settings(db)
+    template_img_path = Path("static/prescription_template.png")
+    return {
+        "success": True,
+        "print_margin_top": float(setting.print_margin_top if setting.print_margin_top is not None else 15.0),
+        "print_margin_bottom": float(setting.print_margin_bottom if setting.print_margin_bottom is not None else 15.0),
+        "print_margin_left": float(setting.print_margin_left if setting.print_margin_left is not None else 20.0),
+        "print_margin_right": float(setting.print_margin_right if setting.print_margin_right is not None else 15.0),
+        "print_paper_size": setting.print_paper_size or "Letter",
+        "print_mode": getattr(setting, "print_mode", "preprinted") or "preprinted",
+        "print_template_config": getattr(setting, "print_template_config", None),
+        "has_template_image": template_img_path.exists(),
+        "clinic_name": setting.clinic_name or "Centro Médico",
+        "doctor_name": setting.doctor_name or "Dr. Especialista",
+        "specialty": setting.specialty or ""
+    }
+
+@router.post("/print-config")
+async def save_print_config(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    import json
+    setting = get_or_create_settings(db)
+    
+    data = {}
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+    else:
+        form = await request.form()
+        data = dict(form)
+        
+    if "print_margin_top" in data:
+        try:
+            setting.print_margin_top = float(data["print_margin_top"])
+        except (ValueError, TypeError):
+            pass
+
+    if "print_margin_bottom" in data:
+        try:
+            setting.print_margin_bottom = float(data["print_margin_bottom"])
+        except (ValueError, TypeError):
+            pass
+
+    if "print_margin_left" in data:
+        try:
+            setting.print_margin_left = float(data["print_margin_left"])
+        except (ValueError, TypeError):
+            pass
+
+    if "print_margin_right" in data:
+        try:
+            setting.print_margin_right = float(data["print_margin_right"])
+        except (ValueError, TypeError):
+            pass
+
+    if "print_paper_size" in data and data["print_paper_size"]:
+        setting.print_paper_size = str(data["print_paper_size"])
+
+    if "print_mode" in data and data["print_mode"]:
+        setting.print_mode = str(data["print_mode"])
+
+    if "print_template_config" in data:
+        cfg = data["print_template_config"]
+        if isinstance(cfg, (dict, list)):
+            setting.print_template_config = json.dumps(cfg, ensure_ascii=False)
+        elif isinstance(cfg, str):
+            setting.print_template_config = cfg
+
+    setting.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(setting)
+
+    return {
+        "success": True,
+        "message": "Configuración guardada correctamente.",
+        "config": {
+            "print_margin_top": setting.print_margin_top,
+            "print_margin_bottom": setting.print_margin_bottom,
+            "print_margin_left": setting.print_margin_left,
+            "print_margin_right": setting.print_margin_right,
+            "print_paper_size": setting.print_paper_size,
+            "print_mode": setting.print_mode,
+            "print_template_config": setting.print_template_config
+        }
+    }
+
+@router.post("/upload-template-image")
+async def upload_template_image(
+    file: UploadFile = File(...)
+):
+    try:
+        content = await file.read()
+        dest = Path("static/prescription_template.png")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with open(dest, "wb") as f:
+            f.write(content)
+        return {"success": True, "message": "Imagen de plantilla guardada correctamente."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

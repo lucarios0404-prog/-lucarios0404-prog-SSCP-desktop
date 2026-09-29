@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calibrador de Talonario y Márgenes - SSCP</title>
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-hover: #0369a1;
+      --primary-light: #e0f2fe;
+      --accent: #0f766e;
+      --accent-light: #ccfbf1;
+      --success: #10b981;
+      --amber: #f59e0b;
+      --slate-50: #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1;
+      --slate-400: #94a3b8;
+      --slate-500: #64748b;
+      --slate-600: #475569;
+      --slate-700: #334155;
+      --slate-800: #1e293b;
+      --slate-900: #0f172a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--slate-100);
+      color: var(--slate-800);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Header */
+    header {
+      background: #ffffff;
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--slate-200);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      z-index: 10;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-icon {
+      width: 38px;
+      height: 38px;
+      background: var(--accent-light);
+      color: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    h1 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--slate-900);
+    }
+
+    p.subtitle {
+      font-size: 12px;
+      color: var(--slate-500);
+    }
+
+    /* Tabs */
+    .tab-nav {
+      display: flex;
+      gap: 4px;
+      background: var(--slate-100);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--slate-200);
+    }
+
+    .tab-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate-600);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .tab-btn.active {
+      background: #ffffff;
+      color: var(--accent);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    /* Main Container */
+    .container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Left Control Panel */
+    .controls-panel {
+      width: 390px;
+      background: #ffffff;
+      border-right: 1px solid var(--slate-200);
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--slate-400);
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .field-chips {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .field-chip {
+      background: var(--slate-50);
+      border: 1.5px solid var(--slate-200);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate-700);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+
+    .field-chip:hover {
+      border-color: var(--accent);
+      background: var(--accent-light);
+      color: var(--accent);
+    }
+
+    .field-chip.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    .field-chip.active .chip-icon {
+      color: #ffffff;
+    }
+
+    .chip-icon {
+      font-size: 14px;
+      color: var(--slate-500);
+    }
+
+    /* Sliders & Inputs */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate-700);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    label span.val-badge {
+      background: var(--slate-100);
+      color: var(--accent);
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--slate-200);
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      height: 5px;
+      border-radius: 4px;
+      background: var(--slate-200);
+      outline: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #ffffff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    input[type="number"] {
+      width: 62px;
+      padding: 4px 6px;
+      border: 1px solid var(--slate-200);
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate-800);
+      text-align: right;
+    }
+
+    input[type="number"]:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-light);
+    }
+
+    /* Micro Steppers */
+    .micro-steppers {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      margin-top: 2px;
+    }
+
+    .step-btn {
+      background: var(--slate-100);
+      border: 1px solid var(--slate-200);
+      border-radius: 6px;
+      padding: 5px 2px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--slate-700);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.1s;
+    }
+
+    .step-btn:hover {
+      background: var(--slate-200);
+      color: var(--slate-900);
+    }
+
+    .step-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Toggle Switches */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate-700);
+      background: var(--slate-50);
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--slate-200);
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: var(--slate-300);
+      transition: .2s;
+      border-radius: 20px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(16px);
+    }
+
+    /* Actions Panel */
+    .actions {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid var(--slate-200);
+    }
+
+    .btn {
+      padding: 9px 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      box-shadow: 0 2px 4px rgba(15, 118, 110, 0.25);
+    }
+
+    .btn-primary:hover {
+      background: #0d9488;
+    }
+
+    .btn-secondary {
+      background: var(--slate-100);
+      color: var(--slate-700);
+      border: 1px solid var(--slate-200);
+    }
+
+    .btn-secondary:hover {
+      background: var(--slate-200);
+      color: var(--slate-900);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--accent);
+      border: 1.5px solid var(--accent);
+    }
+
+    .btn-outline:hover {
+      background: var(--accent-light);
+    }
+
+    /* Right Preview Stage */
+    .preview-stage {
+      flex: 1;
+      background: #334155;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      padding: 16px;
+    }
+
+    .preview-toolbar {
+      position: absolute;
+      top: 12px;
+      background: rgba(15, 23, 42, 0.85);
+      color: #ffffff;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 11.5px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      z-index: 5;
+    }
+
+    .preview-toolbar button {
+      background: rgba(255,255,255,0.15);
+      border: none;
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .preview-toolbar button:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    /* Sheet Container */
+    .sheet-wrapper {
+      position: relative;
+      background: #ffffff;
+      box-shadow: 0 20px 45px rgba(0,0,0,0.45);
+      border-radius: 2px;
+      overflow: hidden;
+      transition: width 0.2s, height 0.2s;
+    }
+
+    /* Background image of the doctor's stationary */
+    .sheet-background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-size: 100% 100%;
+      background-position: center;
+      background-repeat: no-repeat;
+      pointer-events: none;
+      z-index: 1;
+      transition: opacity 0.2s;
+    }
+
+    /* Draggable Item Box */
+    .draggable-item {
+      position: absolute;
+      z-index: 2;
+      cursor: move;
+      border: 1.5px dashed rgba(2, 132, 199, 0.4);
+      background: rgba(2, 132, 199, 0.08);
+      border-radius: 4px;
+      padding: 2px 4px;
+      box-sizing: border-box;
+      line-height: 1.25;
+      color: #0f172a;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .draggable-item:hover {
+      background: rgba(2, 132, 199, 0.15);
+      border-color: var(--primary);
+    }
+
+    .draggable-item.active {
+      border: 2px solid #0284c7 !important;
+      background: rgba(14, 165, 233, 0.18) !important;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.25);
+      z-index: 3;
+    }
+
+    .draggable-item .item-badge {
+      position: absolute;
+      top: -14px;
+      left: 0;
+      background: #0284c7;
+      color: #ffffff;
+      font-size: 8.5px;
+      font-weight: 700;
+      padding: 0 4px;
+      border-radius: 3px;
+      white-space: nowrap;
+      pointer-events: none;
+      display: none;
+    }
+
+    .draggable-item.active .item-badge {
+      display: block;
+    }
+
+    /* Blank margins visual overlay (used in Tab 2) */
+    .margin-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 1;
+      display: none;
+    }
+
+    /* Toast Notification */
+    #status-toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      z-index: 1000;
+    }
+
+    #status-toast.success {
+      background: #059669;
+    }
+
+    /* Keyboard Shortcuts Legend */
+    .shortcuts-legend {
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 11px;
+      color: var(--slate-600);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    kbd {
+      background: var(--slate-200);
+      color: var(--slate-800);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-family: monospace;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-title">
+      <div class="header-icon">📐</div>
+      <div>
+        <h1>Calibrador de Talonario y Márgenes de Impresión</h1>
+        <p class="subtitle">Alineación exacta de etiquetas sobre el papel físico del consultorio</p>
+      </div>
+    </div>
+
+    <!-- Pestañas de Modo -->
+    <div class="tab-nav">
+      <button class="tab-btn active" id="tab-talonario" onclick="switchMode('talonario')">
+        <span>📋</span> Talonario Preimpreso (Drag & Drop)
+      </button>
+      <button class="tab-btn" id="tab-standard" onclick="switchMode('standard')">
+        <span>📄</span> Hoja en Blanco (Márgenes Estándar)
+      </button>
+    </div>
+
+    <div>
+      <button class="btn btn-secondary" onclick="window.close()" style="padding: 5px 12px; font-size: 12px;">Cerrar</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- PANEL IZQUIERDO: CONTROLES -->
+    <div class="controls-panel">
+
+      <!-- MODO TALONARIO: CONTROLES DRAG & DROP -->
+      <div id="controls-talonario" style="display: flex; flex-direction: column; gap: 14px;">
+        
+        <!-- Selección de Campo Activo -->
+        <div>
+          <div class="section-title">
+            <span>1. Seleccionar Campo a Calibrar</span>
+            <span style="font-size: 9px; color: var(--accent); font-weight: 700;">Haz clic en el papel</span>
+          </div>
+          <div class="field-chips">
+            <div class="field-chip active" id="chip-patient_name" onclick="selectField('patient_name')">
+              <span class="chip-icon">👤</span> Paciente
+            </div>
+            <div class="field-chip" id="chip-age" onclick="selectField('age')">
+              <span class="chip-icon">🎂</span> Edad
+            </div>
+            <div class="field-chip" id="chip-id_card" onclick="selectField('id_card')">
+              <span class="chip-icon">🪪</span> Cédula / DNI
+            </div>
+            <div class="field-chip" id="chip-date" onclick="selectField('date')">
+              <span class="chip-icon">📅</span> Fecha
+            </div>
+            <div class="field-chip" id="chip-medications" onclick="selectField('medications')" style="grid-column: span 2;">
+              <span class="chip-icon">💊</span> Cuerpo de la Receta (Medicamentos Rp)
+            </div>
+          </div>
+        </div>
+
+        <!-- Ajuste Milimétrico del Campo Seleccionado -->
+        <div style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+          <div class="section-title" id="active-field-name">
+            Ajuste: Nombre del Paciente
+          </div>
+
+          <!-- Posición X -->
+          <div class="form-group">
+            <label>
+              Posición X (Horizontal desde la izquierda)
+              <span class="val-badge" id="val-pos-x">26.0 mm</span>
+            </label>
+            <div class="slider-row">
+              <input type="range" id="range-pos-x" min="0" max="136" step="0.5" value="26" oninput="updateActiveField('x', this.value)">
+              <input type="number" id="num-pos-x" min="0" max="136" step="0.5" value="26" oninput="updateActiveField('x', this.value)">
+            </div>
+          </div>
+
+          <!-- Posición Y -->
+          <div class="form-group">
+            <label>
+              Posición Y (Vertical desde arriba)
+              <span class="val-badge" id="val-pos-y">178.0 mm</span>
+            </label>
+            <div class="slider-row">
+              <input type="range" id="range-pos-y" min="0" max="217" step="0.5" value="178" oninput="updateActiveField('y', this.value)">
+              <input type="number" id="num-pos-y" min="0" max="217" step="0.5" value="178" oninput="updateActiveField('y', this.value)">
+            </div>
+          </div>
+
+          <!-- Micro-Ajuste con Botones Rápidos -->
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: var(--slate-500); margin-bottom: 4px;">Micro-Ajuste Rápido:</div>
+            <div class="micro-steppers">
+              <button class="step-btn" onclick="stepActiveField('x', -1)">← 1mm</button>
+              <button class="step-btn" onclick="stepActiveField('x', 1)">→ 1mm</button>
+              <button class="step-btn" onclick="stepActiveField('y', -1)">↑ 1mm</button>
+              <button class="step-btn" onclick="stepActiveField('y', 1)">↓ 1mm</button>
+            </div>
+          </div>
+
+          <!-- Ancho y Tamaño de Fuente -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div class="form-group">
+              <label style="font-size: 11px;">Ancho (mm)</label>
+              <input type="number" id="num-width" min="10" max="136" step="1" value="95" oninput="updateActiveField('width', this.value)">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 11px;">Letra (pt)</label>
+              <input type="number" id="num-fontSize" min="7" max="18" step="0.5" value="11" oninput="updateActiveField('fontSize', this.value)">
+            </div>
+          </div>
+
+          <!-- Toggle Solo Valor vs Etiqueta + Valor -->
+          <div class="toggle-row" style="margin-top: 4px;">
+            <span>¿Imprimir solo el dato sin la palabra?</span>
+            <label class="switch">
+              <input type="checkbox" id="chk-only-val" checked onchange="updateActiveField('onlyValue', this.checked)">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <small style="font-size: 10px; color: var(--slate-500); line-height: 1.2;">
+            (Recomendado: Activado para talonarios que ya tienen "PACIENTE: ____" impreso).
+          </small>
+        </div>
+
+        <!-- Ajuste de Fondo de la Plantilla -->
+        <div class="form-group">
+          <div class="section-title">
+            <span>2. Plantilla Visual de Fondo</span>
+          </div>
+          <div class="slider-row">
+            <span style="font-size: 11px; color: var(--slate-600); width: 60px;">Opacidad:</span>
+            <input type="range" id="range-opacity" min="0" max="100" value="85" oninput="updateBgOpacity(this.value)">
+            <span id="val-opacity" style="font-size: 11px; font-weight: 700; width: 35px;">85%</span>
+          </div>
+          <div style="display: flex; gap: 6px; margin-top: 4px;">
+            <input type="file" id="file-bg-input" accept="image/*" style="display: none;" onchange="handleCustomBgUpload(event)">
+            <button class="btn btn-secondary" style="flex: 1; font-size: 11px; padding: 6px;" onclick="document.getElementById('file-bg-input').click()">
+              📷 Cargar otra foto de talonario
+            </button>
+            <button class="btn btn-secondary" style="font-size: 11px; padding: 6px;" onclick="resetDoctorHerediaTemplate()">
+              ↺ Restablecer Dr. Heredia
+            </button>
+          </div>
+        </div>
+
+        <!-- Atajos de Teclado -->
+        <div class="shortcuts-legend">
+          <div>💡 <strong>Atajos de Calibración:</strong></div>
+          <div>• Clic y arrastra con el ratón directamente en el papel.</div>
+          <div>• Usa <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> para mover 0.5 mm.</div>
+          <div>• Usa <kbd>Shift</kbd> + <kbd>Flechas</kbd> para mover 2.0 mm.</div>
+        </div>
+
+      </div>
+
+      <!-- MODO ESTÁNDAR: MÁRGENES DE HOJA EN BLANCO -->
+      <div id="controls-standard" style="display: none; flex-direction: column; gap: 14px;">
+        <div class="section-title">Márgenes para Hoja en Blanco</div>
+        <p style="font-size: 11.5px; color: var(--slate-600);">
+          Úsalo cuando no tengas papel de imprenta y desees que el software imprima el membrete clínico completo.
+        </p>
+
+        <!-- Margen Sup -->
+        <div class="form-group">
+          <label>Margen Superior <span class="val-badge" id="std-val-top">15 mm</span></label>
+          <div class="slider-row">
+            <input type="range" id="std-range-top" min="0" max="60" value="15" oninput="updateStdMargin('top', this.value)">
+            <input type="number" id="std-num-top" min="0" max="60" value="15" oninput="updateStdMargin('top', this.value)">
+          </div>
+        </div>
+
+        <!-- Margen Inf -->
+        <div class="form-group">
+          <label>Margen Inferior <span class="val-badge" id="std-val-bottom">15 mm</span></label>
+          <div class="slider-row">
+            <input type="range" id="std-range-bottom" min="0" max="60" value="15" oninput="updateStdMargin('bottom', this.value)">
+            <input type="number" id="std-num-bottom" min="0" max="60" value="15" oninput="updateStdMargin('bottom', this.value)">
+          </div>
+        </div>
+
+        <!-- Margen Izq -->
+        <div class="form-group">
+          <label>Margen Izquierdo <span class="val-badge" id="std-val-left">20 mm</span></label>
+          <div class="slider-row">
+            <input type="range" id="std-range-left" min="0" max="60" value="20" oninput="updateStdMargin('left', this.value)">
+            <input type="number" id="std-num-left" min="0" max="60" value="20" oninput="updateStdMargin('left', this.value)">
+          </div>
+        </div>
+
+        <!-- Margen Der -->
+        <div class="form-group">
+          <label>Margen Derecho <span class="val-badge" id="std-val-right">15 mm</span></label>
+          <div class="slider-row">
+            <input type="range" id="std-range-right" min="0" max="60" value="15" oninput="updateStdMargin('right', this.value)">
+            <input type="number" id="std-num-right" min="0" max="60" value="15" oninput="updateStdMargin('right', this.value)">
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTONES DE ACCIÓN FIJOS AL PIE -->
+      <div class="actions">
+        <button class="btn btn-primary" onclick="saveConfiguration()">
+          <span>💾</span> Guardar Calibración
+        </button>
+        <button class="btn btn-outline" onclick="printTalonarioTest(false)">
+          <span>🖨️</span> Imprimir Prueba en Talonario Físico
+        </button>
+        <button class="btn btn-secondary" onclick="printTalonarioTest(true)">
+          <span>📄</span> Imprimir Prueba con Fondo (Papel Blanco)
+        </button>
+      </div>
+
+    </div>
+
+    <!-- PANEL DERECHO: EL ESCENARIO VISUAL CON DRAG & DROP -->
+    <div class="preview-stage" id="preview-stage">
+
+      <div class="preview-toolbar">
+        <span id="sheet-info-tag">TALONARIO DR. CARLOS HEREDIA (13.6 × 21.7 cm)</span>
+        <button onclick="toggleBackground()">👁️ Alternar Fondo</button>
+        <button onclick="resetFieldPositions()">↺ Resetear Posiciones</button>
+      </div>
+
+      <!-- Hoja Física Visual del Talonario -->
+      <div class="sheet-wrapper" id="sheet-wrapper">
+        <!-- Imagen de Fondo de la Plantilla -->
+        <div class="sheet-background" id="sheet-bg"></div>
+
+        <!-- ELEMENTOS ARRASTRABLES (DRAGGABLE LABELS) -->
+
+        <!-- 1. PACIENTE -->
+        <div class="draggable-item active" id="item-patient_name" onmousedown="startDrag(event, 'patient_name')">
+          <div class="item-badge" id="badge-patient_name">PACIENTE</div>
+          <span class="item-text" id="text-patient_name">Juan Carlos Pérez Mora</span>
+        </div>
+
+        <!-- 2. EDAD -->
+        <div class="draggable-item" id="item-age" onmousedown="startDrag(event, 'age')">
+          <div class="item-badge" id="badge-age">EDAD</div>
+          <span class="item-text" id="text-age">42 años</span>
+        </div>
+
+        <!-- 3. CÉDULA / DNI -->
+        <div class="draggable-item" id="item-id_card" onmousedown="startDrag(event, 'id_card')">
+          <div class="item-badge" id="badge-id_card">CED.</div>
+          <span class="item-text" id="text-id_card">001-0987654-3</span>
+        </div>
+
+        <!-- 4. FECHA -->
+        <div class="draggable-item" id="item-date" onmousedown="startDrag(event, 'date')">
+          <div class="item-badge" id="badge-date">FECHA</div>
+          <span class="item-text" id="text-date">29/09/2026</span>
+        </div>
+
+        <!-- 5. MEDICAMENTOS (CUERPO Rp) -->
+        <div class="draggable-item" id="item-medications" onmousedown="startDrag(event, 'medications')">
+          <div class="item-badge" id="badge-medications">MEDICAMENTOS (Rp)</div>
+          <div class="item-text" id="text-medications" style="white-space: pre-line;">
+1. AMOXICILINA + ÁC. CLAVULÁNICO 875/125 MG
+   Tomar 1 comp. por vía oral c/12h con las comidas por 7 días.
+
+2. IBUPROFENO 600 MG
+   Tomar 1 tableta c/8h en caso de dolor o fiebre.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div id="status-toast"></div>
+
+  <script>
+    // Dimensiones estándar del talonario vertical (136 mm de ancho × 217 mm de alto)
+    const PAPER_W_MM = 136.0;
+    const PAPER_H_MM = 217.0;
+
+    // Escala del preview en pixeles de alto
+    const PREVIEW_HEIGHT_PX = 560;
+    const MM_TO_PX = PREVIEW_HEIGHT_PX / PAPER_H_MM;
+    const PREVIEW_WIDTH_PX = PAPER_W_MM * MM_TO_PX;
+
+    // Estado general
+    let currentMode = 'talonario'; // 'talonario' | 'standard'
+    let activeFieldId = 'patient_name';
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let itemStartPosX = 0;
+    let itemStartPosY = 0;
+    let bgVisible = true;
+
+    // Coordenadas calibradas del Dr. Carlos M. Heredia (medidas desde la esquina superior-izquierda en mm)
+    // El talonario físico tiene el membrete en los primeros ~60mm, el Rp en el medio, y las líneas al fondo (~178mm)
+    const DEFAULT_CONFIG = {
+      print_mode: 'preprinted',
+      paper_width_mm: 136.0,
+      paper_height_mm: 217.0,
+      paper_size: 'HalfLetter',
+      bg_opacity: 0.85,
+      bg_image: '../assets/prescription_template.png',
+      fields: {
+        patient_name: {
+          x: 28.0,
+          y: 178.5,
+          width: 98.0,
+          fontSize: 10.5,
+          onlyValue: true,
+          label: 'PACIENTE:',
+          sampleValue: 'Juan Carlos Pérez Mora'
+        },
+        age: {
+          x: 16.0,
+          y: 187.0,
+          width: 25.0,
+          fontSize: 10.0,
+          onlyValue: true,
+          label: 'EDAD:',
+          sampleValue: '42 años'
+        },
+        id_card: {
+          x: 52.0,
+          y: 187.0,
+          width: 48.0,
+          fontSize: 10.0,
+          onlyValue: true,
+          label: 'CED.:',
+          sampleValue: '001-0987654-3'
+        },
+        date: {
+          x: 102.0,
+          y: 187.0,
+          width: 30.0,
+          fontSize: 10.0,
+          onlyValue: true,
+          label: 'FECHA:',
+          sampleValue: '29/09/2026'
+        },
+        medications: {
+          x: 16.0,
+          y: 72.0,
+          width: 108.0,
+          fontSize: 9.5,
+          onlyValue: true,
+          label: 'Rp.',
+          sampleValue: '1. AMOXICILINA + ÁC. CLAVULÁNICO 875/125 MG\n   Tomar 1 comp. por vía oral c/12h con las comidas por 7 días.\n\n2. IBUPROFENO 600 MG\n   Tomar 1 tableta c/8h en caso de dolor o fiebre.'
+        }
+      },
+      standard_margins: {
+        top: 15.0,
+        bottom: 15.0,
+        left: 20.0,
+        right: 15.0,
+        paperSize: 'Letter'
+      }
+    };
+
+    let templateConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+
+    function init() {
+      // Configurar tamaño del contenedor del papel
+      const wrapper = document.getElementById('sheet-wrapper');
+      wrapper.style.width = `${PREVIEW_WIDTH_PX}px`;
+      wrapper.style.height = `${PREVIEW_HEIGHT_PX}px`;
+
+      // Fondo del doctor
+      const bg = document.getElementById('sheet-bg');
+      bg.style.backgroundImage = `url('${templateConfig.bg_image}')`;
+      bg.style.opacity = templateConfig.bg_opacity;
+
+      // Cargar configuración guardada de la BD
+      loadSavedConfig();
+
+      // Atajos de teclado
+      window.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('mousemove', onDragMove);
+      window.addEventListener('mouseup', endDrag);
+    }
+
+    async function loadSavedConfig() {
+      try {
+        if (window.electronAPI && window.electronAPI.getPrintConfig) {
+          const res = await window.electronAPI.getPrintConfig();
+          if (res) {
+            if (res.print_mode) currentMode = res.print_mode;
+
+            if (res.print_template_config) {
+              try {
+                const parsed = typeof res.print_template_config === 'string'
+                  ? JSON.parse(res.print_template_config)
+                  : res.print_template_config;
+                if (parsed && parsed.fields) {
+                  templateConfig = { ...templateConfig, ...parsed };
+                }
+              } catch (e) {
+                console.warn('Error parseando print_template_config:', e);
+              }
+            }
+
+            if (res.print_margin_top !== undefined) {
+              templateConfig.standard_margins = {
+                top: res.print_margin_top,
+                bottom: res.print_margin_bottom,
+                left: res.print_margin_left,
+                right: res.print_margin_right,
+                paperSize: res.print_paper_size || 'Letter'
+              };
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Usando configuración local:', err);
+      }
+
+      applyConfigToUI();
+      switchMode(currentMode);
+    }
+
+    function applyConfigToUI() {
+      // Actualizar cada campo en el visor
+      for (const fieldId in templateConfig.fields) {
+        renderFieldElement(fieldId);
+      }
+
+      // Actualizar formulario del campo activo
+      updateControlsFromField(activeFieldId);
+
+      // Actualizar controles estándar
+      const std = templateConfig.standard_margins;
+      document.getElementById('std-val-top').textContent = `${std.top} mm`;
+      document.getElementById('std-range-top').value = std.top;
+      document.getElementById('std-num-top').value = std.top;
+
+      document.getElementById('std-val-bottom').textContent = `${std.bottom} mm`;
+      document.getElementById('std-range-bottom').value = std.bottom;
+      document.getElementById('std-num-bottom').value = std.bottom;
+
+      document.getElementById('std-val-left').textContent = `${std.left} mm`;
+      document.getElementById('std-range-left').value = std.left;
+      document.getElementById('std-num-left').value = std.left;
+
+      document.getElementById('std-val-right').textContent = `${std.right} mm`;
+      document.getElementById('std-range-right').value = std.right;
+      document.getElementById('std-num-right').value = std.right;
+    }
+
+    function renderFieldElement(fieldId) {
+      const field = templateConfig.fields[fieldId];
+      if (!field) return;
+
+      const el = document.getElementById(`item-${fieldId}`);
+      if (!el) return;
+
+      const xPx = field.x * MM_TO_PX;
+      const yPx = field.y * MM_TO_PX;
+      const widthPx = field.width * MM_TO_PX;
+
+      el.style.left = `${xPx}px`;
+      el.style.top = `${yPx}px`;
+      el.style.width = `${widthPx}px`;
+      el.style.fontSize = `${field.fontSize * (MM_TO_PX / 2.83)}px`;
+
+      const textEl = document.getElementById(`text-${fieldId}`);
+      if (textEl) {
+        if (field.onlyValue) {
+          textEl.textContent = field.sampleValue;
+        } else {
+          textEl.textContent = `${field.label} ${field.sampleValue}`;
+        }
+      }
+    }
+
+    function selectField(fieldId) {
+      activeFieldId = fieldId;
+
+      document.querySelectorAll('.field-chip').forEach(c => c.classList.remove('active'));
+      const activeChip = document.getElementById(`chip-${fieldId}`);
+      if (activeChip) activeChip.classList.add('active');
+
+      document.querySelectorAll('.draggable-item').forEach(item => item.classList.remove('active'));
+      const activeItem = document.getElementById(`item-${fieldId}`);
+      if (activeItem) activeItem.classList.add('active');
+
+      updateControlsFromField(fieldId);
+    }
+
+    function updateControlsFromField(fieldId) {
+      const field = templateConfig.fields[fieldId];
+      if (!field) return;
+
+      const titles = {
+        patient_name: 'Ajuste: Nombre del Paciente',
+        age: 'Ajuste: Edad',
+        id_card: 'Ajuste: Cédula / DNI',
+        date: 'Ajuste: Fecha',
+        medications: 'Ajuste: Cuerpo de la Receta (Rp)'
+      };
+      document.getElementById('active-field-name').textContent = titles[fieldId] || fieldId;
+
+      document.getElementById('val-pos-x').textContent = `${field.x.toFixed(1)} mm`;
+      document.getElementById('range-pos-x').value = field.x;
+      document.getElementById('num-pos-x').value = field.x;
+
+      document.getElementById('val-pos-y').textContent = `${field.y.toFixed(1)} mm`;
+      document.getElementById('range-pos-y').value = field.y;
+      document.getElementById('num-pos-y').value = field.y;
+
+      document.getElementById('num-width').value = field.width;
+      document.getElementById('num-fontSize').value = field.fontSize;
+      document.getElementById('chk-only-val').checked = !!field.onlyValue;
+    }
+
+    function updateActiveField(prop, value) {
+      const field = templateConfig.fields[activeFieldId];
+      if (!field) return;
+
+      if (prop === 'onlyValue') {
+        field[prop] = Boolean(value);
+      } else {
+        field[prop] = parseFloat(value) || 0;
+      }
+
+      renderFieldElement(activeFieldId);
+      updateControlsFromField(activeFieldId);
+    }
+
+    function stepActiveField(axis, deltaMm) {
+      const field = templateConfig.fields[activeFieldId];
+      if (!field) return;
+
+      field[axis] = Math.max(0, Math.round((field[axis] + deltaMm) * 10) / 10);
+      renderFieldElement(activeFieldId);
+      updateControlsFromField(activeFieldId);
+    }
+
+    // Drag & Drop
+    function startDrag(e, fieldId) {
+      selectField(fieldId);
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+
+      const field = templateConfig.fields[fieldId];
+      itemStartPosX = field.x;
+      itemStartPosY = field.y;
+
+      e.preventDefault();
+    }
+
+    function onDragMove(e) {
+      if (!isDragging) return;
+
+      const deltaXPx = e.clientX - dragStartX;
+      const deltaYPx = e.clientY - dragStartY;
+
+      const deltaXMm = deltaXPx / MM_TO_PX;
+      const deltaYMm = deltaYPx / MM_TO_PX;
+
+      const field = templateConfig.fields[activeFieldId];
+      if (!field) return;
+
+      // Calcular nueva posición con precisión de 0.5 mm
+      const newX = Math.max(0, Math.min(PAPER_W_MM - 10, Math.round((itemStartPosX + deltaXMm) * 2) / 2));
+      const newY = Math.max(0, Math.min(PAPER_H_MM - 5, Math.round((itemStartPosY + deltaYMm) * 2) / 2));
+
+      field.x = newX;
+      field.y = newY;
+
+      renderFieldElement(activeFieldId);
+      updateControlsFromField(activeFieldId);
+    }
+
+    function endDrag() {
+      isDragging = false;
+    }
+
+    function handleKeyDown(e) {
+      if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+
+      const delta = e.shiftKey ? 2.0 : 0.5;
+      if (e.key === 'ArrowLeft') {
+        stepActiveField('x', -delta);
+        e.preventDefault();
+      } else if (e.key === 'ArrowRight') {
+        stepActiveField('x', delta);
+        e.preventDefault();
+      } else if (e.key === 'ArrowUp') {
+        stepActiveField('y', -delta);
+        e.preventDefault();
+      } else if (e.key === 'ArrowDown') {
+        stepActiveField('y', delta);
+        e.preventDefault();
+      }
+    }
+
+    // Fondo y plantillas
+    function updateBgOpacity(val) {
+      const opacity = val / 100;
+      templateConfig.bg_opacity = opacity;
+      document.getElementById('sheet-bg').style.opacity = opacity;
+      document.getElementById('val-opacity').textContent = `${val}%`;
+    }
+
+    function toggleBackground() {
+      bgVisible = !bgVisible;
+      const bg = document.getElementById('sheet-bg');
+      bg.style.display = bgVisible ? 'block' : 'none';
+      showToast(bgVisible ? 'Fondo del talonario visible' : 'Fondo oculto (solo tintas de impresión)');
+    }
+
+    function resetDoctorHerediaTemplate() {
+      templateConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+      applyConfigToUI();
+      selectField('patient_name');
+      showToast('Calibración del Dr. Carlos M. Heredia restablecida');
+    }
+
+    function resetFieldPositions() {
+      resetDoctorHerediaTemplate();
+    }
+
+    function handleCustomBgUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const dataUrl = e.target.result;
+        templateConfig.bg_image = dataUrl;
+        document.getElementById('sheet-bg').style.backgroundImage = `url('${dataUrl}')`;
+        showToast('Nueva foto de talonario cargada');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Pestañas
+    function switchMode(mode) {
+      currentMode = mode;
+      templateConfig.print_mode = mode;
+
+      document.getElementById('tab-talonario').classList.toggle('active', mode === 'talonario');
+      document.getElementById('tab-standard').classList.toggle('active', mode === 'standard');
+
+      document.getElementById('controls-talonario').style.display = mode === 'talonario' ? 'flex' : 'none';
+      document.getElementById('controls-standard').style.display = mode === 'standard' ? 'flex' : 'none';
+
+      document.getElementById('sheet-bg').style.display = mode === 'talonario' && bgVisible ? 'block' : 'none';
+      document.querySelectorAll('.draggable-item').forEach(item => {
+        item.style.display = mode === 'talonario' ? 'block' : 'none';
+      });
+
+      const tag = document.getElementById('sheet-info-tag');
+      if (mode === 'talonario') {
+        tag.textContent = 'TALONARIO DR. CARLOS HEREDIA (13.6 × 21.7 cm)';
+      } else {
+        tag.textContent = 'HOJA EN BLANCO ESTÁNDAR (CARTA)';
+      }
+    }
+
+    // Márgenes Estándar
+    function updateStdMargin(side, value) {
+      const val = parseFloat(value) || 0;
+      templateConfig.standard_margins[side] = val;
+      document.getElementById(`std-val-${side}`).textContent = `${val} mm`;
+      document.getElementById(`std-range-${side}`).value = val;
+      document.getElementById(`std-num-${side}`).value = val;
+    }
+
+    // Guardar Configuración
+    async function saveConfiguration() {
+      const payload = {
+        print_mode: currentMode,
+        print_margin_top: templateConfig.standard_margins.top,
+        print_margin_bottom: templateConfig.standard_margins.bottom,
+        print_margin_left: templateConfig.standard_margins.left,
+        print_margin_right: templateConfig.standard_margins.right,
+        print_paper_size: currentMode === 'talonario' ? 'HalfLetter' : templateConfig.standard_margins.paperSize,
+        print_template_config: templateConfig
+      };
+
+      try {
+        if (window.electronAPI && window.electronAPI.savePrintConfig) {
+          await window.electronAPI.savePrintConfig(payload);
+          showToast('✅ Calibración de talonario guardada en SSCP con éxito', true);
+        } else {
+          showToast('✅ Configuración aplicada localmente', true);
+        }
+      } catch (err) {
+        showToast('❌ Error al guardar: ' + err.message);
+      }
+    }
+
+    // Imprimir Prueba
+    function printTalonarioTest(includeBackground) {
+      showToast('🖨️ Preparando impresión de prueba...', true);
+
+      // Crear ventana de impresión limpia
+      const printWindow = window.open('', '_blank', 'width=600,height=800');
+      if (!printWindow) {
+        alert('Por favor permite ventanas emergentes para la prueba de impresión.');
+        return;
+      }
+
+      const f = templateConfig.fields;
+      const bgStyle = includeBackground && templateConfig.bg_image
+        ? `background-image: url('${templateConfig.bg_image}'); background-size: 100% 100%;`
+        : '';
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Prueba de Calibración de Talonario</title>
+          <style>
+            @page {
+              size: 136mm 217mm;
+              margin: 0;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              width: 136mm;
+              height: 217mm;
+              position: relative;
+              font-family: Arial, sans-serif;
+              color: #000000;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+              ${bgStyle}
+            }
+            .field {
+              position: absolute;
+              box-sizing: border-box;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="field" style="left: ${f.patient_name.x}mm; top: ${f.patient_name.y}mm; width: ${f.patient_name.width}mm; font-size: ${f.patient_name.fontSize}pt; font-weight: bold;">
+            ${f.patient_name.onlyValue ? f.patient_name.sampleValue : f.patient_name.label + ' ' + f.patient_name.sampleValue}
+          </div>
+
+          <div class="field" style="left: ${f.age.x}mm; top: ${f.age.y}mm; width: ${f.age.width}mm; font-size: ${f.age.fontSize}pt;">
+            ${f.age.onlyValue ? f.age.sampleValue : f.age.label + ' ' + f.age.sampleValue}
+          </div>
+
+          <div class="field" style="left: ${f.id_card.x}mm; top: ${f.id_card.y}mm; width: ${f.id_card.width}mm; font-size: ${f.id_card.fontSize}pt;">
+            ${f.id_card.onlyValue ? f.id_card.sampleValue : f.id_card.label + ' ' + f.id_card.sampleValue}
+          </div>
+
+          <div class="field" style="left: ${f.date.x}mm; top: ${f.date.y}mm; width: ${f.date.width}mm; font-size: ${f.date.fontSize}pt;">
+            ${f.date.onlyValue ? f.date.sampleValue : f.date.label + ' ' + f.date.sampleValue}
+          </div>
+
+          <div class="field" style="left: ${f.medications.x}mm; top: ${f.medications.y}mm; width: ${f.medications.width}mm; font-size: ${f.medications.fontSize}pt; white-space: pre-line; line-height: 1.35;">
+            ${f.medications.sampleValue}
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 1000);
+            };
+          <\/script>
+        </body>
+        </html>
+      `;
+
+      printWindow.document.open();
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+    }
+
+    function showToast(msg, isSuccess = false) {
+      const toast = document.getElementById('status-toast');
+      toast.textContent = msg;
+      toast.className = isSuccess ? 'success' : '';
+      toast.style.display = 'flex';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3500);
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

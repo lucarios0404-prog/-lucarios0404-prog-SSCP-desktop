@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -40,5 +40,16 @@ class Setting(Base):
     )
     whatsapp_gateway_status = Column(String, default="disconnected")  # disconnected, connecting, connected
     whatsapp_connected_phone = Column(String, nullable=True)          # Número vinculado al gateway
+
+    # Configuración de Impresión Personalizada por Estación / Médico (v1.2.0)
+    print_margin_top = Column(Float, default=15.0)       # en milímetros
+    print_margin_bottom = Column(Float, default=15.0)    # en milímetros
+    print_margin_left = Column(Float, default=20.0)      # en milímetros
+    print_margin_right = Column(Float, default=15.0)     # en milímetros
+    print_paper_size = Column(String, default="Letter")  # Letter, A4, Legal, HalfLetter
+    
+    # Modo de Impresión y Calibración de Talonario Preimpreso (Drag & Drop)
+    print_mode = Column(String, default="preprinted")    # preprinted (talonario de imprenta), standard (hoja en blanco)
+    print_template_config = Column(Text, nullable=True)  # JSON con coordenadas X, Y, W, H, fontSize de cada campo
 
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

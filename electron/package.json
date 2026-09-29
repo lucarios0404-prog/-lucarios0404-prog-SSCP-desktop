@@ -1,0 +1,17 @@
+{
+  "name": "sscp-electron",
+  "version": "1.0.0",
+  "description": "SSCP Desktop - Versión Electron",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^44.4.5"
+  }
+}

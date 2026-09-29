@@ -30,10 +30,22 @@
                 {% endif %}
 
                 <!-- Header Actions -->
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                        <h1 class="text-2xl font-bold text-slate-900">Agenda de Citas Médicas</h1>
-                        <p class="text-xs text-slate-500 mt-0.5">Control de horarios, confirmación de asistencia, recordatorios WhatsApp y sala de espera.</p>
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div>
+                            <h1 class="text-2xl font-bold text-slate-900">Agenda de Citas Médicas</h1>
+                            <p class="text-xs text-slate-500 mt-0.5">Control de horarios, confirmación de asistencia, recordatorios WhatsApp y sala de espera.</p>
+                        </div>
+
+                        <!-- Toggle de Vistas: Lista vs Calendario -->
+                        <div class="inline-flex p-1 bg-slate-200/90 rounded-xl border border-slate-200 shadow-xs shrink-0 self-start sm:self-center">
+                            <button type="button" id="tabBtnList" onclick="switchAppointmentView('list')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-white text-slate-900 shadow-xs">
+                                <i class="fas fa-list text-blue-600"></i> Tabla
+                            </button>
+                            <button type="button" id="tabBtnCalendar" onclick="switchAppointmentView('calendar')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
+                                <i class="fas fa-calendar-alt text-indigo-600"></i> Calendario
+                            </button>
+                        </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
                         <!-- Botón Masivo de WhatsApp -->
@@ -61,8 +73,10 @@
                     </div>
                 </div>
 
-                <!-- Filters Bar -->
-                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                <!-- CONTENEDOR VISTA TABLA -->
+                <div id="appointmentListView" class="space-y-6">
+                    <!-- Filters Bar -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
                     <div class="flex flex-wrap items-center gap-2">
                         <a href="/appointments" class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if status_filter == 'all' and not filter_date %}bg-slate-900 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
                             Todas
@@ -262,6 +276,232 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+                </div>
+                <!-- /CONTENEDOR VISTA TABLA -->
+
+                <!-- CONTENEDOR VISTA CALENDARIO INTERACTIVO -->
+                <div id="appointmentCalendarView" class="hidden space-y-5">
+                    <!-- Barra de Navegación y Filtros de Calendario -->
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <!-- Navegación de Período -->
+                        <div class="flex items-center space-x-3">
+                            <div class="inline-flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-2xs">
+                                <button type="button" onclick="navigateCalendar(-1)" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white transition-all shadow-xs" title="Período anterior">
+                                    <i class="fas fa-chevron-left text-xs"></i>
+                                </button>
+                                <button type="button" onclick="goToCalendarToday()" class="px-3 h-8 rounded-lg text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-white transition-all shadow-xs">
+                                    Hoy
+                                </button>
+                                <button type="button" onclick="navigateCalendar(1)" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white transition-all shadow-xs" title="Siguiente período">
+                                    <i class="fas fa-chevron-right text-xs"></i>
+                                </button>
+                            </div>
+                            
+                            <div>
+                                <h2 id="calPeriodTitle" class="text-lg md:text-xl font-bold text-slate-900 capitalize tracking-tight flex items-center gap-2">
+                                    <span>Cargando calendario...</span>
+                                </h2>
+                                <span id="calTotalEventsBadge" class="text-[11px] font-semibold text-slate-500">
+                                    Cargando citas...
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Modos de Vista y Filtros -->
+                        <div class="flex flex-wrap items-center gap-2.5">
+                            <!-- Selector Mes / Semana / Día -->
+                            <div class="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs">
+                                <button type="button" id="btnModeMonth" onclick="setCalendarMode('month')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-indigo-700 shadow-xs">
+                                    Mes
+                                </button>
+                                <button type="button" id="btnModeWeek" onclick="setCalendarMode('week')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-600 hover:text-slate-900">
+                                    Semana
+                                </button>
+                                <button type="button" id="btnModeDay" onclick="setCalendarMode('day')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-600 hover:text-slate-900">
+                                    Día
+                                </button>
+                            </div>
+
+                            <!-- Filtro Doctor -->
+                            <select id="calDoctorFilter" onchange="applyCalendarFilters()" class="text-xs font-medium border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs">
+                                <option value="">Todos los Doctores</option>
+                                {% for d in doctors %}
+                                <option value="{{ d.id }}" {% if selected_doctor_id == d.id %}selected{% endif %}>Dr. {{ d.name }}</option>
+                                {% endfor %}
+                            </select>
+
+                            <!-- Filtro Estado -->
+                            <select id="calStatusFilter" onchange="applyCalendarFilters()" class="text-xs font-medium border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs">
+                                <option value="">Todos los Estados</option>
+                                <option value="En Espera">🛋️ En Espera</option>
+                                <option value="Confirmada">✅ Confirmada</option>
+                                <option value="Pendiente">⏳ Pendiente</option>
+                                <option value="Completada">✨ Completada</option>
+                                <option value="Cancelada">❌ Cancelada</option>
+                            </select>
+
+                            <!-- Botón Agendar Cita Rápida -->
+                            <a id="calBtnNewAppt" href="/appointments/create" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all" title="Agendar nueva cita médica">
+                                <i class="fas fa-plus mr-1.5"></i> Agendar
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Leyenda y Atajos Rápidos -->
+                    <div class="bg-white px-4 py-2.5 rounded-xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <span class="font-bold text-slate-700">Estados:</span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-2xs"></span> En Espera</span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-2xs"></span> Confirmada</span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-2xs"></span> Pendiente</span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-2xs"></span> Completada</span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-400 shadow-2xs"></span> Cancelada</span>
+                        </div>
+                        <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
+                            <i class="fas fa-mouse-pointer text-indigo-500"></i> Haz clic en una cita para ver acciones rápidas o en un día para agendar.
+                        </div>
+                    </div>
+
+                    <!-- CONTENEDOR DE LA VISTA MENSUAL -->
+                    <div id="calMonthGridWrapper" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-2 md:p-3">
+                        <!-- Cabecera de Días de la Semana -->
+                        <div class="grid grid-cols-7 gap-1 text-center py-2 border-b border-slate-100 font-bold text-xs text-slate-600 uppercase tracking-wider mb-1">
+                            <div class="py-1">Lun</div>
+                            <div class="py-1">Mar</div>
+                            <div class="py-1">Mié</div>
+                            <div class="py-1">Jue</div>
+                            <div class="py-1">Vie</div>
+                            <div class="py-1 text-indigo-700">Sáb</div>
+                            <div class="py-1 text-indigo-700">Dom</div>
+                        </div>
+                        <!-- Celdas del Calendario Mensual -->
+                        <div id="calMonthGrid" class="grid grid-cols-7 gap-1.5 min-h-[560px]">
+                            <!-- Generado dinámicamente por JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- CONTENEDOR DE LA VISTA SEMANAL -->
+                    <div id="calWeekGridWrapper" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-3 md:p-4">
+                        <div id="calWeekGridHeader" class="grid grid-cols-7 gap-2 pb-3 border-b border-slate-100 text-center font-bold text-xs text-slate-700">
+                            <!-- Generado dinámicamente -->
+                        </div>
+                        <div id="calWeekGridColumns" class="grid grid-cols-7 gap-2 pt-3 min-h-[520px]">
+                            <!-- Generado dinámicamente -->
+                        </div>
+                    </div>
+
+                    <!-- CONTENEDOR DE LA VISTA DIARIA -->
+                    <div id="calDayViewWrapper" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 md:p-6 space-y-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
+                            <div>
+                                <h3 id="calDayHeaderTitle" class="text-lg font-bold text-slate-900"></h3>
+                                <p id="calDayHeaderSub" class="text-xs text-slate-500 mt-0.5"></p>
+                            </div>
+                            <a id="btnNewApptForDay" href="/appointments/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all self-start">
+                                <i class="fas fa-plus mr-1.5"></i> Agendar en esta fecha
+                            </a>
+                        </div>
+                        <div id="calDayListContainer" class="space-y-3 min-h-[350px]">
+                            <!-- Generado dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MODAL: DETALLES Y ACCIONES RÁPIDAS DE CITA DESDE CALENDARIO -->
+                <div id="calDetailModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-fade-in space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-base shadow-xs">
+                                    <i class="fas fa-user-injured"></i>
+                                </div>
+                                <div>
+                                    <h3 id="calModalPatientName" class="text-base font-bold text-slate-900">Cargando paciente...</h3>
+                                    <p id="calModalPatientPhone" class="text-xs text-slate-500 flex items-center gap-1">
+                                        <i class="fas fa-phone-alt text-[10px]"></i> <span>-</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <button type="button" onclick="closeCalendarDetailModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold p-1">&times;</button>
+                        </div>
+
+                        <!-- Ficha de Datos Clave -->
+                        <div class="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+                            <div>
+                                <span class="text-slate-400 font-semibold uppercase text-[10px] block">Estado</span>
+                                <div id="calModalStatusBadge" class="mt-0.5 inline-block"></div>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 font-semibold uppercase text-[10px] block">Turno del Día</span>
+                                <span id="calModalQueueNum" class="font-bold text-slate-800">-</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 font-semibold uppercase text-[10px] block">Fecha y Hora</span>
+                                <span id="calModalDateTime" class="font-bold text-slate-800 block mt-0.5">-</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 font-semibold uppercase text-[10px] block">Doctor</span>
+                                <span id="calModalDoctor" class="font-bold text-slate-800 block mt-0.5">-</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 font-semibold uppercase text-[10px] block">Seguro Médico / ARS</span>
+                                <span id="calModalInsurance" class="font-bold text-slate-800 block mt-0.5">-</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 font-semibold uppercase text-[10px] block">Servicio / Tarifa</span>
+                                <span id="calModalServicePrice" class="font-bold text-slate-800 block mt-0.5">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Motivo y Notas -->
+                        <div class="space-y-1.5 text-xs">
+                            <div>
+                                <span class="text-slate-400 font-semibold uppercase text-[10px]">Motivo de Consulta:</span>
+                                <p id="calModalReason" class="text-slate-800 font-medium bg-white p-2 rounded-lg border border-slate-200 mt-0.5">-</p>
+                            </div>
+                            <div id="calModalNotesContainer" class="hidden">
+                                <span class="text-slate-400 font-semibold uppercase text-[10px]">Observaciones:</span>
+                                <p id="calModalNotes" class="text-slate-700 italic bg-white p-2 rounded-lg border border-slate-200 mt-0.5">-</p>
+                            </div>
+                        </div>
+
+                        <!-- Botones de Acción Médica Rápida -->
+                        <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex flex-wrap items-center gap-1.5" id="calModalActionButtons">
+                                <!-- Inyectado dinámicamente según permisos y estado -->
+                            </div>
+                            <button type="button" onclick="closeCalendarDetailModal()" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MODAL: LISTA COMPLETA DE CITAS DE UN DÍA -->
+                <div id="calDayListModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-fade-in space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div>
+                                <h3 id="calDayListModalTitle" class="text-base font-bold text-slate-900">Citas del Día</h3>
+                                <p id="calDayListModalSub" class="text-xs text-slate-500"></p>
+                            </div>
+                            <button type="button" onclick="closeDayListModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold p-1">&times;</button>
+                        </div>
+
+                        <div id="calDayListModalContent" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                            <!-- Inyectado dinámicamente -->
+                        </div>
+
+                        <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                            <a id="calDayListModalAddBtn" href="/appointments/create" class="inline-flex items-center px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-all">
+                                <i class="fas fa-plus mr-1.5"></i> Agendar Cita en este Día
+                            </a>
+                            <button type="button" onclick="closeDayListModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
+                                Cerrar
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -587,6 +827,799 @@
                         btn.innerHTML = `<i class="fas fa-play mr-1.5"></i> Despachar Recordatorios Ahora`;
                     }
                 }
+
+                // ==========================================
+                // MOTOR DEL CALENDARIO MÉDICO INTERACTIVO
+                // ==========================================
+                const INITIAL_EVENTS_DATA = {{ calendar_events | tojson }};
+                const USER_CAN_CONSULT = {{ 'true' if user.has_permission('consultations') else 'false' }};
+                
+                let calCurrentDate = new Date();
+                let calMode = 'month'; // 'month', 'week', 'day'
+                let allCalendarEvents = [...INITIAL_EVENTS_DATA];
+                let calLoadedMonths = new Set();
+                
+                // Inicializar mes actual como cargado
+                (function() {
+                    const y = calCurrentDate.getFullYear();
+                    const m = String(calCurrentDate.getMonth() + 1).padStart(2, '0');
+                    calLoadedMonths.add(`${y}-${m}`);
+                })();
+
+                const MONTH_NAMES_ES = [
+                    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+                ];
+
+                const DAY_NAMES_ES = [
+                    "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"
+                ];
+
+                const DAY_SHORT_NAMES_ES = [
+                    "Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"
+                ];
+
+                // Cambiar entre Vista Tabla y Vista Calendario
+                function switchAppointmentView(view, savePref = true) {
+                    const listView = document.getElementById('appointmentListView');
+                    const calView = document.getElementById('appointmentCalendarView');
+                    const btnList = document.getElementById('tabBtnList');
+                    const btnCal = document.getElementById('tabBtnCalendar');
+
+                    if (!listView || !calView || !btnList || !btnCal) return;
+
+                    if (view === 'calendar') {
+                        listView.classList.add('hidden');
+                        calView.classList.remove('hidden');
+
+                        btnList.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 text-slate-600 hover:text-slate-900';
+                        btnCal.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-white text-indigo-700 shadow-xs';
+
+                        renderCalendar();
+                    } else {
+                        calView.classList.add('hidden');
+                        listView.classList.remove('hidden');
+
+                        btnList.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-white text-slate-900 shadow-xs';
+                        btnCal.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 text-slate-600 hover:text-slate-900';
+                    }
+
+                    if (savePref) {
+                        try {
+                            localStorage.setItem('sscp_appointment_view', view);
+                        } catch(e) {}
+                    }
+                }
+
+                // Cambiar modo de calendario (mes, semana, día)
+                function setCalendarMode(mode) {
+                    calMode = mode;
+                    const modes = ['month', 'week', 'day'];
+                    modes.forEach(m => {
+                        const btn = document.getElementById(`btnMode${m.charAt(0).toUpperCase() + m.slice(1)}`);
+                        if (btn) {
+                            if (m === mode) {
+                                btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-indigo-700 shadow-xs';
+                            } else {
+                                btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-600 hover:text-slate-900';
+                            }
+                        }
+                    });
+
+                    document.getElementById('calMonthGridWrapper').classList.toggle('hidden', mode !== 'month');
+                    document.getElementById('calWeekGridWrapper').classList.toggle('hidden', mode !== 'week');
+                    document.getElementById('calDayViewWrapper').classList.toggle('hidden', mode !== 'day');
+
+                    renderCalendar();
+                }
+
+                // Navegación en el calendario
+                function navigateCalendar(direction) {
+                    if (calMode === 'month') {
+                        calCurrentDate.setMonth(calCurrentDate.getMonth() + direction);
+                    } else if (calMode === 'week') {
+                        calCurrentDate.setDate(calCurrentDate.getDate() + (direction * 7));
+                    } else if (calMode === 'day') {
+                        calCurrentDate.setDate(calCurrentDate.getDate() + direction);
+                    }
+                    checkAndFetchMonthData();
+                    renderCalendar();
+                }
+
+                function goToCalendarToday() {
+                    calCurrentDate = new Date();
+                    checkAndFetchMonthData();
+                    renderCalendar();
+                }
+
+                function checkAndFetchMonthData() {
+                    const y = calCurrentDate.getFullYear();
+                    const m = String(calCurrentDate.getMonth() + 1).padStart(2, '0');
+                    const ym = `${y}-${m}`;
+                    if (!calLoadedMonths.has(ym)) {
+                        fetchCalendarEventsForMonth(ym);
+                    }
+                }
+
+                async function fetchCalendarEventsForMonth(ym) {
+                    try {
+                        const res = await fetch(`/appointments/api/events?month=${ym}`);
+                        const data = await res.json();
+                        if (data && Array.isArray(data.events)) {
+                            const map = new Map(allCalendarEvents.map(e => [e.id, e]));
+                            data.events.forEach(e => map.set(e.id, e));
+                            allCalendarEvents = Array.from(map.values());
+                            calLoadedMonths.add(ym);
+                            renderCalendar();
+                        }
+                    } catch(e) {
+                        console.warn('No se pudieron precargar citas para el mes:', ym, e);
+                    }
+                }
+
+                function applyCalendarFilters() {
+                    renderCalendar();
+                }
+
+                function getFilteredEvents() {
+                    const docFilter = document.getElementById('calDoctorFilter')?.value;
+                    const statusFilter = document.getElementById('calStatusFilter')?.value;
+
+                    return allCalendarEvents.filter(ev => {
+                        if (docFilter && String(ev.doctor_id) !== String(docFilter)) return false;
+                        if (statusFilter && ev.status !== statusFilter) return false;
+                        return true;
+                    });
+                }
+
+                function formatIsoDate(d) {
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                }
+
+                function getStatusConfig(status) {
+                    switch(status) {
+                        case 'En Espera':
+                            return {
+                                bg: 'bg-amber-100/90 text-amber-900 border-amber-300 hover:bg-amber-200',
+                                badge: '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300"><i class="fas fa-couch mr-1 text-[10px]"></i> En Espera</span>',
+                                dot: 'bg-amber-500'
+                            };
+                        case 'Confirmada':
+                            return {
+                                bg: 'bg-blue-100/90 text-blue-900 border-blue-300 hover:bg-blue-200',
+                                badge: '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-900 border border-blue-300"><i class="fas fa-check mr-1 text-[10px]"></i> Confirmada</span>',
+                                dot: 'bg-blue-500'
+                            };
+                        case 'Pendiente':
+                            return {
+                                bg: 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100',
+                                badge: '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200"><i class="fas fa-clock mr-1 text-[10px]"></i> Pendiente</span>',
+                                dot: 'bg-amber-400'
+                            };
+                        case 'Completada':
+                            return {
+                                bg: 'bg-emerald-100/90 text-emerald-900 border-emerald-300 hover:bg-emerald-200',
+                                badge: '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300"><i class="fas fa-check-double mr-1 text-[10px]"></i> Atendida</span>',
+                                dot: 'bg-emerald-500'
+                            };
+                        case 'Cancelada':
+                            return {
+                                bg: 'bg-slate-100 text-slate-500 border-slate-200 line-through',
+                                badge: '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200"><i class="fas fa-times mr-1 text-[10px]"></i> Cancelada</span>',
+                                dot: 'bg-slate-400'
+                            };
+                        default:
+                            return {
+                                bg: 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200',
+                                badge: `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">${status || 'Sin estado'}</span>`,
+                                dot: 'bg-slate-400'
+                            };
+                    }
+                }
+
+                // Renderizador principal del calendario
+                function renderCalendar() {
+                    const events = getFilteredEvents();
+                    const titleEl = document.getElementById('calPeriodTitle');
+                    const badgeEl = document.getElementById('calTotalEventsBadge');
+
+                    if (calMode === 'month') {
+                        renderMonthView(events, titleEl, badgeEl);
+                    } else if (calMode === 'week') {
+                        renderWeekView(events, titleEl, badgeEl);
+                    } else if (calMode === 'day') {
+                        renderDayView(events, titleEl, badgeEl);
+                    }
+                }
+
+                // RENDERIZADO VISTA MENSUAL
+                function renderMonthView(events, titleEl, badgeEl) {
+                    const year = calCurrentDate.getFullYear();
+                    const month = calCurrentDate.getMonth();
+                    
+                    if (titleEl) {
+                        titleEl.innerHTML = `<span>${MONTH_NAMES_ES[month]} ${year}</span>`;
+                    }
+
+                    // Contar eventos del mes actual
+                    const currentMonthEvents = events.filter(e => {
+                        if (!e.date) return false;
+                        const [ey, em] = e.date.split('-');
+                        return parseInt(ey) === year && parseInt(em) === (month + 1);
+                    });
+
+                    if (badgeEl) {
+                        badgeEl.textContent = `${currentMonthEvents.length} cita${currentMonthEvents.length === 1 ? '' : 's'} en este mes`;
+                    }
+
+                    const gridEl = document.getElementById('calMonthGrid');
+                    if (!gridEl) return;
+                    gridEl.innerHTML = '';
+
+                    const todayStr = formatIsoDate(new Date());
+
+                    // Días en mes actual
+                    const firstDayOfMonth = new Date(year, month, 1);
+                    const lastDayOfMonth = new Date(year, month + 1, 0);
+                    const daysInMonth = lastDayOfMonth.getDate();
+
+                    // Días del mes previo
+                    const prevMonthLastDay = new Date(year, month, 0).getDate();
+                    // 0 = Lunes, 6 = Domingo
+                    const startDayOfWeek = (firstDayOfMonth.getDay() + 6) % 7;
+
+                    // 1. Celdas del mes anterior (relleno)
+                    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+                        const dayNum = prevMonthLastDay - i;
+                        const prevDate = new Date(year, month - 1, dayNum);
+                        const prevDateStr = formatIsoDate(prevDate);
+                        const cell = createMonthDayCell(dayNum, prevDateStr, false, false, events);
+                        gridEl.appendChild(cell);
+                    }
+
+                    // 2. Celdas del mes actual
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        const currDate = new Date(year, month, d);
+                        const currDateStr = formatIsoDate(currDate);
+                        const isToday = currDateStr === todayStr;
+                        const cell = createMonthDayCell(d, currDateStr, true, isToday, events);
+                        gridEl.appendChild(cell);
+                    }
+
+                    // 3. Celdas del mes siguiente (relleno hasta completar múltiplos de 7)
+                    const totalCells = gridEl.children.length;
+                    const remainingCells = (totalCells % 7 === 0) ? 0 : 7 - (totalCells % 7);
+                    for (let d = 1; d <= remainingCells; d++) {
+                        const nextDate = new Date(year, month + 1, d);
+                        const nextDateStr = formatIsoDate(nextDate);
+                        const cell = createMonthDayCell(d, nextDateStr, false, false, events);
+                        gridEl.appendChild(cell);
+                    }
+                }
+
+                function createMonthDayCell(dayNum, dateStr, isCurrentMonth, isToday, allEvents) {
+                    const dayEvents = allEvents.filter(e => e.date === dateStr);
+                    // Ordenar por hora
+                    dayEvents.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+
+                    const cell = document.createElement('div');
+                    cell.className = `min-h-[110px] p-1.5 md:p-2 rounded-xl flex flex-col justify-between transition-all border ${
+                        isCurrentMonth 
+                            ? (isToday ? 'bg-indigo-50/50 border-indigo-300 ring-2 ring-indigo-500/20 shadow-2xs' : 'bg-white border-slate-100 hover:border-slate-300 hover:shadow-xs')
+                            : 'bg-slate-50/70 border-slate-100/50 opacity-60 text-slate-400'
+                    }`;
+
+                    // Header del día
+                    const header = document.createElement('div');
+                    header.className = 'flex items-center justify-between mb-1 cursor-pointer';
+                    header.title = `Ver citas del día ${dateStr}`;
+                    header.onclick = (e) => {
+                        e.stopPropagation();
+                        openDayListModal(dateStr);
+                    };
+
+                    const numSpan = document.createElement('span');
+                    if (isToday) {
+                        numSpan.className = 'w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-xs';
+                    } else {
+                        numSpan.className = `text-xs font-bold ${isCurrentMonth ? 'text-slate-800' : 'text-slate-400'}`;
+                    }
+                    numSpan.textContent = dayNum;
+
+                    header.appendChild(numSpan);
+
+                    if (dayEvents.length > 0) {
+                        const countBadge = document.createElement('span');
+                        countBadge.className = 'text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600';
+                        countBadge.textContent = dayEvents.length;
+                        header.appendChild(countBadge);
+                    } else if (isCurrentMonth) {
+                        const addHint = document.createElement('span');
+                        addHint.className = 'text-[10px] text-slate-300 hover:text-indigo-600 transition-colors';
+                        addHint.innerHTML = '<i class="fas fa-plus"></i>';
+                        addHint.title = 'Agendar cita en esta fecha';
+                        addHint.onclick = (e) => {
+                            e.stopPropagation();
+                            window.location.href = `/appointments/create?suggested_date=${dateStr}`;
+                        };
+                        header.appendChild(addHint);
+                    }
+
+                    cell.appendChild(header);
+
+                    // Contenedor de citas del día
+                    const eventsContainer = document.createElement('div');
+                    eventsContainer.className = 'space-y-1 flex-1';
+
+                    const maxVisible = 3;
+                    const visibleEvents = dayEvents.slice(0, maxVisible);
+
+                    visibleEvents.forEach(ev => {
+                        const cfg = getStatusConfig(ev.status);
+                        const chip = document.createElement('div');
+                        chip.className = `p-1 rounded-lg text-[11px] font-semibold flex items-center justify-between border cursor-pointer transition-transform active:scale-95 shadow-2xs truncate ${cfg.bg}`;
+                        chip.title = `${ev.start_time || 'Sin hora'} - ${ev.patient_name} (${ev.status})`;
+                        chip.onclick = (e) => {
+                            e.stopPropagation();
+                            openCalendarDetailModal(ev.id);
+                        };
+
+                        const left = document.createElement('div');
+                        left.className = 'flex items-center space-x-1 truncate';
+                        
+                        if (ev.start_time) {
+                            const timeSpan = document.createElement('span');
+                            timeSpan.className = 'text-[10px] font-mono opacity-80 shrink-0';
+                            timeSpan.textContent = ev.start_time;
+                            left.appendChild(timeSpan);
+                        }
+
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'truncate font-medium';
+                        nameSpan.textContent = ev.patient_name;
+                        left.appendChild(nameSpan);
+
+                        chip.appendChild(left);
+
+                        if (ev.whatsapp_sent) {
+                            const waIcon = document.createElement('i');
+                            waIcon.className = 'fab fa-whatsapp text-emerald-600 text-[10px] ml-1 shrink-0';
+                            waIcon.title = 'Recordatorio enviado';
+                            chip.appendChild(waIcon);
+                        }
+
+                        eventsContainer.appendChild(chip);
+                    });
+
+                    // Si hay más eventos, mostrar botón "+X más"
+                    if (dayEvents.length > maxVisible) {
+                        const moreBtn = document.createElement('button');
+                        moreBtn.type = 'button';
+                        moreBtn.className = 'w-full text-left px-1.5 py-0.5 rounded text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors block';
+                        moreBtn.textContent = `+${dayEvents.length - maxVisible} más...`;
+                        moreBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            openDayListModal(dateStr);
+                        };
+                        eventsContainer.appendChild(moreBtn);
+                    }
+
+                    cell.appendChild(eventsContainer);
+
+                    // Si el día está vacío, clic abre para agendar
+                    if (dayEvents.length === 0 && isCurrentMonth) {
+                        cell.style.cursor = 'pointer';
+                        cell.onclick = () => {
+                            window.location.href = `/appointments/create?suggested_date=${dateStr}`;
+                        };
+                    }
+
+                    return cell;
+                }
+
+                // RENDERIZADO VISTA SEMANAL
+                function renderWeekView(events, titleEl, badgeEl) {
+                    const curr = new Date(calCurrentDate);
+                    // Lunes de la semana actual
+                    const dayOfWeek = (curr.getDay() + 6) % 7;
+                    const monday = new Date(curr);
+                    monday.setDate(curr.getDate() - dayOfWeek);
+
+                    const sunday = new Date(monday);
+                    sunday.setDate(monday.getDate() + 6);
+
+                    if (titleEl) {
+                        titleEl.innerHTML = `<span>Semana del ${monday.getDate()} ${MONTH_NAMES_ES[monday.getMonth()].slice(0,3)} al ${sunday.getDate()} ${MONTH_NAMES_ES[sunday.getMonth()]} ${sunday.getFullYear()}</span>`;
+                    }
+
+                    const weekHeaderEl = document.getElementById('calWeekGridHeader');
+                    const weekColsEl = document.getElementById('calWeekGridColumns');
+                    if (!weekHeaderEl || !weekColsEl) return;
+
+                    weekHeaderEl.innerHTML = '';
+                    weekColsEl.innerHTML = '';
+
+                    const todayStr = formatIsoDate(new Date());
+                    let weekEventsCount = 0;
+
+                    for (let i = 0; i < 7; i++) {
+                        const d = new Date(monday);
+                        d.setDate(monday.getDate() + i);
+                        const dStr = formatIsoDate(d);
+                        const isToday = dStr === todayStr;
+
+                        const dayEvents = events.filter(e => e.date === dStr);
+                        dayEvents.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+                        weekEventsCount += dayEvents.length;
+
+                        // Header col
+                        const hCol = document.createElement('div');
+                        hCol.className = `py-2 px-1 rounded-xl text-center cursor-pointer transition-all ${
+                            isToday ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                        }`;
+                        hCol.onclick = () => openDayListModal(dStr);
+                        hCol.innerHTML = `
+                            <div class="text-[11px] uppercase tracking-wider font-semibold opacity-90">${DAY_SHORT_NAMES_ES[(d.getDay())]}</div>
+                            <div class="text-base font-extrabold">${d.getDate()}</div>
+                            <div class="text-[10px] font-bold mt-0.5 opacity-80">${dayEvents.length} cita${dayEvents.length === 1 ? '' : 's'}</div>
+                        `;
+                        weekHeaderEl.appendChild(hCol);
+
+                        // Body col
+                        const bCol = document.createElement('div');
+                        bCol.className = 'bg-slate-50/50 rounded-xl p-2 border border-slate-100 space-y-2 flex flex-col justify-start min-h-[480px]';
+
+                        if (dayEvents.length === 0) {
+                            const empty = document.createElement('div');
+                            empty.className = 'text-center py-8 text-slate-300 text-xs italic flex flex-col items-center justify-center space-y-1';
+                            empty.innerHTML = `
+                                <i class="far fa-calendar-plus text-xl text-slate-200"></i>
+                                <span>Sin citas</span>
+                                <a href="/appointments/create?suggested_date=${dStr}" class="text-[11px] text-indigo-600 hover:underline font-semibold mt-1">
+                                    + Agendar
+                                </a>
+                            `;
+                            bCol.appendChild(empty);
+                        } else {
+                            dayEvents.forEach(ev => {
+                                const cfg = getStatusConfig(ev.status);
+                                const card = document.createElement('div');
+                                card.className = `p-2.5 rounded-xl border cursor-pointer transition-all hover:shadow-xs active:scale-95 space-y-1.5 ${cfg.bg}`;
+                                card.onclick = () => openCalendarDetailModal(ev.id);
+
+                                card.innerHTML = `
+                                    <div class="flex items-center justify-between text-[11px]">
+                                        <span class="font-mono font-bold">${ev.start_time || 'S/H'}</span>
+                                        <span class="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-white/80 border border-current shadow-2xs">${ev.status}</span>
+                                    </div>
+                                    <div class="font-bold text-xs text-slate-900 truncate">${ev.patient_name}</div>
+                                    <div class="text-[10px] text-slate-600 truncate flex items-center gap-1">
+                                        <i class="fas fa-user-md text-[9px]"></i> <span>${ev.doctor_name || 'Dr. Principal'}</span>
+                                    </div>
+                                    ${ev.reason ? `<div class="text-[10px] text-slate-500 italic truncate">${ev.reason}</div>` : ''}
+                                `;
+                                bCol.appendChild(card);
+                            });
+                        }
+
+                        weekColsEl.appendChild(bCol);
+                    }
+
+                    if (badgeEl) {
+                        badgeEl.textContent = `${weekEventsCount} cita${weekEventsCount === 1 ? '' : 's'} esta semana`;
+                    }
+                }
+
+                // RENDERIZADO VISTA DIARIA
+                function renderDayView(events, titleEl, badgeEl) {
+                    const dStr = formatIsoDate(calCurrentDate);
+                    const dayEvents = events.filter(e => e.date === dStr);
+                    dayEvents.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+
+                    const dayName = DAY_NAMES_ES[calCurrentDate.getDay()];
+                    const monthName = MONTH_NAMES_ES[calCurrentDate.getMonth()];
+                    const fullDateStr = `${dayName}, ${calCurrentDate.getDate()} de ${monthName} de ${calCurrentDate.getFullYear()}`;
+
+                    if (titleEl) {
+                        titleEl.innerHTML = `<span>${fullDateStr}</span>`;
+                    }
+
+                    if (badgeEl) {
+                        badgeEl.textContent = `${dayEvents.length} cita${dayEvents.length === 1 ? '' : 's'} agendada${dayEvents.length === 1 ? '' : 's'}`;
+                    }
+
+                    const hTitle = document.getElementById('calDayHeaderTitle');
+                    const hSub = document.getElementById('calDayHeaderSub');
+                    const btnAdd = document.getElementById('btnNewApptForDay');
+
+                    if (hTitle) hTitle.textContent = fullDateStr;
+                    if (hSub) hSub.textContent = `Agenda completa para este día con ${dayEvents.length} cita(s) registrada(s).`;
+                    if (btnAdd) btnAdd.href = `/appointments/create?suggested_date=${dStr}`;
+
+                    const container = document.getElementById('calDayListContainer');
+                    if (!container) return;
+                    container.innerHTML = '';
+
+                    if (dayEvents.length === 0) {
+                        container.innerHTML = `
+                            <div class="text-center py-16 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                <i class="far fa-calendar-check text-4xl text-slate-300 mb-3 block"></i>
+                                <h4 class="text-base font-bold text-slate-700">No hay citas médicas para esta fecha</h4>
+                                <p class="text-xs text-slate-400 mt-1">Aprovecha para agendar nuevos pacientes o programar citas de control.</p>
+                                <a href="/appointments/create?suggested_date=${dStr}" class="inline-flex items-center px-4 py-2 mt-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow transition-all">
+                                    <i class="fas fa-plus mr-1.5"></i> Agendar Cita para este Día
+                                </a>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    dayEvents.forEach(ev => {
+                        const cfg = getStatusConfig(ev.status);
+                        const card = document.createElement('div');
+                        card.className = 'p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-sm transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4';
+
+                        const left = document.createElement('div');
+                        left.className = 'flex items-start space-x-3.5';
+
+                        const timeBox = document.createElement('div');
+                        timeBox.className = 'w-16 h-16 rounded-2xl bg-slate-100 flex flex-col items-center justify-center font-bold text-slate-800 shrink-0 border border-slate-200';
+                        timeBox.innerHTML = `
+                            <span class="text-xs text-slate-500 font-mono">${ev.start_time || 'S/H'}</span>
+                            <span class="text-[10px] text-slate-400 font-mono">${ev.end_time || ''}</span>
+                        `;
+                        left.appendChild(timeBox);
+
+                        const info = document.createElement('div');
+                        info.className = 'space-y-1';
+                        info.innerHTML = `
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-base font-bold text-slate-900">${ev.patient_name}</h4>
+                                ${cfg.badge}
+                                ${ev.queue_number ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Turno #${ev.queue_number}</span>` : ''}
+                            </div>
+                            <div class="text-xs text-slate-600 flex flex-wrap items-center gap-3">
+                                <span><i class="fas fa-user-md text-slate-400 mr-1"></i> ${ev.doctor_name || 'Dr. Principal'}</span>
+                                ${ev.patient_phone ? `<span><i class="fas fa-phone text-slate-400 mr-1"></i> ${ev.patient_phone}</span>` : ''}
+                                ${ev.patient_insurance ? `<span class="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-medium"><i class="fas fa-id-card mr-1 text-slate-400"></i> ${ev.patient_insurance}</span>` : ''}
+                            </div>
+                            ${ev.reason ? `<div class="text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 inline-block font-medium">Motivo: ${ev.reason}</div>` : ''}
+                        `;
+                        left.appendChild(info);
+                        card.appendChild(left);
+
+                        // Acciones rápidas a la derecha
+                        const right = document.createElement('div');
+                        right.className = 'flex flex-wrap items-center gap-1.5 shrink-0 self-end lg:self-center';
+
+                        // Botón Detalles
+                        const btnDetail = document.createElement('button');
+                        btnDetail.type = 'button';
+                        btnDetail.className = 'px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all';
+                        btnDetail.innerHTML = '<i class="fas fa-eye mr-1"></i> Detalle';
+                        btnDetail.onclick = () => openCalendarDetailModal(ev.id);
+                        right.appendChild(btnDetail);
+
+                        // Botón Turno / Espera
+                        if (ev.status !== 'En Espera' && ev.status !== 'Completada' && ev.status !== 'Cancelada') {
+                            const formCheckin = document.createElement('form');
+                            formCheckin.method = 'post';
+                            formCheckin.action = `/appointments/${ev.id}/check-in`;
+                            formCheckin.className = 'inline';
+                            formCheckin.innerHTML = `
+                                <button type="submit" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition-all flex items-center">
+                                    <i class="fas fa-couch mr-1"></i> Poner en Espera
+                                </button>
+                            `;
+                            right.appendChild(formCheckin);
+                        }
+
+                        // Botón Atender
+                        if (USER_CAN_CONSULT && ev.status !== 'Completada' && ev.status !== 'Cancelada') {
+                            const btnConsult = document.createElement('a');
+                            btnConsult.href = `/consultations/create?patient_id=${ev.patient_id}&appointment_id=${ev.id}`;
+                            btnConsult.className = 'px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-all flex items-center';
+                            btnConsult.innerHTML = '<i class="fas fa-stethoscope mr-1"></i> Atender';
+                            right.appendChild(btnConsult);
+                        }
+
+                        // Botón Cobrar
+                        const btnPay = document.createElement('a');
+                        btnPay.href = `/payments/create?patient_id=${ev.patient_id}&appointment_id=${ev.id}`;
+                        btnPay.className = 'px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all flex items-center';
+                        btnPay.innerHTML = '<i class="fas fa-cash-register mr-1"></i> Cobrar';
+                        right.appendChild(btnPay);
+
+                        // Botón WhatsApp
+                        if (ev.patient_phone) {
+                            const btnWa = document.createElement('button');
+                            btnWa.type = 'button';
+                            btnWa.onclick = () => openSingleWaModal(ev.id);
+                            btnWa.className = 'p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition-all' + (ev.whatsapp_sent ? ' opacity-75' : '');
+                            btnWa.title = ev.whatsapp_sent ? 'WhatsApp ya enviado (clic para reenviar)' : 'Enviar recordatorio por WhatsApp';
+                            btnWa.innerHTML = '<i class="fab fa-whatsapp text-sm"></i>';
+                            right.appendChild(btnWa);
+                        }
+
+                        card.appendChild(right);
+                        container.appendChild(card);
+                    });
+                }
+
+                // ==========================================
+                // MODAL DE DETALLES RÁPIDOS DE CITA
+                // ==========================================
+                function openCalendarDetailModal(appointmentId) {
+                    const ev = allCalendarEvents.find(e => e.id === appointmentId);
+                    if (!ev) return;
+
+                    const modal = document.getElementById('calDetailModal');
+                    if (!modal) return;
+
+                    document.getElementById('calModalPatientName').textContent = ev.patient_name;
+                    document.getElementById('calModalPatientPhone').innerHTML = `
+                        <i class="fas fa-phone-alt text-[10px]"></i> <span>${ev.patient_phone || 'Sin teléfono registrado'}</span>
+                    `;
+
+                    const cfg = getStatusConfig(ev.status);
+                    document.getElementById('calModalStatusBadge').innerHTML = cfg.badge;
+
+                    document.getElementById('calModalQueueNum').textContent = ev.queue_number ? `Turno #${ev.queue_number}` : 'No asignado';
+                    document.getElementById('calModalDateTime').textContent = `${ev.date} ${ev.start_time ? `(${ev.start_time})` : ''}`;
+                    document.getElementById('calModalDoctor').textContent = ev.doctor_name || 'Doctor Principal';
+                    document.getElementById('calModalInsurance').textContent = ev.patient_insurance ? `${ev.patient_insurance} (${ev.patient_insurance_num || 'Sin No.'})` : 'Privado / Particular';
+                    
+                    const priceFmt = (ev.price && ev.price > 0) ? `RD$ ${Number(ev.price).toLocaleString('en-US', {minimumFractionDigits: 2})}` : 'RD$ 0.00';
+                    document.getElementById('calModalServicePrice').textContent = `${ev.service_name || 'Consulta Estándar'} - ${priceFmt}`;
+
+                    document.getElementById('calModalReason').textContent = ev.reason || 'Sin motivo especificado';
+
+                    const notesCont = document.getElementById('calModalNotesContainer');
+                    if (ev.notes) {
+                        notesCont.classList.remove('hidden');
+                        document.getElementById('calModalNotes').textContent = ev.notes;
+                    } else {
+                        notesCont.classList.add('hidden');
+                    }
+
+                    // Botones de acción dinámicos
+                    const actionsBox = document.getElementById('calModalActionButtons');
+                    actionsBox.innerHTML = '';
+
+                    // 1. Asignar turno / Pasar a espera
+                    if (ev.status !== 'En Espera' && ev.status !== 'Completada' && ev.status !== 'Cancelada') {
+                        const formCheckin = document.createElement('form');
+                        formCheckin.method = 'post';
+                        formCheckin.action = `/appointments/${ev.id}/check-in`;
+                        formCheckin.className = 'inline';
+                        formCheckin.innerHTML = `
+                            <button type="submit" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition-all flex items-center">
+                                <i class="fas fa-couch mr-1"></i> Pasar a Espera
+                            </button>
+                        `;
+                        actionsBox.appendChild(formCheckin);
+                    }
+
+                    // 2. Atender consulta
+                    if (USER_CAN_CONSULT && ev.status !== 'Completada' && ev.status !== 'Cancelada') {
+                        const btnConsult = document.createElement('a');
+                        btnConsult.href = `/consultations/create?patient_id=${ev.patient_id}&appointment_id=${ev.id}`;
+                        btnConsult.className = 'px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-all flex items-center';
+                        btnConsult.innerHTML = '<i class="fas fa-stethoscope mr-1"></i> Atender';
+                        actionsBox.appendChild(btnConsult);
+                    }
+
+                    // 3. Cobrar Cita
+                    const btnPay = document.createElement('a');
+                    btnPay.href = `/payments/create?patient_id=${ev.patient_id}&appointment_id=${ev.id}`;
+                    btnPay.className = 'px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all flex items-center';
+                    btnPay.innerHTML = '<i class="fas fa-cash-register mr-1"></i> Cobrar';
+                    actionsBox.appendChild(btnPay);
+
+                    // 4. WhatsApp Recordatorio
+                    if (ev.patient_phone) {
+                        const btnWa = document.createElement('button');
+                        btnWa.type = 'button';
+                        btnWa.onclick = () => {
+                            closeCalendarDetailModal();
+                            openSingleWaModal(ev.id);
+                        };
+                        btnWa.className = 'px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all flex items-center';
+                        btnWa.innerHTML = '<i class="fab fa-whatsapp text-emerald-600 mr-1 text-sm"></i> WhatsApp';
+                        actionsBox.appendChild(btnWa);
+                    }
+
+                    // 5. Ver Paciente
+                    const btnPatient = document.createElement('a');
+                    btnPatient.href = `/patients/${ev.patient_id}`;
+                    btnPatient.className = 'px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center';
+                    btnPatient.innerHTML = '<i class="fas fa-user mr-1"></i> Ficha';
+                    actionsBox.appendChild(btnPatient);
+
+                    modal.classList.remove('hidden');
+                }
+
+                function closeCalendarDetailModal() {
+                    const modal = document.getElementById('calDetailModal');
+                    if (modal) modal.classList.add('hidden');
+                }
+
+                // ==========================================
+                // MODAL LISTA COMPLETA DE CITAS DE UN DÍA
+                // ==========================================
+                function openDayListModal(dateStr) {
+                    const modal = document.getElementById('calDayListModal');
+                    if (!modal) return;
+
+                    const events = getFilteredEvents().filter(e => e.date === dateStr);
+                    events.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+
+                    document.getElementById('calDayListModalTitle').textContent = `Citas para el día ${dateStr}`;
+                    document.getElementById('calDayListModalSub').textContent = `${events.length} cita(s) programada(s)`;
+                    document.getElementById('calDayListModalAddBtn').href = `/appointments/create?suggested_date=${dateStr}`;
+
+                    const listContainer = document.getElementById('calDayListModalContent');
+                    listContainer.innerHTML = '';
+
+                    if (events.length === 0) {
+                        listContainer.innerHTML = `
+                            <div class="text-center py-8 text-slate-400 text-xs italic">
+                                <i class="far fa-calendar-times text-3xl mb-2 block text-slate-300"></i>
+                                No hay citas registradas para este día.
+                            </div>
+                        `;
+                    } else {
+                        events.forEach(ev => {
+                            const cfg = getStatusConfig(ev.status);
+                            const item = document.createElement('div');
+                            item.className = 'p-3 rounded-xl border border-slate-200/90 bg-slate-50 flex items-center justify-between gap-3 hover:bg-white transition-all cursor-pointer';
+                            item.onclick = () => {
+                                closeDayListModal();
+                                openCalendarDetailModal(ev.id);
+                            };
+
+                            item.innerHTML = `
+                                <div class="flex items-center space-x-3">
+                                    <div class="text-center font-mono font-bold text-xs text-slate-700 bg-white px-2 py-1.5 rounded-lg border border-slate-200 shrink-0">
+                                        ${ev.start_time || 'S/H'}
+                                    </div>
+                                    <div>
+                                        <h5 class="text-xs font-bold text-slate-900">${ev.patient_name}</h5>
+                                        <p class="text-[11px] text-slate-500">${ev.doctor_name || 'Dr. Principal'} &bull; ${ev.reason || 'Sin motivo'}</p>
+                                    </div>
+                                </div>
+                                <div class="shrink-0 flex items-center space-x-1.5">
+                                    ${cfg.badge}
+                                    <i class="fas fa-chevron-right text-slate-400 text-[10px]"></i>
+                                </div>
+                            `;
+                            listContainer.appendChild(item);
+                        });
+                    }
+
+                    modal.classList.remove('hidden');
+                }
+
+                function closeDayListModal() {
+                    const modal = document.getElementById('calDayListModal');
+                    if (modal) modal.classList.add('hidden');
+                }
+
+                // ==========================================
+                // INICIALIZACIÓN AUTOMÁTICA DE VISTAS
+                // ==========================================
+                document.addEventListener('DOMContentLoaded', () => {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const viewParam = urlParams.get('view');
+                    const savedView = localStorage.getItem('sscp_appointment_view');
+
+                    if (viewParam === 'calendar' || (!viewParam && savedView === 'calendar')) {
+                        switchAppointmentView('calendar', false);
+                    }
+                });
 
                 if (new URLSearchParams(window.location.search).get('action') === 'walkin') {
                     document.getElementById('walkinModal')?.classList.remove('hidden');

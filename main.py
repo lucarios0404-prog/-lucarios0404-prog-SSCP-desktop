@@ -120,6 +120,20 @@ def ensure_schema_migrations(engine):
                 conn.execute(text("ALTER TABLE settings ADD COLUMN station_role TEXT DEFAULT 'doctor_principal'"))
             if "central_station_url" not in s_cols:
                 conn.execute(text("ALTER TABLE settings ADD COLUMN central_station_url TEXT"))
+            if "print_margin_top" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN print_margin_top FLOAT DEFAULT 15.0"))
+            if "print_margin_bottom" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN print_margin_bottom FLOAT DEFAULT 15.0"))
+            if "print_margin_left" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN print_margin_left FLOAT DEFAULT 20.0"))
+            if "print_margin_right" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN print_margin_right FLOAT DEFAULT 15.0"))
+            if "print_paper_size" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN print_paper_size TEXT DEFAULT 'Letter'"))
+            if "print_mode" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN print_mode TEXT DEFAULT 'preprinted'"))
+            if "print_template_config" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN print_template_config TEXT"))
 
             # 3. Migraciones en appointments (Turnos, Servicios, WhatsApp)
             res_a = conn.execute(text("PRAGMA table_info(appointments)")).fetchall()
@@ -455,3 +469,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db), current_use
             "waiting_patients": waiting_patients,
         }
     )
+
+@app.get("/labs", include_in_schema=False)
+def labs_alias_redirect():
+    return RedirectResponse(url="/lab-results", status_code=307)
