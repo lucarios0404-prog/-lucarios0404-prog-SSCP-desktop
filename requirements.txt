@@ -17,8 +17,8 @@ access-parser
 openpyxl
 # === Sistema de Licenciamiento ===
 cryptography
-wmi
+wmi; sys_platform == 'win32'
 pyarmor
 # === Interfaz Nativa de Escritorio ===
 pywebview
-pythonnet
+pythonnet; sys_platform == 'win32'

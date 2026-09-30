@@ -1,0 +1,70 @@
+name: Compilación macOS (Intel & Apple Silicon) - SSCP Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos:
+    name: Build macOS (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            os: macos-14
+            label: Apple Silicon (M1/M2/M3/M4)
+          - arch: x64
+            os: macos-13
+            label: Intel (x86_64)
+
+    steps:
+      - name: 📥 Clonar repositorio
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'requirements.txt'
+
+      - name: 📦 Instalar dependencias de Python
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: ⚙️ Compilar Backend Python Nativo para macOS (${{ matrix.arch }})
+        run: |
+          python build_backend_mac.py
+
+      - name: 🟢 Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Instalar dependencias de Electron
+        run: |
+          cd electron
+          npm install
+
+      - name: 🚀 Empaquetar Instaladores DMG y ZIP (${{ matrix.label }})
+        run: |
+          cd electron
+          npx electron-builder --mac --${{ matrix.arch }} -c.mac.identity=null
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: 📤 Publicar Artefactos Compilados (${{ matrix.arch }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: SSCP-Desktop-macOS-${{ matrix.arch }}
+          path: |
+            electron/dist/*.dmg
+            electron/dist/*.zip
+          if-no-files-found: error
+          retention-days: 14

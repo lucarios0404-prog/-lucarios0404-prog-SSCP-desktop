@@ -189,18 +189,23 @@ class ServerManager {
       ? this.config.backendDir
       : path.resolve(baseConfigDir, this.config.backendDir);
 
-    const pythonExe = path.isAbsolute(this.config.pythonExe)
-      ? this.config.pythonExe
-      : path.resolve(backendDir, this.config.pythonExe);
+    const isWindows = process.platform === 'win32';
+    const exeName = isWindows ? 'SSCP-Desktop.exe' : 'SSCP-Desktop';
+    const fallbackPyExe = isWindows ? 'venv/Scripts/python.exe' : 'venv/bin/python';
+
+    const rawPyConfig = this.config.pythonExe || fallbackPyExe;
+    const pythonExe = path.isAbsolute(rawPyConfig)
+      ? rawPyConfig
+      : path.resolve(backendDir, rawPyConfig);
 
     const dataDir = this.setupDataDirectory();
 
-    // Detección inteligente del ejecutable del backend:
-    // 1. Recursos empaquetados por electron-builder (process.resourcesPath/backend/SSCP-Desktop.exe)
-    // 2. Ejecutable local en dist/SSCP-Desktop/SSCP-Desktop.exe
+    // Detección inteligente del ejecutable del backend (Windows / macOS / Linux):
+    // 1. Recursos empaquetados por electron-builder (process.resourcesPath/backend/SSCP-Desktop[.exe])
+    // 2. Ejecutable local en dist/SSCP-Desktop/SSCP-Desktop[.exe]
     // 3. Intérprete Python en entorno virtual (desarrollo)
-    const packagedExe = process.resourcesPath ? path.join(process.resourcesPath, 'backend', 'SSCP-Desktop.exe') : null;
-    const localDistExe = path.resolve(baseConfigDir, '../dist/SSCP-Desktop/SSCP-Desktop.exe');
+    const packagedExe = process.resourcesPath ? path.join(process.resourcesPath, 'backend', exeName) : null;
+    const localDistExe = path.resolve(baseConfigDir, `../dist/SSCP-Desktop/${exeName}`);
 
     let exeToRun = pythonExe;
     let args = [

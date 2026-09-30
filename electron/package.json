@@ -1,17 +1,97 @@
 {
-  "name": "sscp-electron",
-  "version": "1.0.0",
-  "description": "SSCP Desktop - Versión Electron",
+  "name": "sscp-desktop",
+  "productName": "SSCP Desktop",
+  "version": "1.2.1",
+  "description": "Sistema de Seguimiento para Consultas de Pacientes - Versión Desktop",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron ."
+    "dev": "electron .",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:mac:arm64": "electron-builder --mac --arm64",
+    "dist:mac:x64": "electron-builder --mac --x64",
+    "dist:mac:universal": "electron-builder --mac --universal",
+    "dist:win": "electron-builder --win"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "medical",
+    "clinic",
+    "patients",
+    "sscp"
+  ],
+  "author": "Laxarus Devs",
+  "license": "Proprietary",
   "type": "commonjs",
+  "build": {
+    "appId": "com.sscp.desktop",
+    "productName": "SSCP Desktop",
+    "copyright": "Copyright © 2026 Laxarus Devs",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "src/**/*",
+      "config/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist/SSCP-Desktop",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.medical",
+      "icon": "assets/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "config/entitlements.mac.plist",
+      "entitlementsInherit": "config/entitlements.mac.plist"
+    },
+    "dmg": {
+      "title": "${productName} ${version}",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    }
+  },
   "devDependencies": {
-    "electron": "^44.4.5"
+    "electron": "^44.4.5",
+    "electron-builder": "^25.1.8"
   }
 }

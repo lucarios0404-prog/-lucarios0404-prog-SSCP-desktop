@@ -138,15 +138,22 @@
             if (res.ok) {
                 const data = await res.json();
                 const phoneInput = document.getElementById('wa-modal-phone');
+                const testInput = document.getElementById('wa_modal_test_phone');
                 if (phoneInput && data.connected_phone) {
                     phoneInput.value = data.connected_phone;
+                }
+                if (testInput && !testInput.value && data.connected_phone) {
+                    testInput.value = data.connected_phone;
                 }
             }
         } catch (e) {}
 
         const testInput = document.getElementById('wa_modal_test_phone');
         if (testInput) {
-            setTimeout(() => testInput.focus(), 150);
+            setTimeout(() => {
+                testInput.focus();
+                testInput.select();
+            }, 150);
         }
     }
 

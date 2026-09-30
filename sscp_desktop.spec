@@ -89,17 +89,26 @@ hidden_imports = [
     'cryptography.hazmat.primitives',
     'cryptography.hazmat.primitives.serialization',
     'cryptography.hazmat.primitives.asymmetric.ed25519',
-    'wmi',
     'app.models.license_config',
     'app.services.license_service',
     'app.routers.activation',
-    'webview',
-    'webview.platforms.winforms',
-    'webview.platforms.edgechromium',
-    'clr',
-    'pythonnet',
-    'clr_loader',
 ]
+
+if sys.platform == 'win32':
+    hidden_imports.extend([
+        'wmi',
+        'webview',
+        'webview.platforms.winforms',
+        'webview.platforms.edgechromium',
+        'clr',
+        'pythonnet',
+        'clr_loader',
+    ])
+elif sys.platform == 'darwin':
+    hidden_imports.extend([
+        'webview',
+        'webview.platforms.cocoa',
+    ])
 
 import os
 use_obfuscated = os.path.exists("app_obfuscated")
@@ -146,7 +155,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='static/app_icon.ico',
+    icon='static/app_icon.ico' if sys.platform == 'win32' else None,
 )
 
 coll = COLLECT(

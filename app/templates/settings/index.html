@@ -143,6 +143,26 @@
                             </div>
                         </div>
 
+                        <!-- Caja de Prueba Directa de WhatsApp -->
+                        <div class="bg-white p-4 rounded-xl border border-emerald-200 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                            <div class="space-y-0.5">
+                                <label for="test_wa_phone" class="block text-xs font-bold text-slate-800 flex items-center">
+                                    <i class="fas fa-paper-plane text-emerald-600 mr-1.5"></i> Probar Envío Directo a un Celular
+                                </label>
+                                <p class="text-[11px] text-slate-500">Ingresa tu número celular (ej. 809-555-0199) para verificar que WhatsApp abre y envía sin problemas.</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="test_wa_phone" placeholder="Ej: 809-555-0199 o +1..." 
+                                       value="{{ setting.whatsapp_doctor_phone or '' }}"
+                                       onkeydown="if(event.key==='Enter') sendTestWhatsApp()"
+                                       class="px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 w-44 font-mono">
+                                <button type="button" onclick="sendTestWhatsApp()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center shrink-0">
+                                    <i class="fab fa-whatsapp mr-1.5"></i> Probar Test
+                                </button>
+                            </div>
+                        </div>
+                        <div id="test_wa_result" class="text-xs"></div>
+
                         <!-- Sub-sección: Parámetros y Automatización -->
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
                             <div>
@@ -502,13 +522,15 @@
 <script>
 
 async function sendTestWhatsApp() {
-    const phone = document.getElementById('test_wa_phone').value;
-    const resElem = document.getElementById('test_wa_result');
+    const phoneInput = document.getElementById('test_wa_phone') || document.getElementById('wa_modal_test_phone') || document.getElementById('wa-modal-phone');
+    const resElem = document.getElementById('test_wa_result') || document.getElementById('wa_modal_test_result');
+    const phone = phoneInput ? phoneInput.value.trim() : '';
     if (!phone) {
-        resElem.innerHTML = '<span class="text-red-500 font-bold">Ingrese un número</span>';
+        if (resElem) resElem.innerHTML = '<span class="text-red-500 font-bold">Por favor ingrese un número celular para la prueba.</span>';
+        if (phoneInput) phoneInput.focus();
         return;
     }
-    resElem.innerHTML = '<span class="text-slate-500">Enviando prueba...</span>';
+    if (resElem) resElem.innerHTML = '<span class="text-slate-500"><i class="fas fa-spinner fa-spin mr-1"></i>Generando mensaje de WhatsApp...</span>';
     const formData = new FormData();
     formData.append('phone', phone);
     formData.append('message', 'Prueba de WhatsApp desde SSCP Desktop: Integración activa y funcionando.');
@@ -518,16 +540,25 @@ async function sendTestWhatsApp() {
         const data = await res.json();
         if (data.success) {
             if (data.mode === 'wa_link') {
-                resElem.innerHTML = `<a href="${data.wa_link}" target="_blank" class="text-emerald-700 font-bold underline"><i class="fas fa-external-link-alt mr-1"></i>Abrir WhatsApp (1-Clic)</a>`;
+                if (resElem) {
+                    resElem.innerHTML = `
+                        <div class="mt-2 p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 flex items-center justify-between gap-3">
+                            <span class="font-bold flex items-center"><i class="fas fa-check-circle mr-1.5 text-emerald-600"></i> ¡Listo! Abre el chat para enviar.</span>
+                            <a href="${data.wa_link}" target="_blank" class="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-xs transition">
+                                <i class="fab fa-whatsapp mr-1"></i> Abrir WhatsApp
+                            </a>
+                        </div>
+                    `;
+                }
                 window.open(data.wa_link, '_blank');
             } else {
-                resElem.innerHTML = `<span class="text-emerald-600 font-bold"><i class="fas fa-check-circle mr-1"></i>Enviado por Gateway</span>`;
+                if (resElem) resElem.innerHTML = `<span class="text-emerald-600 font-bold"><i class="fas fa-check-circle mr-1"></i> Mensaje enviado correctamente vía Gateway.</span>`;
             }
         } else {
-            resElem.innerHTML = `<span class="text-red-500 font-bold">${data.error || 'Error'}</span>`;
+            if (resElem) resElem.innerHTML = `<span class="text-red-500 font-bold">${data.error || 'Error al generar enlace de WhatsApp'}</span>`;
         }
     } catch(e) {
-        resElem.innerHTML = '<span class="text-red-500 font-bold">Error de conexión</span>';
+        if (resElem) resElem.innerHTML = '<span class="text-red-500 font-bold">Error de conexión con el servidor local.</span>';
     }
 }
 
