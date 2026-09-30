@@ -27,12 +27,9 @@ def build():
     spec_file = BASE_DIR / "sscp_desktop.spec"
     assert spec_file.exists(), f"No se encontró el archivo de especificación {spec_file}"
 
-    # 1. Ejecutar PyInstaller
-    target_arch = sys.argv[1] if len(sys.argv) > 1 else (os.environ.get("TARGET_ARCH") or None)
+    # 1. Ejecutar PyInstaller (compila nativo para la arquitectura de Python en ejecucion)
     cmd = [str(pyinstaller_bin), str(spec_file), "--noconfirm", "--clean"]
-    if target_arch:
-        cmd.extend(["--target-arch", target_arch])
-    print(f"\n[1/3] Ejecutando PyInstaller ({spec_file.name}) con target-arch={target_arch or 'nativo'}...")
+    print(f"\n[1/3] Ejecutando PyInstaller ({spec_file.name}) para arquitectura nativa...")
     result = subprocess.run(cmd, cwd=str(BASE_DIR))
     if result.returncode != 0:
         print("❌ Error durante la compilación con PyInstaller.")

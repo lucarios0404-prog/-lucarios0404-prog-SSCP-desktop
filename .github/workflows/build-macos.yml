@@ -3,6 +3,8 @@ name: Compilación macOS (Intel & Apple Silicon) - SSCP Desktop
 on:
   workflow_dispatch:
   push:
+    branches:
+      - macos-version
     tags:
       - 'v*'
 
@@ -15,10 +17,8 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            py_arch: arm64
             label: Apple Silicon (M1/M2/M3/M4)
           - arch: x64
-            py_arch: x86_64
             label: Intel (x86_64)
 
     steps:
@@ -41,7 +41,7 @@ jobs:
 
       - name: ⚙️ Compilar Backend Python Nativo para macOS (${{ matrix.arch }})
         run: |
-          python build_backend_mac.py ${{ matrix.py_arch }}
+          python build_backend_mac.py
 
       - name: 🟢 Configurar Node.js 20
         uses: actions/setup-node@v4
