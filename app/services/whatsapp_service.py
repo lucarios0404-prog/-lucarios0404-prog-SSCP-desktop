@@ -160,32 +160,30 @@ class WhatsAppService:
         }
 
     @classmethod
-    def dispatch_message(cls, phone: str, message: str, force_manual: bool = False) -> Dict[str, Any]:
+    def dispatch_message(cls, phone: str, message: str, force_manual: bool = True) -> Dict[str, Any]:
         """
-        Envía un mensaje:
-        - Si el Gateway está conectado y no se fuerza modo manual, se despacha en automático.
-        - En caso contrario, provee el enlace directo wa.me para apertura de 1-clic.
+        Envía un mensaje mediante enlace oficial directo de WhatsApp (1-clic).
+        Abre el chat directamente en WhatsApp Web o la App oficial de Windows
+        con el mensaje y datos del paciente prellenados.
         """
         clean_phone = cls.clean_phone_number(phone)
         wa_link = cls.build_wa_link(clean_phone, message) if clean_phone else ""
-        gateway_state = gateway_manager.get_status()
 
-        if gateway_state["is_connected"] and not force_manual:
-            gw_result = gateway_manager.send_message(clean_phone, message)
+        if not clean_phone:
             return {
-                "success": gw_result.get("success", False),
-                "mode": "gateway",
-                "phone": clean_phone,
+                "success": False,
+                "error": "Número telefónico no válido o vacío.",
+                "mode": "wa_link",
+                "phone": "",
                 "message": message,
-                "wa_link": wa_link,
-                "detail": "Despachado automáticamente por el Gateway de WhatsApp."
+                "wa_link": ""
             }
-        
+
         return {
             "success": True,
             "mode": "wa_link",
             "phone": clean_phone,
             "message": message,
             "wa_link": wa_link,
-            "detail": "Listo para envío manual en WhatsApp (1-clic)."
+            "detail": "Enlace oficial generado listo para enviar por WhatsApp (1-clic)."
         }

@@ -254,8 +254,16 @@ def get_whatsapp_gateway_status(
     current_user = Depends(require_current_user)
 ):
     """Retorna el estado de conexión actual del gateway y estadísticas."""
-    status = gateway_manager.get_status()
-    return JSONResponse(content=status)
+    setting = get_or_create_settings(db)
+    phone = setting.whatsapp_doctor_phone or setting.whatsapp_connected_phone or setting.phone or ""
+    return JSONResponse(content={
+        "status": "connected",
+        "is_connected": True,
+        "mode": "1-clic",
+        "connected_phone": phone,
+        "has_active_qr": False,
+        "messages_sent_count": getattr(setting, 'whatsapp_messages_sent_count', 0)
+    })
 
 @router.post("/whatsapp/generate-qr")
 def generate_whatsapp_qr(
@@ -263,56 +271,60 @@ def generate_whatsapp_qr(
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
-    """Genera un nuevo código QR dinámico para vinculación de WhatsApp."""
+    """Modo 1-Clic Oficial: no requiere código QR, retorna estado conectado."""
     setting = get_or_create_settings(db)
-    doctor_phone = phone or setting.whatsapp_doctor_phone or setting.phone
-    qr_data = gateway_manager.generate_pairing_qr(custom_phone=doctor_phone)
-    
-    setting.whatsapp_gateway_status = "pairing"
-    db.commit()
-    
-    return JSONResponse(content=qr_data)
+    doctor_phone = phone or setting.whatsapp_doctor_phone or setting.phone or ""
+    return JSONResponse(content={
+        "status": "connected",
+        "is_connected": True,
+        "mode": "1-clic",
+        "phone": doctor_phone
+    })
 
 @router.post("/whatsapp/confirm-pairing")
 def confirm_whatsapp_pairing(
-    phone: str = Form("+1 (809) 555-0199"),
+    phone: str = Form(...),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
-    """Confirma la vinculación del dispositivo (tras escanear el QR)."""
-    result = gateway_manager.confirm_pairing(phone=phone)
-    
+    """Guarda y valida el celular oficial del consultorio / doctor para recordatorios."""
     setting = get_or_create_settings(db)
+    clean_phone = WhatsAppService.clean_phone_number(phone)
     setting.whatsapp_gateway_status = "connected"
+    setting.whatsapp_doctor_phone = phone
     setting.whatsapp_connected_phone = phone
     db.commit()
 
-    return JSONResponse(content=result)
+    return JSONResponse(content={
+        "status": "connected",
+        "is_connected": True,
+        "phone": phone,
+        "clean_phone": clean_phone,
+        "message": "Celular de WhatsApp del consultorio configurado exitosamente."
+    })
 
 @router.post("/whatsapp/disconnect")
 def disconnect_whatsapp_gateway(
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
-    """Desvincula la sesión activa del Gateway de WhatsApp."""
-    result = gateway_manager.disconnect()
-    
+    """Resetea el número configurado de WhatsApp."""
     setting = get_or_create_settings(db)
-    setting.whatsapp_gateway_status = "disconnected"
+    setting.whatsapp_doctor_phone = None
     setting.whatsapp_connected_phone = None
     db.commit()
 
-    return JSONResponse(content=result)
+    return JSONResponse(content={"status": "connected", "is_connected": True, "phone": ""})
 
 @router.post("/whatsapp/send-test")
 def send_whatsapp_test_message(
     phone: str = Form(...),
-    message: str = Form("Mensaje de prueba desde SSCP Desktop: La integración de WhatsApp está funcionando correctamente."),
+    message: str = Form("Mensaje de prueba desde SSCP Desktop: La integración oficial de WhatsApp está funcionando correctamente."),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
-    """Prueba el envío de un mensaje de WhatsApp (vía gateway o wa.me)."""
-    result = WhatsAppService.dispatch_message(phone=phone, message=message)
+    """Prueba el envío de un mensaje de WhatsApp vía enlace oficial 1-clic wa.me."""
+    result = WhatsAppService.dispatch_message(phone=phone, message=message, force_manual=True)
     return JSONResponse(content=result)
 
 @router.get("/backup/export")
