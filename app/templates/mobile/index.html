@@ -211,6 +211,23 @@
 
         </header>
 
+        <!-- Barra de Estado de Conexión & Sincronización P2P / Tailscale (Local-First) -->
+        <div id="sync-status-bar" class="w-full bg-emerald-50 border-b border-emerald-100 px-4 py-1.5 flex items-center justify-between text-[11px] transition-all shrink-0">
+            <div class="flex items-center space-x-1.5" id="sync-status-indicator">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="sync-dot"></span>
+                <span class="font-bold text-emerald-800" id="sync-text">Conectado a Central (Doctor)</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span id="sync-queue-badge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-200 text-amber-900 animate-bounce">
+                    0 en cola
+                </span>
+                <button onclick="OfflineSyncManager.checkAndSync()" title="Comprobar conexión y sincronizar con la PC" class="text-slate-500 hover:text-indigo-600 font-semibold flex items-center active:scale-95 transition">
+                    <i class="fas fa-arrows-rotate text-xs mr-1" id="sync-icon"></i>
+                    <span id="sync-action-btn">Sincronizar</span>
+                </button>
+            </div>
+        </div>
+
         <!-- Main Scrollable Area -->
         <main class="flex-1 overflow-y-auto p-4 space-y-4 pb-28" id="main-content">
             
@@ -1241,6 +1258,7 @@
 
             if (authToken && currentUser) {
                 showAppScreen();
+                OfflineSyncManager.init();
             } else {
                 showLoginScreen();
                 // Si la app está en el teléfono y nunca se ha configurado la IP de la clínica, guiar al usuario
@@ -1291,6 +1309,266 @@
             localStorage.setItem('sscp_mobile_server_url', serverUrl);
             closeConfigModal();
             alert('Servidor guardado correctamente.');
+            OfflineSyncManager.checkAndSync();
+        }
+
+        // ==============================================================================
+        // MOTOR DE SINCRONIZACIÓN OFFLINE-FIRST (SSCP STORE-AND-FORWARD P2P)
+        // ==============================================================================
+        const OfflineSyncManager = {
+            OUTBOX_KEY: 'sscp_mobile_outbox_queue',
+            CACHE_PATIENTS_KEY: 'sscp_mobile_cached_patients',
+            CACHE_DASHBOARD_KEY: 'sscp_mobile_cached_dashboard',
+            LAST_SYNC_KEY: 'sscp_mobile_last_sync_time',
+            isSyncing: false,
+            serverOnline: false,
+
+            init() {
+                this.updateSyncUI();
+                if (!window.__offlineSyncIntervalSet) {
+                    window.__offlineSyncIntervalSet = true;
+                    // Chequeo periódico automático cada 15 segundos
+                    setInterval(() => this.checkAndSync(), 15000);
+                    window.addEventListener('online', () => this.checkAndSync());
+                    window.addEventListener('offline', () => this.setOnlineStatus(false));
+                }
+                setTimeout(() => this.checkAndSync(), 800);
+            },
+
+            getOutbox() {
+                try {
+                    return JSON.parse(localStorage.getItem(this.OUTBOX_KEY) || '{"patients":[], "appointments":[]}');
+                } catch (e) {
+                    return { patients: [], appointments: [] };
+                }
+            },
+
+            saveOutbox(outbox) {
+                localStorage.setItem(this.OUTBOX_KEY, JSON.stringify(outbox));
+                this.updateSyncUI();
+            },
+
+            getPendingCount() {
+                const ob = this.getOutbox();
+                return (ob.patients?.length || 0) + (ob.appointments?.length || 0);
+            },
+
+            enqueuePatient(patientData) {
+                const ob = this.getOutbox();
+                const clientUuid = 'p-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+                patientData.client_uuid = clientUuid;
+                patientData.created_at = new Date().toISOString();
+                patientData.pending_sync = true;
+                ob.patients.push(patientData);
+                this.saveOutbox(ob);
+                this.addPatientToLocalCache(patientData);
+                return clientUuid;
+            },
+
+            enqueueAppointment(apptData) {
+                const ob = this.getOutbox();
+                const clientUuid = 'a-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+                apptData.client_uuid = clientUuid;
+                apptData.created_at = new Date().toISOString();
+                apptData.pending_sync = true;
+                ob.appointments.push(apptData);
+                this.saveOutbox(ob);
+                this.addAppointmentToLocalDashboard(apptData);
+                return clientUuid;
+            },
+
+            addPatientToLocalCache(p) {
+                if (!window.qaPatientsList) window.qaPatientsList = [];
+                const displayDoc = p.document_id ? ` (${p.document_id})` : '';
+                const displayPhone = p.phone ? ` - Tel: ${p.phone}` : '';
+                const fullName = `${p.first_name} ${p.last_name}`.trim();
+                window.qaPatientsList.unshift({
+                    id: p.client_uuid,
+                    client_uuid: p.client_uuid,
+                    name: fullName,
+                    first_name: p.first_name,
+                    last_name: p.last_name,
+                    document_id: p.document_id || '',
+                    phone: p.phone || '',
+                    display: `${p.last_name}, ${p.first_name}${displayDoc}${displayPhone} [En Celular]`,
+                    is_offline: true
+                });
+                populateQaPatientSelect(window.qaPatientsList);
+            },
+
+            addAppointmentToLocalDashboard(a) {
+                let cached = this.getCachedDashboard();
+                if (!cached) {
+                    cached = {
+                        date: new Date().toISOString().split('T')[0],
+                        stats: { total: 0, waiting: 0, in_consultation: 0, completed: 0 },
+                        appointments: []
+                    };
+                }
+                const newCardItem = {
+                    id: 'offline-' + Date.now(),
+                    client_uuid: a.client_uuid,
+                    patient_id: a.patient_id || a.patient_client_uuid,
+                    patient_name: a.patient_name ? `${a.patient_name} ${a.patient_last_name || ''}`.trim() : (a.patient_display_name || 'Paciente Local'),
+                    patient_phone: a.patient_phone || '',
+                    date: a.date,
+                    start_time: a.start_time,
+                    reason: a.reason || 'Consulta General',
+                    status: 'Pendiente',
+                    price: a.price || 0,
+                    insurance_name: a.insurance_name || 'Privado',
+                    is_offline: true,
+                    pending_sync: true
+                };
+                cached.appointments.push(newCardItem);
+                cached.stats.total = (cached.stats.total || 0) + 1;
+                localStorage.setItem(this.CACHE_DASHBOARD_KEY, JSON.stringify(cached));
+                renderDashboard(cached);
+            },
+
+            getCachedDashboard() {
+                try {
+                    return JSON.parse(localStorage.getItem(this.CACHE_DASHBOARD_KEY) || 'null');
+                } catch (e) {
+                    return null;
+                }
+            },
+
+            setOnlineStatus(isOnline) {
+                this.serverOnline = isOnline;
+                this.updateSyncUI();
+            },
+
+            updateSyncUI() {
+                const bar = document.getElementById('sync-status-bar');
+                const dot = document.getElementById('sync-dot');
+                const text = document.getElementById('sync-text');
+                const badge = document.getElementById('sync-queue-badge');
+                const icon = document.getElementById('sync-icon');
+                const btnTxt = document.getElementById('sync-action-btn');
+
+                if (!bar || !dot || !text) return;
+                const pending = this.getPendingCount();
+
+                if (this.isSyncing) {
+                    bar.className = 'w-full bg-blue-50 border-b border-blue-200 px-4 py-1.5 flex items-center justify-between text-[11px] transition-all shrink-0';
+                    dot.className = 'w-2 h-2 rounded-full bg-blue-500 animate-ping';
+                    text.innerHTML = '<span class="font-bold text-blue-900">Transfiriendo a la PC Central...</span>';
+                    if (icon) icon.className = 'fas fa-arrows-rotate fa-spin text-blue-600 text-xs mr-1';
+                    if (btnTxt) btnTxt.textContent = 'Enviando...';
+                } else if (this.serverOnline) {
+                    bar.className = 'w-full bg-emerald-50 border-b border-emerald-100 px-4 py-1.5 flex items-center justify-between text-[11px] transition-all shrink-0';
+                    dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+                    text.innerHTML = '<span class="font-bold text-emerald-800">Conectado a Central (Doctor)</span>';
+                    if (icon) icon.className = 'fas fa-arrows-rotate text-emerald-600 text-xs mr-1';
+                    if (btnTxt) btnTxt.textContent = 'Sincronizar';
+                } else {
+                    bar.className = 'w-full bg-amber-50 border-b border-amber-200 px-4 py-1.5 flex items-center justify-between text-[11px] transition-all shrink-0';
+                    dot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+                    text.innerHTML = '<span class="font-bold text-amber-900">PC Doctor Apagada / Fuera de Línea</span>';
+                    if (icon) icon.className = 'fas fa-cloud-arrow-up text-amber-700 text-xs mr-1';
+                    if (btnTxt) btnTxt.textContent = 'Reintentar';
+                }
+
+                if (badge) {
+                    if (pending > 0) {
+                        badge.classList.remove('hidden');
+                        badge.textContent = `${pending} en cola para envío`;
+                    } else {
+                        badge.classList.add('hidden');
+                    }
+                }
+            },
+
+            async checkAndSync() {
+                if (!authToken || this.isSyncing) return;
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 4000);
+                    const res = await fetch(getApiUrl('/api/mobile/ping'), { signal: controller.signal });
+                    clearTimeout(timeoutId);
+
+                    if (res.ok) {
+                        this.setOnlineStatus(true);
+                        const pending = this.getPendingCount();
+                        if (pending > 0) {
+                            await this.flushOutbox();
+                        }
+                    } else {
+                        this.setOnlineStatus(false);
+                    }
+                } catch (e) {
+                    this.setOnlineStatus(false);
+                }
+            },
+
+            async flushOutbox() {
+                if (this.isSyncing) return;
+                const ob = this.getOutbox();
+                const hasPatients = ob.patients && ob.patients.length > 0;
+                const hasAppts = ob.appointments && ob.appointments.length > 0;
+
+                if (!hasPatients && !hasAppts) return;
+
+                this.isSyncing = true;
+                this.updateSyncUI();
+
+                try {
+                    const payload = {
+                        patients: ob.patients || [],
+                        appointments: ob.appointments || [],
+                        last_synced_at: localStorage.getItem(this.LAST_SYNC_KEY) || null
+                    };
+
+                    const res = await fetch(getApiUrl('/api/mobile/sync/batch'), {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${authToken}`
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        console.log('✓ Sincronización exitosa con PC Central:', data);
+                        this.saveOutbox({ patients: [], appointments: [] });
+                        localStorage.setItem(this.LAST_SYNC_KEY, new Date().toISOString());
+
+                        showSyncToast(`✓ ¡Conexión con Central lista! Se transfirieron ${data.processed_appointments} citas y ${data.processed_patients} pacientes.`);
+                        loadDashboardData();
+                        loadQaPatientsList();
+                    } else {
+                        console.warn('Servidor respondió error en batch sync:', res.status);
+                    }
+                } catch (e) {
+                    console.warn('Error al vaciar cola outbox:', e);
+                } finally {
+                    this.isSyncing = false;
+                    this.updateSyncUI();
+                }
+            }
+        };
+
+        function showSyncToast(message, type = 'success') {
+            let toast = document.getElementById('sscp-sync-toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'sscp-sync-toast';
+                document.body.appendChild(toast);
+            }
+            if (type === 'success') {
+                toast.className = 'fixed bottom-20 left-4 right-4 z-50 p-3.5 rounded-2xl shadow-2xl bg-emerald-700 text-white text-xs font-bold flex items-center space-x-2 transition-all transform duration-300 opacity-100 translate-y-0';
+                toast.innerHTML = `<i class="fas fa-check-circle text-base flex-shrink-0"></i><span>${message}</span>`;
+            } else {
+                toast.className = 'fixed bottom-20 left-4 right-4 z-50 p-3.5 rounded-2xl shadow-2xl bg-amber-600 text-white text-xs font-bold flex items-center space-x-2 transition-all transform duration-300 opacity-100 translate-y-0';
+                toast.innerHTML = `<i class="fas fa-clock text-base flex-shrink-0"></i><span>${message}</span>`;
+            }
+            setTimeout(() => {
+                if (toast) {
+                    toast.className = 'fixed bottom-20 left-4 right-4 z-50 p-3.5 rounded-2xl text-xs font-bold flex items-center space-x-2 transition-all transform duration-300 opacity-0 translate-y-4 pointer-events-none';
+                }
+            }, 5000);
         }
 
         // Autenticación
@@ -1331,6 +1609,7 @@
                 localStorage.setItem('sscp_mobile_clinic', JSON.stringify(currentClinic));
 
                 showAppScreen();
+                OfflineSyncManager.init();
             } catch (err) {
                 errBox.textContent = err.message;
                 errBox.classList.remove('hidden');
@@ -1485,22 +1764,37 @@
         // Cargar Datos del Dashboard Móvil
         async function loadDashboardData() {
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4000);
                 const res = await fetch(getApiUrl('/api/mobile/dashboard'), {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
 
                 if (res.status === 401) {
                     handleLogout();
                     return;
                 }
 
-                const data = await res.json();
-                renderDashboard(data);
-                if (!window.mobileServicesCatalog || window.mobileServicesCatalog.length === 0) {
-                    loadMobileCatalogs();
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('sscp_mobile_cached_dashboard', JSON.stringify(data));
+                    OfflineSyncManager.setOnlineStatus(true);
+                    renderDashboard(data);
+                    if (!window.mobileServicesCatalog || window.mobileServicesCatalog.length === 0) {
+                        loadMobileCatalogs();
+                    }
+                    return;
                 }
+                throw new Error('Servidor central fuera de línea');
             } catch (e) {
-                console.error('Error cargando datos del dashboard:', e);
+                console.warn('Dashboard usando caché local offline (PC central no responde):', e);
+                OfflineSyncManager.setOnlineStatus(false);
+                const cached = OfflineSyncManager.getCachedDashboard();
+                if (cached) {
+                    renderDashboard(cached);
+                }
             }
         }
 
@@ -1556,7 +1850,9 @@
             const isDoctor = currentUser.role === 'doctor';
 
             let statusBadge = '';
-            if (a.status === 'En Espera') {
+            if (a.is_offline || a.pending_sync) {
+                statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300"><i class="fas fa-cloud-arrow-up mr-1 text-amber-700 animate-pulse"></i>En Celular (Pendiente)</span>';
+            } else if (a.status === 'En Espera') {
                 statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">En Sala de Espera</span>';
             } else if (a.status === 'En Consulta') {
                 statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">En Consulta</span>';
@@ -1832,17 +2128,26 @@
             const countBadge = document.getElementById('qa-patients-count');
             countBadge.textContent = 'Cargando...';
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4000);
                 const res = await fetch(getApiUrl('/api/mobile/patients/options'), {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
+
                 if (!res.ok) throw new Error('Error al cargar pacientes');
                 const data = await res.json();
                 window.qaPatientsList = data.patients || [];
+                localStorage.setItem(OfflineSyncManager.CACHE_PATIENTS_KEY, JSON.stringify(window.qaPatientsList));
                 countBadge.textContent = `${window.qaPatientsList.length} en sistema`;
                 populateQaPatientSelect(window.qaPatientsList, selectedId);
             } catch (err) {
-                console.error('Error cargando lista de pacientes:', err);
-                countBadge.textContent = 'Error al cargar';
+                console.warn('Usando catálogo local offline de pacientes:', err);
+                const cached = JSON.parse(localStorage.getItem(OfflineSyncManager.CACHE_PATIENTS_KEY) || '[]');
+                window.qaPatientsList = cached;
+                countBadge.textContent = `${window.qaPatientsList.length} en celular`;
+                populateQaPatientSelect(window.qaPatientsList, selectedId);
             }
         }
 
@@ -2126,23 +2431,36 @@
             submitText.textContent = 'Guardando cita...';
 
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4000);
                 const res = await fetch(getApiUrl('/api/mobile/appointments/quick-create'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
 
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.detail || 'Error al agendar cita');
-                closeModal('modal-quick-appt');
-                alert(data.message || 'Cita agendada exitosamente en el sistema del doctor.');
-                loadDashboardData();
-                loadQaPatientsList(); // Actualizar caché de pacientes
+                if (res.ok) {
+                    const data = await res.json();
+                    closeModal('modal-quick-appt');
+                    showSyncToast('✓ Cita agendada directamente en la PC del doctor.');
+                    loadDashboardData();
+                    loadQaPatientsList();
+                    return;
+                }
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.detail || 'Error de conexión con PC central');
             } catch (err) {
-                alert(err.message);
+                // FALLBACK OFFLINE INTELIGENTE: Si la PC está apagada o no hay conexión
+                console.warn('PC doctor apagada o sin red. Guardando cita en cola local (Store-and-Forward)...', err);
+                payload.patient_display_name = (mode === 'existing') ? (document.getElementById('qa-patient-select')?.selectedOptions[0]?.text || 'Paciente') : `${payload.patient_name} ${payload.patient_last_name || ''}`.trim();
+                OfflineSyncManager.enqueueAppointment(payload);
+                closeModal('modal-quick-appt');
+                showSyncToast('✓ Cita guardada en el celular. Se transferirá automáticamente al encender la PC del doctor.', 'warning');
             } finally {
                 submitBtn.disabled = false;
                 submitText.textContent = mode === 'existing' ? 'Agendar Cita en el Sistema' : 'Crear Paciente y Agendar Cita';
@@ -2617,48 +2935,61 @@
             saveBtn.disabled = true;
             saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i> Guardando en base de datos...';
 
+            const patientPayload = {
+                first_name: fn,
+                last_name: ln,
+                document_id: docId || null,
+                phone: phone || null,
+                date_of_birth: dob || null,
+                gender: gender || null,
+                email: email || null,
+                address: address || null,
+                blood_type: blood || null,
+                allergies: allergies || null,
+                emergency_contact_name: emName || null,
+                emergency_contact_phone: emPhone || null,
+                insurance_name: insName,
+                insurance_number: insNum || null
+            };
+
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4000);
                 const res = await fetch(getApiUrl('/api/mobile/patients'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
-                    body: JSON.stringify({
-                        first_name: fn,
-                        last_name: ln,
-                        document_id: docId || null,
-                        phone: phone || null,
-                        date_of_birth: dob || null,
-                        gender: gender || null,
-                        email: email || null,
-                        address: address || null,
-                        blood_type: blood || null,
-                        allergies: allergies || null,
-                        emergency_contact_name: emName || null,
-                        emergency_contact_phone: emPhone || null,
-                        insurance_name: insName,
-                        insurance_number: insNum || null
-                    })
+                    body: JSON.stringify(patientPayload),
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
 
-                const data = await res.json();
-                if (!res.ok) {
-                    throw new Error(data.detail || 'Error al registrar paciente');
+                if (res.ok) {
+                    const data = await res.json();
+                    closeModal('modal-new-patient');
+                    showSyncToast('✓ Paciente registrado con éxito.');
+                    if (window.__returnToApptModalAfterPatientSave && data.patient) {
+                        window.__returnToApptModalAfterPatientSave = false;
+                        openQuickApptForPatient(data.patient.id, data.patient.name, data.patient.phone);
+                    } else if (currentMainTab === 'patients') {
+                        loadMobilePatients(1);
+                    }
+                    loadQaPatientsList();
+                    return;
                 }
-
-                closeModal('modal-new-patient');
-                alert(data.message || 'Paciente registrado exitosamente.');
-
-                // Si se abrió desde Agendar Cita, regresar a la cita con el paciente seleccionado
-                if (window.__returnToApptModalAfterPatientSave && data.patient) {
-                    window.__returnToApptModalAfterPatientSave = false;
-                    openQuickApptForPatient(data.patient.id, data.patient.name, data.patient.phone);
-                } else if (currentMainTab === 'patients') {
-                    loadMobilePatients(1);
-                }
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.detail || 'Error al registrar paciente');
             } catch (err) {
-                alert(err.message);
+                console.warn('PC doctor apagada o sin red. Guardando paciente en cola offline...', err);
+                const clientUuid = OfflineSyncManager.enqueuePatient(patientPayload);
+                closeModal('modal-new-patient');
+                showSyncToast('✓ Paciente guardado en el celular. Se transferirá a la PC del doctor al encenderla.', 'warning');
+                if (window.__returnToApptModalAfterPatientSave) {
+                    window.__returnToApptModalAfterPatientSave = false;
+                    openQuickApptForPatient(clientUuid, `${fn} ${ln}`, phone);
+                }
             } finally {
                 saveBtn.disabled = false;
                 saveBtn.innerHTML = '<i class="fas fa-save mr-1.5"></i> Guardar Paciente en Base de Datos';

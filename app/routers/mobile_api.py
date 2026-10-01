@@ -76,6 +76,48 @@ class QuickPaymentRequest(BaseModel):
     insurance_name: Optional[str] = None
     notes: Optional[str] = "Pago registrado desde aplicación móvil"
 
+# --- Schemas de Sincronización Diferida / Offline-First (Tailscale / LAN) ---
+class BatchSyncPatientItem(BaseModel):
+    client_uuid: Optional[str] = None
+    first_name: str
+    last_name: str
+    document_id: Optional[str] = None
+    phone: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    gender: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    blood_type: Optional[str] = None
+    allergies: Optional[str] = None
+    insurance_name: Optional[str] = "Privado / Particular"
+    insurance_number: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    created_at: Optional[str] = None
+
+class BatchSyncAppointmentItem(BaseModel):
+    client_uuid: Optional[str] = None
+    patient_client_uuid: Optional[str] = None
+    patient_id: Optional[int] = None
+    patient_name: Optional[str] = None
+    patient_last_name: Optional[str] = None
+    patient_document_id: Optional[str] = None
+    patient_phone: Optional[str] = None
+    patient_allergies: Optional[str] = None
+    date: str  # YYYY-MM-DD
+    start_time: str  # HH:MM
+    reason: Optional[str] = "Consulta General"
+    service_id: Optional[int] = None
+    price: Optional[float] = None
+    insurance_name: Optional[str] = None
+    created_at: Optional[str] = None
+
+class MobileBatchSyncRequest(BaseModel):
+    patients: List[BatchSyncPatientItem] = []
+    appointments: List[BatchSyncAppointmentItem] = []
+    last_synced_at: Optional[str] = None
+
+
 # --- Public Ping Endpoint for Connection Testing ---
 @router.get("/ping")
 def ping_server(db: Session = Depends(get_db)):
@@ -995,4 +1037,278 @@ def list_mobile_ars():
     return {
         "ars": get_all_ars()
     }
+
+
+# ==============================================================================
+# MOTOR DE SINCRONIZACIÓN OFFLINE-FIRST (ALMACENAR EN MÓVIL Y TRANSFERIR A PC)
+# ==============================================================================
+
+@router.post("/sync/batch")
+def mobile_sync_batch(
+    payload: MobileBatchSyncRequest,
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Recibe un lote de citas y pacientes creados en modo offline por la APK/Móvil.
+    Reconcilia registros existentes, previene duplicados por cédula/teléfono/horario
+    y devuelve el mapeo de IDs asignados en SQLite para que el móvil actualice su caché.
+    """
+    patient_id_map = {}
+    processed_patients = 0
+    processed_appointments = 0
+
+    # 1. Procesar Pacientes Offline
+    for p_item in payload.patients:
+        doc_clean = (p_item.document_id or "").strip() or None
+        phone_clean = (p_item.phone or "").strip() or None
+        fn = p_item.first_name.strip()
+        ln = p_item.last_name.strip()
+
+        existing = None
+        if doc_clean:
+            existing = db.query(Patient).filter(Patient.document_id == doc_clean, Patient.is_active == True).first()
+        if not existing and phone_clean:
+            existing = db.query(Patient).filter(Patient.phone == phone_clean, Patient.is_active == True).first()
+        if not existing and fn and ln:
+            existing = db.query(Patient).filter(
+                Patient.first_name.ilike(fn),
+                Patient.last_name.ilike(ln),
+                Patient.is_active == True
+            ).first()
+
+        if existing:
+            # Actualizar datos complementarios si faltaban
+            if not existing.phone and phone_clean:
+                existing.phone = phone_clean
+            if not existing.allergies and p_item.allergies:
+                existing.allergies = p_item.allergies.strip()
+            if not existing.insurance_name and p_item.insurance_name:
+                existing.insurance_name = p_item.insurance_name
+            db.commit()
+            assigned_id = existing.id
+            processed_patients += 1
+        else:
+            dob_val = None
+            if p_item.date_of_birth:
+                try:
+                    dob_val = datetime.strptime(p_item.date_of_birth, "%Y-%m-%d").date()
+                except Exception:
+                    pass
+
+            new_p = Patient(
+                first_name=fn,
+                last_name=ln,
+                document_id=doc_clean,
+                phone=phone_clean,
+                date_of_birth=dob_val,
+                gender=p_item.gender or None,
+                email=p_item.email or None,
+                address=p_item.address or None,
+                blood_type=p_item.blood_type or None,
+                allergies=p_item.allergies or None,
+                emergency_contact_name=p_item.emergency_contact_name or None,
+                emergency_contact_phone=p_item.emergency_contact_phone or None,
+                insurance_name=p_item.insurance_name or "Privado / Particular",
+                insurance_number=p_item.insurance_number or None,
+                is_active=True
+            )
+            db.add(new_p)
+            db.commit()
+            db.refresh(new_p)
+            assigned_id = new_p.id
+            processed_patients += 1
+
+        if p_item.client_uuid:
+            patient_id_map[p_item.client_uuid] = assigned_id
+
+    # 2. Procesar Citas Offline
+    appointment_id_map = {}
+    for a_item in payload.appointments:
+        target_pid = a_item.patient_id
+        if not target_pid and a_item.patient_client_uuid:
+            target_pid = patient_id_map.get(a_item.patient_client_uuid)
+
+        if not target_pid and a_item.patient_name:
+            # Resolver paciente al vuelo
+            doc_c = (a_item.patient_document_id or "").strip() or None
+            ph_c = (a_item.patient_phone or "").strip() or None
+            fn_c = a_item.patient_name.strip()
+            ln_c = (a_item.patient_last_name or "").strip()
+
+            p_match = None
+            if doc_c:
+                p_match = db.query(Patient).filter(Patient.document_id == doc_c, Patient.is_active == True).first()
+            if not p_match and ph_c:
+                p_match = db.query(Patient).filter(Patient.phone == ph_c, Patient.is_active == True).first()
+            if not p_match:
+                p_match = db.query(Patient).filter(
+                    Patient.first_name.ilike(fn_c),
+                    Patient.last_name.ilike(ln_c) if ln_c else True,
+                    Patient.is_active == True
+                ).first()
+
+            if p_match:
+                target_pid = p_match.id
+            else:
+                p_new = Patient(
+                    first_name=fn_c,
+                    last_name=ln_c or "S/A",
+                    document_id=doc_c,
+                    phone=ph_c,
+                    allergies=a_item.patient_allergies or None,
+                    is_active=True
+                )
+                db.add(p_new)
+                db.commit()
+                db.refresh(p_new)
+                target_pid = p_new.id
+
+        if not target_pid:
+            continue
+
+        try:
+            appt_date = datetime.strptime(a_item.date, "%Y-%m-%d").date()
+            time_parts = a_item.start_time.split(":")
+            st_h, st_m = int(time_parts[0]), int(time_parts[1])
+            start_t = time(st_h, st_m)
+            end_t = time((st_h + 1) % 24, st_m)
+        except Exception:
+            continue
+
+        # Idempotencia: Verificar si ya existe cita para este paciente en misma fecha y hora
+        existing_appt = db.query(Appointment).filter(
+            Appointment.patient_id == target_pid,
+            Appointment.date == appt_date,
+            Appointment.start_time == start_t
+        ).first()
+
+        if existing_appt:
+            if a_item.client_uuid:
+                appointment_id_map[a_item.client_uuid] = existing_appt.id
+            processed_appointments += 1
+            continue
+
+        new_appt = Appointment(
+            patient_id=target_pid,
+            date=appt_date,
+            start_time=start_t,
+            end_time=end_t,
+            reason=a_item.reason or "Consulta General",
+            service_id=a_item.service_id,
+            price=a_item.price or 0.0,
+            status="Pendiente"
+        )
+        db.add(new_appt)
+        db.commit()
+        db.refresh(new_appt)
+        processed_appointments += 1
+
+        if a_item.client_uuid:
+            appointment_id_map[a_item.client_uuid] = new_appt.id
+
+    return {
+        "success": True,
+        "processed_patients": processed_patients,
+        "processed_appointments": processed_appointments,
+        "patient_id_map": patient_id_map,
+        "appointment_id_map": appointment_id_map,
+        "server_time": datetime.utcnow().isoformat(),
+        "message": f"Sincronización por lote completada: {processed_patients} pacientes y {processed_appointments} citas procesadas."
+    }
+
+
+@router.get("/sync/delta")
+def mobile_sync_delta(
+    since: Optional[str] = Query(None),
+    target_date: Optional[str] = Query(None),
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retorna la lista completa de datos actualizados para hidratar el almacenamiento local de la APK.
+    """
+    # Pacientes
+    patients = (
+        db.query(Patient)
+        .filter(or_(Patient.is_active == True, Patient.is_active == None))
+        .order_by(func.coalesce(Patient.last_name, ''), Patient.first_name)
+        .all()
+    )
+    patients_list = []
+    for p in patients:
+        ln = (p.last_name or "").strip()
+        fn = (p.first_name or "").strip()
+        doc = (p.document_id or "").strip()
+        phone = (p.phone or "").strip()
+        patients_list.append({
+            "id": p.id,
+            "first_name": fn,
+            "last_name": ln,
+            "name": f"{fn} {ln}".strip(),
+            "document_id": doc,
+            "phone": phone,
+            "email": p.email or "",
+            "allergies": p.allergies or "",
+            "blood_type": p.blood_type or "",
+            "insurance_name": p.insurance_name or "Privado / Particular",
+            "insurance_number": p.insurance_number or "",
+            "display": f"{ln}, {fn}".strip(", ") + (f" ({doc})" if doc else "") + (f" - Tel: {phone}" if phone else "")
+        })
+
+    # Citas
+    appt_date = date.today()
+    if target_date:
+        try:
+            appt_date = datetime.strptime(target_date, "%Y-%m-%d").date()
+        except Exception:
+            pass
+
+    appts = (
+        db.query(Appointment)
+        .filter(Appointment.date >= appt_date)
+        .order_by(Appointment.date.asc(), Appointment.start_time.asc())
+        .limit(150)
+        .all()
+    )
+    appts_list = []
+    for a in appts:
+        p_name = "Paciente no encontrado"
+        p_phone = ""
+        p_doc = ""
+        if a.patient:
+            p_name = f"{a.patient.first_name} {a.patient.last_name}".strip()
+            p_phone = a.patient.phone or ""
+            p_doc = a.patient.document_id or ""
+        appts_list.append({
+            "id": a.id,
+            "patient_id": a.patient_id,
+            "patient_name": p_name,
+            "patient_phone": p_phone,
+            "patient_document_id": p_doc,
+            "date": a.date.strftime("%Y-%m-%d") if a.date else "",
+            "start_time": a.start_time.strftime("%H:%M") if a.start_time else "",
+            "reason": a.reason or "Consulta General",
+            "status": a.status or "Pendiente",
+            "service_id": a.service_id,
+            "price": a.price or 0.0
+        })
+
+    from app.models.service import Service
+    services = db.query(Service).filter(Service.is_active == True).order_by(Service.category.asc(), Service.name.asc()).all()
+    from app.services.ars_service import get_all_ars
+
+    return {
+        "server_time": datetime.utcnow().isoformat(),
+        "total_patients": len(patients_list),
+        "total_appointments": len(appts_list),
+        "patients": patients_list,
+        "appointments": appts_list,
+        "services": [
+            {"id": s.id, "name": s.name, "price": s.price, "color": s.color, "category": s.category}
+            for s in services
+        ],
+        "ars": get_all_ars()
+    }
+
 
