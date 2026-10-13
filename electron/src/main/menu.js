@@ -124,7 +124,7 @@ function buildAppMenu(mainWindow, baseUrl, getAppIcon) {
               type: 'info',
               title: 'Acerca de SSCP Desktop',
               message: 'SSCP Desktop - Edición Electron',
-              detail: `Versión Suite: 1.3.0\nVersión Electron: ${process.versions.electron}\nVersión Node: ${process.versions.node}\nMotor Chromium: ${process.versions.chrome}\n\nDiseñado para consultas médicas profesionales de alto rendimiento con soporte de márgenes personalizados y notificaciones de sala de espera.`,
+              detail: `Versión Suite: ${app.getVersion()}\nVersión Electron: ${process.versions.electron}\nVersión Node: ${process.versions.node}\nMotor Chromium: ${process.versions.chrome}\n\nDiseñado para consultas médicas profesionales de alto rendimiento con soporte de márgenes personalizados y notificaciones de sala de espera.`,
               buttons: ['Entendido']
             });
           }

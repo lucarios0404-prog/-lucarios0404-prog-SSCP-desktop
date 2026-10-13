@@ -911,7 +911,7 @@ def quick_register_payment(
         receipt_number=receipt_no,
         created_by_id=current_user.id,
         status="paid",
-        created_at=datetime.utcnow()
+        created_at=datetime.now()
     )
     db.add(payment)
     db.commit()

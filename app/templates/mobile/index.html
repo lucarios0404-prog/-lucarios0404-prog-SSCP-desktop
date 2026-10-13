@@ -7,7 +7,12 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Standalone QR Code & Barcode Scanner Engine -->
-    <script src="/static/js/html5-qrcode.min.js"></script>
+    <script>
+        (function() {
+            var src = (location.protocol === 'file:') ? 'html5-qrcode.min.js' : '/static/js/html5-qrcode.min.js';
+            document.write('<script src="' + src + '"><\/script>');
+        })();
+    </script>
     <script>
         tailwind.config = {
             theme: {

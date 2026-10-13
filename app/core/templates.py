@@ -93,3 +93,11 @@ def get_current_setting():
     }
 
 templates.env.globals["get_current_setting"] = get_current_setting
+
+try:
+    from app.version import SUITE_VERSION, APK_VERSION
+    templates.env.globals["SUITE_VERSION"] = SUITE_VERSION
+    templates.env.globals["APK_VERSION"] = APK_VERSION
+except ImportError:
+    templates.env.globals["SUITE_VERSION"] = "1.3.0"
+    templates.env.globals["APK_VERSION"] = "1.5.3"

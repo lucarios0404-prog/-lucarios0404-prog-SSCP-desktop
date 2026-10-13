@@ -272,7 +272,8 @@ async def lifespan(app: FastAPI):
     except asyncio.CancelledError:
         pass
 
-app = FastAPI(title="SSCP Desktop", version="1.3.0", lifespan=lifespan)
+from app.version import SUITE_VERSION
+app = FastAPI(title="SSCP Desktop", version=SUITE_VERSION, lifespan=lifespan)
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
