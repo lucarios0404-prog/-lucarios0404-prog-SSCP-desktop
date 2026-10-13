@@ -4,8 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>SSCP Móvil — Doctor &amp; Secretaria</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS (Offline Local + Fallback CDN) -->
+    <script>
+        (function() {
+            var src = (location.protocol === 'file:') ? 'tailwind.min.js' : '/static/js/tailwind.min.js';
+            document.write('<script src="' + src + '"><\/script>');
+        })();
+    </script>
+    <script>
+        if (typeof tailwind === 'undefined') {
+            document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
+        }
+    </script>
     <!-- Standalone QR Code & Barcode Scanner Engine -->
     <script>
         (function() {
@@ -35,15 +45,24 @@
             }
         }
     </script>
-    <!-- FontAwesome 6 -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- FontAwesome 6 (Offline Local + Fallback CDN) -->
+    <script>
+        (function() {
+            var href = (location.protocol === 'file:') ? 'css/fontawesome.min.css' : '/static/css/fontawesome.min.css';
+            document.write('<link rel="stylesheet" href="' + href + '">');
+        })();
+    </script>
+    <noscript>
+        <link rel="stylesheet" href="css/fontawesome.min.css">
+    </noscript>
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        .hidden { display: none !important; }
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
         }
