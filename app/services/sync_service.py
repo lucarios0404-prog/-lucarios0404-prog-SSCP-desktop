@@ -1052,9 +1052,10 @@ class SyncService:
             return {"success": False, "message": "URL de la estación par no especificada."}
 
         clean_url = peer_url.strip().rstrip("/")
+        verify_ssl = SyncService._should_verify_ssl(clean_url)
         # 1. Comprobar salud y rol de la estación par
         try:
-            async with httpx.AsyncClient(timeout=4.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=4.0, verify=verify_ssl) as client:
                 ping_resp = await client.get(f"{clean_url}/sync/peer/status")
                 if ping_resp.status_code != 200:
                     return {
@@ -1074,7 +1075,7 @@ class SyncService:
         sent_count = sum(local_delta.get("counts", {}).values())
 
         try:
-            async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=30.0, verify=verify_ssl) as client:
                 push_resp = await client.post(f"{clean_url}/sync/peer/import", json=local_delta)
         except Exception as e:
             print(f"[Peer Sync] Error enviando delta a par: {e}")
@@ -1082,7 +1083,7 @@ class SyncService:
         # 3. Pull delta desde el par
         pulled_counts = {}
         try:
-            async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=30.0, verify=verify_ssl) as client:
                 pull_resp = await client.get(f"{clean_url}/sync/peer/delta")
                 if pull_resp.status_code == 200:
                     peer_delta = pull_resp.json()

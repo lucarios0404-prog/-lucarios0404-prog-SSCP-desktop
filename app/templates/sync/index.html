@@ -16,13 +16,13 @@
                 <!-- Encabezado -->
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 class="text-2xl font-bold text-slate-900">Sincronización Offline / Online</h1>
-                        <p class="text-xs text-slate-500 mt-0.5">Gestión de conectividad con la nube, respaldo portátil y sincronización entre consultorios.</p>
+                        <h1 class="text-2xl font-bold text-slate-900">Conectividad Local y Respaldo</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Enlace con tablets, sincronización de estaciones (Doctor & Secretaria) y respaldo portátil sin dependencias de la nube.</p>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold {% if connection.online %}bg-emerald-100 text-emerald-800{% else %}bg-amber-100 text-amber-800{% endif %}">
-                            <span class="w-2 h-2 rounded-full mr-2 {% if connection.online %}bg-emerald-500 animate-pulse{% else %}bg-amber-500{% endif %}"></span>
-                            {% if connection.online %}En Línea con el Servidor{% else %}Modo Offline Activo{% endif %}
+                        <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            <span class="w-2 h-2 rounded-full mr-2 bg-emerald-500 animate-pulse"></span>
+                            Servidor Local Autónomo
                         </span>
                     </div>
                 </div>
@@ -153,38 +153,45 @@
 
                 <!-- Opciones de Sincronización -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Tarjeta 1: Sincronización en la Nube -->
+                    <!-- Tarjeta 1: Enlace con Tablets y Celulares en Red Local -->
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between space-y-5">
                         <div>
-                            <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center mb-4">
-                                <i class="fas fa-cloud-arrow-up text-lg"></i>
+                            <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center mb-4">
+                                <i class="fas fa-tablet-screen-button text-lg"></i>
                             </div>
-                            <h2 class="text-base font-bold text-slate-900">Sincronización en la Nube</h2>
-                            <p class="text-xs text-slate-500 mt-1">Conecta con el servidor central SSCP para subir consultas realizadas offline y descargar actualizaciones.</p>
+                            <h2 class="text-base font-bold text-slate-900">Enlace con Tablets y Celulares</h2>
+                            <p class="text-xs text-slate-500 mt-1">Conecta cualquier Tablet (iPad / Android) o teléfono en el consultorio a esta computadora física sin necesidad de Tailscale ni servidores en la nube.</p>
                             
-                            <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1.5">
-                                <div class="flex justify-between">
-                                    <span class="text-slate-500">Servidor Remoto:</span>
-                                    <span class="font-mono text-slate-700 font-semibold truncate max-w-[200px]">{{ remote_url }}</span>
+                            <div class="mt-4 p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-slate-500">IP de esta Computadora:</span>
+                                    <span class="font-mono text-slate-800 font-bold bg-white px-2 py-0.5 rounded border border-slate-200">{{ local_ip }}</span>
                                 </div>
-                                <div class="flex justify-between">
-                                    <span class="text-slate-500">Sede Actual:</span>
-                                    <span class="text-slate-700 font-bold">{{ stats.sede_name }}</span>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-slate-500">Puerto de Servicio:</span>
+                                    <span class="font-mono text-slate-800 font-bold">{{ local_port }}</span>
                                 </div>
-                                <div class="flex justify-between">
-                                    <span class="text-slate-500">Última Comprobación:</span>
-                                    <span class="text-slate-700">{{ stats.last_synced_at }}</span>
+                                <div class="pt-2 border-t border-slate-200/60">
+                                    <span class="text-[10px] text-slate-400 font-bold uppercase block mb-1">Abre esta URL en el navegador de la Tablet:</span>
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" readonly value="{{ mobile_url }}" id="mobile-url-input" class="w-full font-mono text-xs font-bold text-indigo-700 bg-white border border-indigo-200 rounded-lg px-2.5 py-1.5 select-all">
+                                        <button type="button" onclick="navigator.clipboard.writeText('{{ mobile_url }}'); alert('Enlace copiado al portapapeles');" class="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200 shrink-0">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <form method="post" action="/sync/trigger">
-                            <input type="hidden" name="remote_url" value="{{ remote_url }}">
-                            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center space-x-2">
-                                <i class="fas fa-rotate"></i>
-                                <span>Probar Conexión y Sincronizar Ahora</span>
-                            </button>
-                        </form>
+                        <div class="space-y-2 pt-2 border-t border-slate-100">
+                            <form method="post" action="/sync/firewall-rule">
+                                <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center space-x-2">
+                                    <i class="fas fa-shield-halved text-emerald-400"></i>
+                                    <span>Habilitar Puerto {{ local_port }} en Firewall de Windows</span>
+                                </button>
+                            </form>
+                            <p class="text-[10px] text-slate-400 text-center">Asegura que la Tablet y esta PC estén en el mismo Wi-Fi del consultorio.</p>
+                        </div>
                     </div>
 
                     <!-- Tarjeta 2: Respaldo y Migración Portátil (Pendrive / USB) -->

@@ -16,7 +16,7 @@ from app.models.payment import Payment
 from app.models.service import Service
 from app.models.setting import Setting
 from app.core import security
-from app.core.deps import require_current_user
+from app.core.deps import require_current_user, require_permission
 
 router = APIRouter(prefix="/api/mobile", tags=["mobile"])
 
@@ -41,6 +41,12 @@ class QuickAppointmentRequest(BaseModel):
     service_id: Optional[int] = None
     price: Optional[float] = None
     insurance_name: Optional[str] = None
+    insurance_number: Optional[str] = None
+    # Lógica de Cobro Inmediato vs Cobrar Más Tarde
+    collect_now: Optional[bool] = False
+    payment_amount: Optional[float] = None
+    payment_method: Optional[str] = "Efectivo"
+    payment_notes: Optional[str] = None
 
 class MobilePatientCreateRequest(BaseModel):
     first_name: str
@@ -74,7 +80,20 @@ class QuickPaymentRequest(BaseModel):
     service_id: Optional[int] = None
     service_name: Optional[str] = "Consulta Médica General"
     insurance_name: Optional[str] = None
+    item_type: Optional[str] = "servicio"  # "servicio" o "articulo"
     notes: Optional[str] = "Pago registrado desde aplicación móvil"
+
+class MobileServiceCreateRequest(BaseModel):
+    name: str
+    price: float = 0.0
+    category: Optional[str] = "General"
+    color: Optional[str] = "#0d9488"
+
+class MobileServiceUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    price: Optional[float] = None
+    category: Optional[str] = None
+    is_active: Optional[bool] = None
 
 # --- Schemas de Sincronización Diferida / Offline-First (Tailscale / LAN) ---
 class BatchSyncPatientItem(BaseModel):
@@ -110,6 +129,11 @@ class BatchSyncAppointmentItem(BaseModel):
     service_id: Optional[int] = None
     price: Optional[float] = None
     insurance_name: Optional[str] = None
+    insurance_number: Optional[str] = None
+    collect_now: Optional[bool] = False
+    payment_amount: Optional[float] = None
+    payment_method: Optional[str] = "Efectivo"
+    payment_notes: Optional[str] = None
     created_at: Optional[str] = None
 
 class MobileBatchSyncRequest(BaseModel):
@@ -328,6 +352,13 @@ def quick_create_appointment(
 
         if existing:
             patient_id = existing.id
+            req_ins = (payload.insurance_name or "").strip()
+            if req_ins and req_ins.lower() not in ("privado", "privado / particular", ""):
+                if (not existing.insurance_name) or existing.insurance_name.strip().lower() in ("privado", "privado / particular"):
+                    existing.insurance_name = req_ins
+                    if payload.insurance_number:
+                        existing.insurance_number = payload.insurance_number.strip()
+                    db.commit()
         else:
             fname = name_clean
             lname = last_clean
@@ -335,11 +366,15 @@ def quick_create_appointment(
                 parts = fname.split(" ", 1)
                 fname = parts[0]
                 lname = parts[1]
+            ins_name = (payload.insurance_name or "").strip() or "Privado / Particular"
+            ins_num = (payload.insurance_number or "").strip() or None
             new_patient = Patient(
                 first_name=fname,
-                last_name=lname,
+                last_name=lname or "S/A",
                 phone=phone_clean or None,
                 document_id=doc_clean or None,
+                insurance_name=ins_name,
+                insurance_number=ins_num,
                 allergies=(payload.patient_allergies or "").strip() or None,
                 is_active=True
             )
@@ -365,11 +400,45 @@ def quick_create_appointment(
         start_time=start_t,
         end_time=end_t,
         reason=payload.reason or "Consulta General",
+        service_id=payload.service_id,
+        price=payload.price or 0.0,
         status="Pendiente"
     )
     db.add(new_appt)
     db.commit()
     db.refresh(new_appt)
+
+    payment_record = None
+    if payload.collect_now and payload.payment_amount and payload.payment_amount > 0:
+        svc_name = payload.reason or "Consulta Médica General"
+        if payload.service_id:
+            svc = db.query(Service).filter(Service.id == payload.service_id).first()
+            if svc:
+                svc_name = svc.name
+        
+        p = db.query(Patient).filter(Patient.id == patient_id).first()
+        ins_name = payload.insurance_name or (p.insurance_name if p else "Privado / Particular")
+        receipt_no = generate_mobile_receipt_number()
+        
+        note_text = payload.payment_notes or f"Cobro inmediato al agendar cita #{new_appt.id} (por {current_user.name})"
+        payment_record = Payment(
+            patient_id=patient_id,
+            appointment_id=new_appt.id,
+            service_id=payload.service_id,
+            service_name=svc_name,
+            insurance_name=ins_name or "Privado / Particular",
+            amount=payload.payment_amount,
+            total=payload.payment_amount,
+            payment_method=payload.payment_method or "Efectivo",
+            notes=note_text,
+            receipt_number=receipt_no,
+            created_by_id=current_user.id,
+            status="paid",
+            created_at=datetime.utcnow()
+        )
+        db.add(payment_record)
+        db.commit()
+        db.refresh(payment_record)
 
     return {
         "success": True,
@@ -377,7 +446,13 @@ def quick_create_appointment(
         "patient_id": patient_id,
         "date": str(new_appt.date),
         "start_time": new_appt.start_time.strftime("%H:%M"),
-        "status": new_appt.status
+        "status": new_appt.status,
+        "payment": {
+            "id": payment_record.id,
+            "receipt_number": payment_record.receipt_number,
+            "amount": payment_record.total,
+            "method": payment_record.payment_method
+        } if payment_record else None
     }
 
 # --- Listado Completo de Pacientes para Selectores y Agendar Citas Rápidas ---
@@ -420,18 +495,9 @@ def get_patient_options(
         })
     return {"patients": results, "total": len(results)}
 
-# --- Directorio de Pacientes Móvil con Paginación y Búsqueda ---
-@router.get("/patients")
-def list_mobile_patients(
-    q: Optional[str] = None,
-    page: int = Query(1, ge=1),
-    limit: int = Query(30, ge=1, le=100),
-    current_user: User = Depends(require_current_user),
-    db: Session = Depends(get_db)
-):
-    """Listado del directorio de pacientes para la versión móvil."""
+def _filter_active_patients(db: Session, q: Optional[str] = None):
+    """Helper unificado para filtrado y búsqueda de pacientes activos en la API móvil."""
     query = db.query(Patient).filter(Patient.is_active == True)
-
     if q and q.strip():
         term = f"%{q.strip()}%"
         query = query.filter(
@@ -443,7 +509,19 @@ def list_mobile_patients(
                 Patient.email.ilike(term)
             )
         )
+    return query
 
+# --- Directorio de Pacientes Móvil con Paginación y Búsqueda ---
+@router.get("/patients")
+def list_mobile_patients(
+    q: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(30, ge=1, le=100),
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """Listado del directorio de pacientes para la versión móvil."""
+    query = _filter_active_patients(db, q)
     total = query.count()
     patients = query.order_by(Patient.id.desc()).offset((page - 1) * limit).limit(limit).all()
 
@@ -691,21 +769,7 @@ def search_patients(
     current_user: User = Depends(require_current_user),
     db: Session = Depends(get_db)
 ):
-    term = f"%{q.strip()}%"
-    patients = (
-        db.query(Patient)
-        .filter(
-            or_(
-                Patient.first_name.ilike(term),
-                Patient.last_name.ilike(term),
-                Patient.phone.ilike(term),
-                Patient.document_id.ilike(term)
-            )
-        )
-        .filter(Patient.is_active == True)
-        .limit(20)
-        .all()
-    )
+    patients = _filter_active_patients(db, q).limit(20).all()
 
     results = []
     for p in patients:
@@ -767,9 +831,14 @@ def get_patient_quick_card(
 @router.post("/consultations/quick")
 def quick_save_consultation(
     payload: QuickConsultationRequest,
-    current_user: User = Depends(require_current_user),
+    current_user: User = Depends(require_permission("consultations")),
     db: Session = Depends(get_db)
 ):
+    if current_user.role not in ("doctor", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso restringido: Solo el personal médico o administradores pueden diagnosticar y registrar consultas."
+        )
     new_cons = Consultation(
         patient_id=payload.patient_id,
         doctor_id=current_user.id,
@@ -810,7 +879,13 @@ def quick_register_payment(
     db: Session = Depends(get_db)
 ):
     service_name = payload.service_name or "Consulta Médica General"
-    if payload.service_id:
+    if payload.item_type == "articulo" and payload.service_name:
+        clean_item = payload.service_name.strip()
+        if not clean_item.startswith("[Artículo]") and not clean_item.startswith("[Insumo]"):
+            service_name = f"[Artículo] {clean_item}"
+        else:
+            service_name = clean_item
+    elif payload.service_id:
         svc = db.query(Service).filter(Service.id == payload.service_id).first()
         if svc and (not payload.service_name or payload.service_name == "Consulta Médica General"):
             service_name = svc.name
@@ -826,7 +901,7 @@ def quick_register_payment(
 
     payment = Payment(
         patient_id=payload.patient_id,
-        service_id=payload.service_id,
+        service_id=payload.service_id if payload.item_type != "articulo" else None,
         service_name=service_name,
         insurance_name=ins_name or "Privado / Particular",
         amount=payload.amount,
@@ -852,6 +927,133 @@ def quick_register_payment(
         "total": payment.total,
         "payment_method": payment.payment_method,
         "message": f"Pago de RD$ {payment.total:,.2f} registrado exitosamente ({payment.receipt_number})"
+    }
+
+# --- Catálogo de Servicios y Administración Móvil (Talonario) ---
+@router.get("/services")
+def get_mobile_services(
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """Retorna la lista completa de servicios activos del talonario para citas y cobros."""
+    services = db.query(Service).filter(Service.is_active == True).order_by(Service.category, Service.name).all()
+    return {
+        "services": [
+            {
+                "id": s.id,
+                "name": s.name,
+                "price": s.price,
+                "category": s.category or "General",
+                "color": s.color or "#0d9488",
+                "is_active": s.is_active
+            }
+            for s in services
+        ]
+    }
+
+@router.post("/services")
+def create_mobile_service(
+    payload: MobileServiceCreateRequest,
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """Crea un nuevo servicio en el talonario oficial desde la app móvil."""
+    clean_name = payload.name.strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="El nombre del servicio es obligatorio")
+    
+    existing = db.query(Service).filter(func.lower(Service.name) == clean_name.lower()).first()
+    if existing:
+        existing.is_active = True
+        existing.price = max(0.0, float(payload.price))
+        existing.category = payload.category or "General"
+        db.commit()
+        db.refresh(existing)
+        svc = existing
+    else:
+        svc = Service(
+            name=clean_name,
+            price=max(0.0, float(payload.price)),
+            category=payload.category or "General",
+            color=payload.color or "#0d9488",
+            is_active=True
+        )
+        db.add(svc)
+        db.commit()
+        db.refresh(svc)
+    return {
+        "success": True,
+        "service": {
+            "id": svc.id,
+            "name": svc.name,
+            "price": svc.price,
+            "category": svc.category
+        },
+        "message": f"Servicio '{svc.name}' guardado correctamente en el talonario"
+    }
+
+@router.put("/services/{service_id}")
+def update_mobile_service(
+    service_id: int,
+    payload: MobileServiceUpdateRequest,
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """Modifica un servicio existente (nombre, precio o categoría) desde la app móvil."""
+    svc = db.query(Service).filter(Service.id == service_id).first()
+    if not svc:
+        raise HTTPException(status_code=404, detail="Servicio no encontrado")
+    if payload.name is not None and payload.name.strip():
+        svc.name = payload.name.strip()
+    if payload.price is not None:
+        svc.price = max(0.0, float(payload.price))
+    if payload.category is not None:
+        svc.category = payload.category.strip()
+    if payload.is_active is not None:
+        svc.is_active = payload.is_active
+    db.commit()
+    db.refresh(svc)
+    return {
+        "success": True,
+        "service": {
+            "id": svc.id,
+            "name": svc.name,
+            "price": svc.price,
+            "category": svc.category,
+            "is_active": svc.is_active
+        },
+        "message": f"Servicio '{svc.name}' actualizado exitosamente"
+    }
+
+# --- Catálogo Oficial de ARS para la App Móvil ---
+@router.get("/ars")
+def get_mobile_ars(
+    current_user: User = Depends(require_current_user)
+):
+    """Retorna la lista oficial de ARS (República Dominicana) con metadatos y logos."""
+    from app.services.ars_service import get_all_ars
+    return {"ars": get_all_ars()}
+
+# --- Catálogo de Artículos / Insumos de Inventario para Cobros ---
+@router.get("/inventory")
+def get_mobile_inventory_items(
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """Retorna artículos del inventario o insumos disponibles para cobro directo."""
+    from app.models.inventory import InventoryItem
+    items = db.query(InventoryItem).order_by(InventoryItem.name).all()
+    return {
+        "items": [
+            {
+                "id": it.id,
+                "name": it.name,
+                "price": it.price,
+                "category": it.category or "Insumo",
+                "stock": it.stock
+            }
+            for it in items
+        ]
     }
 
 # --- Mobile Consolidated Reports (Pagos, Vistos, Citas Previas y PDF) ---
@@ -1150,12 +1352,21 @@ def mobile_sync_batch(
 
             if p_match:
                 target_pid = p_match.id
+                req_ins = (a_item.insurance_name or "").strip()
+                if req_ins and req_ins.lower() not in ("privado", "privado / particular", ""):
+                    if (not p_match.insurance_name) or p_match.insurance_name.strip().lower() in ("privado", "privado / particular"):
+                        p_match.insurance_name = req_ins
+                        if getattr(a_item, "insurance_number", None):
+                            p_match.insurance_number = a_item.insurance_number.strip()
+                        db.commit()
             else:
                 p_new = Patient(
                     first_name=fn_c,
                     last_name=ln_c or "S/A",
                     document_id=doc_c,
                     phone=ph_c,
+                    insurance_name=(a_item.insurance_name or "").strip() or "Privado / Particular",
+                    insurance_number=(getattr(a_item, "insurance_number", None) or "").strip() or None,
                     allergies=a_item.patient_allergies or None,
                     is_active=True
                 )

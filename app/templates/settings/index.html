@@ -272,10 +272,20 @@
                             </div>
 
                             <div>
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">URL o IP de la Estación Principal / Nube</label>
-                                <input type="text" name="central_station_url" value="{{ setting.central_station_url or '' }}" placeholder="Ej: http://100.x.y.z:8080 o https://sscp.laxarusdevs.com" 
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">URL o IP de la Estación Par (Doctor o Secretaría)</label>
+                                <input type="text" name="central_station_url" value="{{ setting.central_station_url or '' }}" placeholder="Ej: http://192.168.1.50:8080 (IP local de la otra PC)" 
                                     class="w-full px-3.5 py-2 text-sm font-mono border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
-                                <p class="mt-1 text-[11px] text-slate-400">Dirección para que la secretaría sincronice datos directamente con el doctor o la nube.</p>
+                                <p class="mt-1 text-[11px] text-slate-400">Dirección para que la secretaría sincronice datos directamente con la PC del doctor en la red local.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-sky-800 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                    <i class="fas fa-cloud text-sky-600"></i>
+                                    <span>Canal del Buzón Cloud Relay (Enlace Tablet por Internet)</span>
+                                </label>
+                                <input type="text" name="relay_channel_id" value="{{ setting.relay_channel_id or 'dr_carlos_heredia' }}" placeholder="Ej: dr_manuel_ramirez o dra_laura_gomez" 
+                                    class="w-full px-3.5 py-2 text-sm font-mono border border-sky-300 bg-sky-50/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                                <p class="mt-1 text-[11px] text-sky-700">Canal exclusivo en la nube para enlazar la Tablet de la secretaría sin importar si están en redes diferentes o si la PC no tiene Wi-Fi.</p>
                             </div>
 
                             <div>
@@ -285,6 +295,7 @@
                                 <p class="mt-1 text-[11px] text-slate-400">Permite enlazar de forma segura múltiples consultorios a través de internet sin abrir puertos.</p>
                             </div>
                         </div>
+
 
                         <div class="border-t border-slate-100 pt-5 mt-6 flex items-center justify-end space-x-3">
                             <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold shadow-md transition-all">
@@ -339,6 +350,58 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Tarjeta: Calibrador de Talonario y Márgenes de Impresión (Unificado v1.2.6) -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+                        <div>
+                            <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center">
+                                <i class="fas fa-sliders-h text-amber-600 mr-2"></i> Calibrador de Talonario y Márgenes de Impresión
+                            </h2>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                Ajusta con precisión milimétrica las coordenadas del papel físico para que el texto coincida exactamente sobre tus líneas preimpresas.
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                13.6 × 21.7 cm (Media Carta)
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="p-4 rounded-xl border border-amber-200/80 bg-amber-50/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div class="space-y-1 text-xs text-slate-700">
+                            <p class="font-semibold text-slate-900 flex items-center">
+                                <i class="fas fa-check-circle text-emerald-600 mr-1.5"></i>
+                                Compatible con todos los documentos clínicos de SSCP:
+                            </p>
+                            <p class="text-slate-600 text-[11px] leading-relaxed">
+                                • <strong>Recetas Médicas Rápidas</strong> y <strong>Prescripciones de Consulta</strong><br>
+                                • <strong>Licencias Médicas / Certificados de Reposo</strong><br>
+                                • <strong>Cartas de Referencia / Interconsulta</strong><br>
+                                • <strong>Órdenes y Solicitudes de Laboratorio Clínico</strong>
+                            </p>
+                        </div>
+                        <div class="shrink-0 flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                            <button type="button" onclick="openPrintConfiguratorFromSettings()"
+                                class="inline-flex items-center justify-center px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md transition-all">
+                                <i class="fas fa-external-link-alt mr-2"></i> Abrir Calibrador (Ctrl+Alt+M)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                function openPrintConfiguratorFromSettings() {
+                    if (window.electronAPI && window.electronAPI.openPrintConfigurator) {
+                        window.electronAPI.openPrintConfigurator();
+                    } else if (window.sscpElectron && window.sscpElectron.openPrintConfigurator) {
+                        window.sscpElectron.openPrintConfigurator();
+                    } else {
+                        alert('Para abrir el Calibrador interactivo, presiona Ctrl+Alt+M o selecciona Archivo > Configurar Márgenes de Impresión.');
+                    }
+                }
+                </script>
 
                 <!-- Tarjeta: Copias de Seguridad y Respaldo de Base de Datos -->
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
@@ -418,7 +481,7 @@
                             <div>
                                 <div class="flex items-center space-x-2 text-slate-800 font-bold text-sm mb-1.5">
                                     <i class="fab fa-android text-emerald-600 text-lg"></i>
-                                    <span>APK Móvil para PC Desktop (v1.4.0)</span>
+                                    <span>APK Móvil para PC Desktop (v1.5.3)</span>
                                 </div>
                                 <p class="text-xs text-slate-600 leading-relaxed mb-3">
                                     Instalador Android oficial para conectar el teléfono o tablet de recepción directamente con esta computadora.
@@ -426,15 +489,15 @@
                                 <div class="bg-white/90 p-3 rounded-lg border border-emerald-100 text-[11px] text-slate-600 space-y-1.5">
                                     <div class="flex items-start space-x-1.5">
                                         <i class="fas fa-check text-emerald-600 mt-0.5 text-[10px]"></i>
-                                        <span><strong>PC apagada:</strong> La secretaria puede agendar citas en su celular y se guardan sin perderse.</span>
+                                        <span><strong>Modo Fuera de Línea:</strong> Registro de citas y pacientes en almacenamiento local seguro.</span>
                                     </div>
                                     <div class="flex items-start space-x-1.5">
                                         <i class="fas fa-check text-emerald-600 mt-0.5 text-[10px]"></i>
-                                        <span><strong>Sincronización auto:</strong> Al encender la PC o conectarse a Tailscale, se transfieren solas.</span>
+                                        <span><strong>Sincronización Automática:</strong> Transferencia bidireccional inmediata al restablecer conexión.</span>
                                     </div>
                                     <div class="flex items-start space-x-1.5">
                                         <i class="fas fa-check text-emerald-600 mt-0.5 text-[10px]"></i>
-                                        <span><strong>Túnel Tailscale P2P:</strong> Conexión permanente cifrada sin abrir puertos.</span>
+                                        <span><strong>Comunicación Segura:</strong> Canal cifrado de alta disponibilidad.</span>
                                     </div>
                                 </div>
                             </div>
@@ -510,19 +573,16 @@
                     </div>
 
                     <!-- Banner Informativo: Diferencia entre APK Desktop y Edición Nube -->
-                    <div class="mt-4 p-3.5 rounded-xl border border-sky-100 bg-sky-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
+                    <div class="mt-4 p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
                         <div class="flex items-start sm:items-center space-x-2.5">
-                            <span class="text-base text-sky-600">☁️</span>
+                            <span class="text-base text-emerald-600">📶</span>
                             <div>
-                                <span class="font-bold text-slate-800">¿Tu consultorio opera con la Nube Central 24/7?</span>
+                                <span class="font-bold text-slate-800">Conexión 100% Local en tu Consultorio</span>
                                 <p class="text-[11px] text-slate-500">
-                                    Este APK local conecta con esta computadora física. Si utilizas la edición SaaS en la nube, ingresa directamente a <code class="bg-white px-1.5 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">https://sscp.laxarusdevs.com/app</code> desde el navegador de tu celular (PWA).
+                                    Cualquier tablet o celular conectado al mismo Wi-Fi del consultorio puede operar el sistema abriendo <code class="bg-white px-1.5 py-0.5 rounded border border-emerald-200 text-emerald-800 font-bold">/mobile</code> o usando el APK local.
                                 </p>
                             </div>
                         </div>
-                        <a href="https://sscp.laxarusdevs.com/app" target="_blank" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold shrink-0 transition shadow-sm text-center">
-                            Abrir Nube Web <i class="fas fa-external-link-alt ml-1 text-[10px]"></i>
-                        </a>
                     </div>
                 </div>
             </div>

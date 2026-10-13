@@ -1,6 +1,6 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}Licencias Médicas — SSCP Desktop{% endblock %}
+{% block title %}Certificados Médicos — SSCP Desktop{% endblock %}
 
 {% block body %}
 <div class="flex h-screen bg-slate-50 overflow-hidden">
@@ -8,18 +8,18 @@
     {% include "partials/sidebar.html" %}
 
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {% set page_title = "Licencias y Reposos Médicos" %}
+        {% set page_title = "Certificados Médicos" %}
         {% include "partials/header.html" %}
 
         <main class="flex-1 overflow-y-auto p-6 md:p-8">
             <div class="max-w-5xl mx-auto space-y-6">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 class="text-2xl font-bold text-slate-900">Certificados de Licencia Médica</h1>
-                        <p class="text-xs text-slate-500 mt-0.5">Control de permisos laborales, reposos médicos emitidos y reimpresión en PDF oficial.</p>
+                        <h1 class="text-2xl font-bold text-slate-900">Certificados Médicos</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Control de permisos laborales, certificados de salud emitidos y reimpresión en PDF oficial o talonario.</p>
                     </div>
                     <a href="/licenses/create" class="inline-flex items-center px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md shadow-amber-600/30 transition-all">
-                        <i class="fas fa-plus mr-1.5"></i> Emitir Licencia Médica
+                        <i class="fas fa-plus mr-1.5"></i> Emitir Certificado Médico
                     </a>
                 </div>
 
@@ -40,7 +40,7 @@
                                 {% if not licenses %}
                                 <tr>
                                     <td colspan="6" class="py-8 text-center text-slate-400">
-                                        No se han emitido licencias médicas registradas.
+                                        No se han emitido certificados médicos registrados.
                                     </td>
                                 </tr>
                                 {% endif %}
@@ -68,9 +68,12 @@
                                     <td class="py-3.5 px-4 text-slate-500">
                                         {{ l.workplace_or_school or 'General' }}
                                     </td>
-                                    <td class="py-3.5 px-4 text-right">
+                                    <td class="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                                        <a href="/licenses/{{ l.id }}/talonario/pdf" target="_blank" class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold shadow-sm" title="Imprimir en Talonario Preimpreso (13.6 × 21.7 cm)">
+                                            <i class="fas fa-file-medical mr-1"></i> Talonario
+                                        </a>
                                         <a href="/licenses/{{ l.id }}/pdf" target="_blank" class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold">
-                                            <i class="fas fa-file-pdf mr-1"></i> Descargar PDF
+                                            <i class="fas fa-file-pdf mr-1"></i> PDF
                                         </a>
                                     </td>
                                 </tr>

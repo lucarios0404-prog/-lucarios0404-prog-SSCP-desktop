@@ -19,6 +19,20 @@ def _sync_redirect(msg: str, msg_type: str = "info") -> RedirectResponse:
     query = urlencode({"msg": msg or "", "type": msg_type or "info"})
     return RedirectResponse(url=f"/sync?{query}", status_code=303)
 
+import socket
+import os
+
+def get_local_ip() -> str:
+    """Detecta la IP local de la computadora en la red Wi-Fi o Ethernet del consultorio."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
 @router.get("/")
 async def sync_dashboard(
     request: Request,
@@ -28,25 +42,9 @@ async def sync_dashboard(
     stats = SyncService.get_sync_stats(db)
     setting = db.query(Setting).first()
 
-    # Si la base de datos local aún tiene la IP quemada de laxarusserver (100.111.106.27), limpiarla
-    if setting and setting.tailscale_ip == "100.111.106.27":
-        setting.tailscale_ip = None
-        db.commit()
-
-    DEFAULT_REMOTE_URL = "https://sscp.laxarusdevs.com"
-    remote_url = DEFAULT_REMOTE_URL
-
-    if setting and setting.email and ("http://" in setting.email or "https://" in setting.email):
-        remote_url = setting.email.strip()
-    elif setting and setting.tailscale_ip and setting.tailscale_ip.strip() and setting.tailscale_ip.strip() != "100.111.106.27":
-        candidate_url = f"http://{setting.tailscale_ip.strip()}:8000"
-        candidate_chk = await SyncService.check_connection(candidate_url, timeout=1.0)
-        if candidate_chk.get("online"):
-            remote_url = candidate_url
-
-    # Chequeo no bloqueante rápido
-    conn_result = await SyncService.check_connection(remote_url, timeout=2.0)
-    recent_logs = SyncService.get_recent_logs(db, limit=10)
+    local_ip = get_local_ip()
+    local_port = int(os.environ.get("SSCP_PORT", 8080))
+    mobile_url = f"http://{local_ip}:{local_port}/mobile"
 
     return templates.TemplateResponse(
         request=request,
@@ -55,71 +53,27 @@ async def sync_dashboard(
             "user": current_user,
             "stats": stats,
             "setting": setting,
-            "remote_url": remote_url,
-            "connection": conn_result,
-            "recent_logs": recent_logs,
+            "local_ip": local_ip,
+            "local_port": local_port,
+            "mobile_url": mobile_url,
             "message": request.query_params.get("msg"),
             "msg_type": request.query_params.get("type", "info")
         }
     )
 
-@router.post("/trigger")
-async def trigger_sync(
-    request: Request,
-    remote_url: str = Form("https://sscp.laxarusdevs.com"),
+@router.post("/firewall-rule")
+async def enable_firewall_rule(
     db: Session = Depends(get_db),
-    current_user = Depends(require_permission("sync"))
+    current_user = Depends(require_admin)
 ):
-    if not remote_url or "100.111.106.27" in remote_url:
-        remote_url = "https://sscp.laxarusdevs.com"
-
-    setting = db.query(Setting).first()
-    node_ip = setting.tailscale_ip if setting else None
-    
-    # Ejecutar Push y Pull con política último gana
-    push_res = await SyncService.push_to_remote(db, remote_url, node_ip)
-    pull_res = await SyncService.pull_from_remote(db, remote_url, node_ip)
-
-    if setting:
-        setting.updated_at = datetime.utcnow()
-        db.commit()
-
-    if push_res.get("success") or pull_res.get("success"):
-        msg = f"Sincronización completada. Subidos: {push_res.get('sent', 0)} registros. Recibidos: {pull_res.get('received', 0)} registros."
-        msg_type = "success"
-    else:
-        msg = f"Modo Offline: No se pudo conectar al servidor central ({push_res.get('message')}). Los datos están protegidos en SQLite local."
-        msg_type = "warning"
-
-    return _sync_redirect(msg, msg_type)
-
-@router.post("/push")
-async def push_sync(
-    remote_url: str = Form("https://sscp.laxarusdevs.com"),
-    db: Session = Depends(get_db),
-    current_user = Depends(require_permission("sync"))
-):
-    if not remote_url or "100.111.106.27" in remote_url:
-        remote_url = "https://sscp.laxarusdevs.com"
-
-    setting = db.query(Setting).first()
-    res = await SyncService.push_to_remote(db, remote_url, node_ip=setting.tailscale_ip if setting else None)
-    msg_type = "success" if res.get("success") else "warning"
-    return _sync_redirect(res.get("message", ""), msg_type)
-
-@router.post("/pull")
-async def pull_sync(
-    remote_url: str = Form("https://sscp.laxarusdevs.com"),
-    db: Session = Depends(get_db),
-    current_user = Depends(require_permission("sync"))
-):
-    if not remote_url or "100.111.106.27" in remote_url:
-        remote_url = "https://sscp.laxarusdevs.com"
-
-    setting = db.query(Setting).first()
-    res = await SyncService.pull_from_remote(db, remote_url, node_ip=setting.tailscale_ip if setting else None)
-    msg_type = "success" if res.get("success") else "warning"
-    return _sync_redirect(res.get("message", ""), msg_type)
+    """Asegura la regla de Windows Firewall para permitir acceso de Tablets en la red local."""
+    import subprocess
+    try:
+        cmd = 'netsh advfirewall firewall add rule name="SSCP Desktop Server (Port 8080)" dir=in action=allow protocol=TCP localport=8080 profile=any'
+        subprocess.run(cmd, shell=True, check=True)
+        return _sync_redirect("Regla de Firewall de Windows habilitada con éxito para el puerto 8080.", "success")
+    except Exception as e:
+        return _sync_redirect(f"Aviso: Ejecuta SSCP como Administrador para habilitar el firewall ({e})", "warning")
 
 @router.get("/export")
 def export_sync_package(
@@ -190,7 +144,8 @@ async def ping_peer_station(
     import httpx
     clean_target = target_url.rstrip("/")
     try:
-        async with httpx.AsyncClient(timeout=3.0, verify=False) as client:
+        verify_ssl = SyncService._should_verify_ssl(clean_target)
+        async with httpx.AsyncClient(timeout=3.0, verify=verify_ssl) as client:
             resp = await client.get(f"{clean_target}/sync/peer/status")
             if resp.status_code == 200:
                 data = resp.json()

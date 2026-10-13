@@ -307,14 +307,18 @@ LAB_PANELS = [
         "category": "Sonografía",
         "icon": "fa-wave-square",
         "tests": [
-            "Pélvica",
-            "Transvaginal",
+            "Sonografía Pélvica",
+            "Sonografía Transvaginal",
+            "Sonografía Abdominal",
+            "Sonografía Obstétrica",
+            "Sonografía Morfológica",
+            "Sonografía Genética",
+            "Sonografía Perfil Hemodinámico",
+            "Sonografía Doppler Placentario",
             "Sonomamografía",
-            "Obstetricia",
-            "Abdominal",
-            "Genética",
-            "Morfológica",
-            "Perfil hemodinámico",
+            "Radiografía Pélvica",
+            "Tomografía Abdominal",
+            "Tomografía Pélvica",
         ]
     }
 ]

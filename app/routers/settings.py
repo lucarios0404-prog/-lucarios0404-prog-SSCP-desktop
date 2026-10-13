@@ -130,6 +130,7 @@ def update_settings(
     sync_interval_minutes: int = Form(5),
     station_role: str = Form("doctor_principal"),
     central_station_url: str = Form(None),
+    relay_channel_id: str = Form(None),
     # Campos WhatsApp
     whatsapp_doctor_phone: str = Form(None),
     whatsapp_auto_send: bool = Form(False),
@@ -140,6 +141,7 @@ def update_settings(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("settings"))
 ):
+    import re
     setting = get_or_create_settings(db)
     setting.clinic_name = clinic_name
     setting.doctor_name = doctor_name
@@ -154,6 +156,16 @@ def update_settings(
     setting.station_role = station_role or "doctor_principal"
     setting.central_station_url = central_station_url.strip() if central_station_url else None
     
+    # Canal Cloud Relay único del médico
+    import unicodedata
+    if relay_channel_id and relay_channel_id.strip():
+        norm_channel = unicodedata.normalize('NFKD', relay_channel_id.strip()).encode('ASCII', 'ignore').decode('utf-8').lower()
+        setting.relay_channel_id = re.sub(r'[^a-zA-Z0-9_\-]+', '_', norm_channel).strip('_')
+    elif doctor_name and doctor_name.strip() and doctor_name.strip() not in ("Dr. Especialista", "Dr. Carlos Heredia"):
+        norm_name = unicodedata.normalize('NFKD', doctor_name.strip()).encode('ASCII', 'ignore').decode('utf-8').lower()
+        raw_slug = re.sub(r'[^a-zA-Z0-9_\-]+', '_', norm_name).strip('_')
+        setting.relay_channel_id = f"dr_{raw_slug}" if not raw_slug.startswith("dr") else raw_slug
+    
     # Guardar campos WhatsApp
     setting.whatsapp_doctor_phone = whatsapp_doctor_phone
     setting.whatsapp_auto_send = whatsapp_auto_send
@@ -163,6 +175,7 @@ def update_settings(
     if whatsapp_template_waiting:
         setting.whatsapp_template_waiting = whatsapp_template_waiting
     if whatsapp_template_followup:
+
         setting.whatsapp_template_followup = whatsapp_template_followup
 
     setting.updated_at = datetime.utcnow()
@@ -354,7 +367,16 @@ async def restore_backup(
             status_code=400
         )
 
-    # 1. Crear copia de seguridad preventiva del estado actual
+    # 1. Liberar todas las conexiones activas del pool de SQLAlchemy antes de modificar el archivo en disco
+    from app.database import engine
+    try:
+        db.close()
+        engine.dispose()
+    except Exception:
+        pass
+
+    # 2. Crear copia de seguridad preventiva del estado actual
+    pre_restore_bak = None
     if DB_PATH.exists():
         pre_restore_bak = DB_PATH.with_suffix(".pre_restore.bak")
         try:
@@ -362,9 +384,64 @@ async def restore_backup(
         except Exception:
             pass
 
-    # 2. Escribir el nuevo contenido en DB_PATH
-    with open(DB_PATH, "wb") as f:
-        f.write(content)
+    # 3. Escribir el nuevo contenido en DB_PATH y limpiar archivos WAL/SHM obsoletos
+    try:
+        # Remover diarios temporales de SQLite de la base previa para evitar corrupción
+        wal_file = DB_PATH.parent / f"{DB_PATH.name}-wal"
+        shm_file = DB_PATH.parent / f"{DB_PATH.name}-shm"
+        if wal_file.exists():
+            try:
+                wal_file.unlink()
+            except Exception:
+                pass
+        if shm_file.exists():
+            try:
+                shm_file.unlink()
+            except Exception:
+                pass
+
+        with open(DB_PATH, "wb") as f:
+            f.write(content)
+
+    except (PermissionError, OSError) as e:
+        # Si Windows mantiene el archivo bloqueado por un hilo en segundo plano, restaurar backup
+        if pre_restore_bak and pre_restore_bak.exists():
+            try:
+                shutil.copy2(pre_restore_bak, DB_PATH)
+            except Exception:
+                pass
+        setting = get_or_create_settings(db)
+        return templates.TemplateResponse(
+            request=request,
+            name="settings/index.html",
+            context={
+                "user": current_user,
+                "setting": setting,
+                "gateway_status": gateway_manager.get_status(),
+                "error": f"No se pudo reemplazar la base de datos (archivo bloqueado por Windows: {str(e)[:80]}). Intente nuevamente en unos segundos."
+            },
+            status_code=500
+        )
 
     return RedirectResponse(url="/settings?backup_restored=1", status_code=303)
+
+
+@router.get("/print-config")
+def get_print_configuration():
+    """Retorna la configuración activa de márgenes y calibración del talonario."""
+    from app.services.print_config_service import get_print_config
+    cfg = get_print_config()
+    return JSONResponse(content={"success": True, **cfg})
+
+
+@router.post("/print-config")
+async def save_print_configuration(request: Request):
+    """Guarda y sincroniza los márgenes y coordenadas calibradas del talonario."""
+    from app.services.print_config_service import save_print_config
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    updated = save_print_config(body)
+    return JSONResponse(content={"success": True, **updated})
 

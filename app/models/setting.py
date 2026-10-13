@@ -21,6 +21,8 @@ class Setting(Base):
     # Rol de Estación y Topología de Red (v1.2.0)
     station_role = Column(String, default="doctor_principal")  # doctor_principal, secretaria
     central_station_url = Column(String, nullable=True)        # URL / IP del nodo central o Tailscale
+    relay_channel_id = Column(String, default="dr_carlos_heredia", nullable=True) # Canal único de Buzón Cloud Relay
+
 
     # Integración WhatsApp (1-Clic + Gateway Autónomo)
     whatsapp_doctor_phone = Column(String, nullable=True)  # Teléfono del médico para avisos de sala de espera

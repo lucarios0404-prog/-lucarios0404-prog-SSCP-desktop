@@ -189,7 +189,10 @@ def find_ars(name_or_id: str):
     }
 
 def render_ars_badge_html(name_or_id: str, affiliate_number: str = None) -> str:
-    """Genera el código HTML del badge con el logo de la ARS para Jinja2 / frontend."""
+    """Genera el código HTML del badge con el logo de la ARS para Jinja2 / frontend (sanitizado contra XSS)."""
+    import html
     info = find_ars(name_or_id)
-    aff_text = f"""<span class="text-[10px] opacity-75 font-mono ml-1">#{affiliate_number}</span>""" if affiliate_number else ""
-    return f"""<span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-xs font-bold shadow-xs border" style="background-color: {info['bg_color']}; color: {info['text_color']}; border-color: {info['border_color']};">{info['svg']}<span>{info['short_name']}</span>{aff_text}</span>"""
+    clean_short_name = html.escape(str(info.get('short_name', '')), quote=True)
+    clean_aff = html.escape(str(affiliate_number), quote=True) if affiliate_number else ""
+    aff_text = f"""<span class="text-[10px] opacity-75 font-mono ml-1">#{clean_aff}</span>""" if clean_aff else ""
+    return f"""<span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-xs font-bold shadow-xs border" style="background-color: {info['bg_color']}; color: {info['text_color']}; border-color: {info['border_color']};">{info['svg']}<span>{clean_short_name}</span>{aff_text}</span>"""

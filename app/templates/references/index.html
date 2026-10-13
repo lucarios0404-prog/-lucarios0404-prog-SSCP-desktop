@@ -62,9 +62,12 @@
                                     <td class="py-3.5 px-4 text-slate-500">
                                         {{ r.created_at.strftime("%d/%m/%Y") if r.created_at else '' }}
                                     </td>
-                                    <td class="py-3.5 px-4 text-right">
+                                    <td class="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                                        <a href="/references/{{ r.id }}/talonario/pdf" target="_blank" class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold shadow-sm" title="Imprimir en Talonario Preimpreso (13.6 × 21.7 cm)">
+                                            <i class="fas fa-file-medical mr-1"></i> Talonario
+                                        </a>
                                         <a href="/references/{{ r.id }}/pdf" target="_blank" class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold">
-                                            <i class="fas fa-file-pdf mr-1"></i> Descargar PDF
+                                            <i class="fas fa-file-pdf mr-1"></i> PDF
                                         </a>
                                     </td>
                                 </tr>

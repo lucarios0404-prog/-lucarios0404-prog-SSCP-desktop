@@ -37,26 +37,17 @@ from app.routers import (
     data_import,
     permissions,
     services,
+    insurance_preauthorizations,
+    reception,
+    relay,
 )
 from app.routers.activation import router as activation_router
 from app.core.deps import get_current_user
 
 async def run_periodic_sync():
-    """Tarea en segundo plano: sincronización periódica cada 5 minutos (Fase 6)"""
-    while True:
-        try:
-            await asyncio.sleep(300)  # 5 minutos
-            from app.services.sync_service import SyncService
-            from app.models.setting import Setting
-            with SessionLocal() as db:
-                setting = db.query(Setting).first()
-                remote_url = setting.email if (setting and "http" in (setting.email or "")) else "https://sscp.laxarusdevs.com"
-                node_ip = setting.tailscale_ip if setting else None
-                await SyncService.background_sync(db, remote_url, node_ip)
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            print(f"[Auto-Sync Background] Error no crítico: {e}")
+    """Desktop es 100% independiente y local. Sincronización automática con la web desactivada."""
+    return
+
 
 async def run_peer_continuous_sync():
     """Tarea en segundo plano: sincronización P2P desatendida entre Doctor y Secretaría cada 45s."""
@@ -74,6 +65,28 @@ async def run_peer_continuous_sync():
             break
         except Exception:
             pass
+
+
+async def run_relay_continuous_sync():
+    """Tarea en segundo plano: vacía automáticamente los deltas del Buzón Relay (Cloud y Local) hacia SQLite cada 15s."""
+    while True:
+        try:
+            await asyncio.sleep(15)
+            from app.services.relay_service import RelayService
+            with SessionLocal() as db:
+                clinic_id = RelayService.get_clinic_id(db)
+                # 1. Absorber desde el Cloud Relay público (Internet sin importar la red)
+                RelayService.pull_from_cloud(db, clinic_id=clinic_id)
+                # 2. Absorber desde el buzón local
+                messages = RelayService.pull_messages(db, clinic_id=clinic_id, exclude_device_id="pc_doctor", limit=50)
+                for m in messages:
+                    payload = m.get("payload", {})
+                    RelayService.reconcile_incoming_delta(db, payload)
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            pass
+
 
 
 def ensure_schema_migrations(engine):
@@ -120,6 +133,9 @@ def ensure_schema_migrations(engine):
                 conn.execute(text("ALTER TABLE settings ADD COLUMN station_role TEXT DEFAULT 'doctor_principal'"))
             if "central_station_url" not in s_cols:
                 conn.execute(text("ALTER TABLE settings ADD COLUMN central_station_url TEXT"))
+            if "relay_channel_id" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN relay_channel_id TEXT DEFAULT 'dr_carlos_heredia'"))
+
 
             # 3. Migraciones en appointments (Turnos, Servicios, WhatsApp)
             res_a = conn.execute(text("PRAGMA table_info(appointments)")).fetchall()
@@ -156,6 +172,10 @@ def ensure_schema_migrations(engine):
             # 6. Tabla lab_orders (Solicitud de Laboratorios Digital v1.2.0)
             from app.models.lab_order import LabOrder
             LabOrder.__table__.create(bind=conn, checkfirst=True)
+
+            # 7. Tabla insurance_preauthorizations (Historia Clínica & Pre-Autorizaciones ARS)
+            from app.models.insurance_preauthorization import InsurancePreauthorization
+            InsurancePreauthorization.__table__.create(bind=conn, checkfirst=True)
 
             conn.commit()
     except Exception as e:
@@ -232,19 +252,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Startup Database] Aviso: {e}")
 
-    sync_task = asyncio.create_task(run_periodic_sync())
     peer_sync_task = asyncio.create_task(run_peer_continuous_sync())
+    relay_sync_task = asyncio.create_task(run_relay_continuous_sync())
     wa_task = asyncio.create_task(run_whatsapp_scheduled_reminders())
     yield
-    sync_task.cancel()
     peer_sync_task.cancel()
+    relay_sync_task.cancel()
     wa_task.cancel()
     try:
-        await sync_task
+        await peer_sync_task
     except asyncio.CancelledError:
         pass
     try:
-        await peer_sync_task
+        await relay_sync_task
     except asyncio.CancelledError:
         pass
     try:
@@ -252,18 +272,19 @@ async def lifespan(app: FastAPI):
     except asyncio.CancelledError:
         pass
 
-app = FastAPI(title="SSCP Desktop", lifespan=lifespan)
+app = FastAPI(title="SSCP Desktop", version="1.3.0", lifespan=lifespan)
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from app.routers import mobile_api
 
-# Habilitar CORS para permitir solicitudes desde aplicaciones móviles Android y tablets
+# CORS restringido: permite aplicaciones móviles locales, Electron y la red local de la clínica
+# Evita que sitios web de terceros en el navegador puedan sondear la API local del consultorio
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+|100\.\d+\.\d+\.\d+)(:\d+)?|app://.*|capacitor://.*|file://.*)$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
 
@@ -300,6 +321,9 @@ app.include_router(users.router)
 app.include_router(permissions.router)
 app.include_router(mobile_api.router)
 app.include_router(services.router)
+app.include_router(insurance_preauthorizations.router)
+app.include_router(reception.router)
+app.include_router(relay.router)
 
 from fastapi.exceptions import RequestValidationError
 from app.services.license_service import check_license, LicenseStatus

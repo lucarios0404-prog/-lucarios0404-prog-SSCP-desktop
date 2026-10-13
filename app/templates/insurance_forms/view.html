@@ -1,0 +1,213 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Pre-Autorización #{{ form.id }} — {{ form.ars_name }} — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'insurance_forms' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Ficha de Pre-Autorización • " ~ form.ars_name %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
+            <div class="max-w-4xl mx-auto space-y-5">
+                <!-- Barra superior de acciones -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <a href="/insurance-forms" class="text-xs font-bold text-slate-500 hover:text-slate-800 transition inline-flex items-center mb-1">
+                            <i class="fas fa-arrow-left mr-1.5"></i> Volver al Listado
+                        </a>
+                        <div class="flex items-center space-x-2">
+                            <h1 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                                Solicitud de Cobertura #{{ form.id }}
+                            </h1>
+                            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-black {% if 'SeNaSa' in form.ars_name %}bg-emerald-100 text-emerald-800{% elif 'Humano' in form.ars_name %}bg-blue-100 text-blue-800{% else %}bg-slate-200 text-slate-800{% endif %}">
+                                {{ form.ars_name }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <a href="/insurance-forms/new" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+                            <i class="fas fa-plus mr-1"></i> Nueva Solicitud
+                        </a>
+                        <a href="/insurance-forms/{{ form.id }}/pdf" target="_blank" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-md shadow-teal-600/30 transition flex items-center space-x-2 active:scale-95">
+                            <i class="fas fa-print"></i>
+                            <span>Imprimir en Hoja Carta (PDF)</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- CONTENEDOR TIPO HOJA CARTA IMPRESA -->
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-md p-6 sm:p-8 space-y-6">
+                    <!-- Cabecera del Documento -->
+                    <div class="border-b border-slate-200 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <span class="text-[10px] font-bold text-teal-700 uppercase tracking-widest block">REPÚBLICA DOMINICANA • SEGURO MÉDICO</span>
+                            <h2 class="text-lg font-black text-slate-900 leading-tight">
+                                {{ form.ars_name }}
+                            </h2>
+                            <p class="text-xs text-slate-500 font-medium">HISTORIA CLÍNICA & SOLICITUD DE PRE-AUTORIZACIÓN (CIRUGÍAS ELECTIVAS)</p>
+                        </div>
+                        <div class="text-right sm:border-l sm:border-slate-100 sm:pl-4">
+                            <div class="text-xs font-bold text-slate-900">Fecha: {{ form.request_date.strftime('%d/%m/%Y') if form.request_date else form.created_at.strftime('%d/%m/%Y') }}</div>
+                            <div class="text-[11px] text-slate-500">Centro: {{ form.health_center or 'Clínica' }}</div>
+                            <div class="text-[11px] text-slate-500 font-semibold">Accidente de Tránsito: <span class="font-bold text-slate-800">{{ 'SÍ' if form.is_traffic_accident else 'NO' }}</span></div>
+                        </div>
+                    </div>
+
+                    <!-- I. DATOS DEL AFILIADO -->
+                    <div class="space-y-2">
+                        <h3 class="text-xs font-extrabold uppercase tracking-wider text-teal-800 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-100 flex items-center justify-between">
+                            <span>I. DATOS DEL AFILIADO Y PÓLIZA</span>
+                            <span class="text-[10px] text-teal-600 font-semibold">{{ form.request_type }}</span>
+                        </h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs p-3 bg-slate-50/70 rounded-xl border border-slate-100">
+                            <div><span class="font-bold text-slate-400 block text-[10px]">NOMBRE AFILIADO:</span> <span class="font-bold text-slate-900">{{ form.patient.first_name }} {{ form.patient.last_name }}</span></div>
+                            <div><span class="font-bold text-slate-400 block text-[10px]">CÉDULA / DNI:</span> <span class="font-semibold text-slate-800">{{ form.patient.document_id or 'N/D' }}</span></div>
+                            <div><span class="font-bold text-slate-400 block text-[10px]">NSS (SEGURIDAD SOCIAL):</span> <span class="font-mono text-slate-800">{{ form.affiliate_nss or 'N/D' }}</span></div>
+                            <div><span class="font-bold text-slate-400 block text-[10px]">NO. CARNET / PÓLIZA:</span> <span class="font-bold text-slate-900">{{ form.affiliate_card_number or 'N/D' }}</span></div>
+                            <div><span class="font-bold text-slate-400 block text-[10px]">CONTRATO / PLAN:</span> <span class="text-slate-800">{{ form.contract_number or 'N/D' }} • {{ form.plan_type or 'Básico' }}</span></div>
+                            <div><span class="font-bold text-slate-400 block text-[10px]">EDAD / GÉNERO:</span> <span class="text-slate-800">{{ form.patient.age or 'N/D' }} años / {{ form.patient.gender or 'N/D' }}</span></div>
+                            <div><span class="font-bold text-slate-400 block text-[10px]">TELÉFONOS:</span> <span class="text-slate-800">{{ form.patient.phone or 'N/D' }}</span></div>
+                            <div><span class="font-bold text-slate-400 block text-[10px]">ALERGIAS:</span> <span class="text-red-700 font-bold">{{ form.patient.allergies or 'Ninguna' }}</span></div>
+                        </div>
+                    </div>
+
+                    <!-- II. HISTORIA DE LA ENFERMEDAD ACTUAL -->
+                    <div class="space-y-2">
+                        <h3 class="text-xs font-extrabold uppercase tracking-wider text-teal-800 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-100">
+                            II. HISTORIA DE LA ENFERMEDAD ACTUAL
+                        </h3>
+                        <div class="p-3 bg-white rounded-xl border border-slate-200 text-xs space-y-2">
+                            <div>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase block">¿Desde qué fecha iniciaron los síntomas? / Tiempo de Evolución:</span>
+                                <span class="font-bold text-slate-800">{{ form.symptoms_onset_date or 'No especificado' }}</span>
+                            </div>
+                            <div>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase block">Cuadro Clínico y Justificación:</span>
+                                <p class="text-slate-800 leading-relaxed font-sans whitespace-pre-line">{{ form.current_illness_history or 'Sin detalles' }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- III. ANTECEDENTES Y ESTUDIOS -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="space-y-1.5">
+                            <h3 class="text-xs font-extrabold uppercase tracking-wider text-teal-800 bg-teal-50 px-3 py-1 rounded-lg border border-teal-100">
+                                III. ANTECEDENTES PERSONALES Y FAMILIARES
+                            </h3>
+                            <div class="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 min-h-[70px] whitespace-pre-line">
+                                {{ form.personal_family_history or 'Sin antecedentes relevantes reportados.' }}
+                            </div>
+                        </div>
+                        <div class="space-y-1.5">
+                            <h3 class="text-xs font-extrabold uppercase tracking-wider text-teal-800 bg-teal-50 px-3 py-1 rounded-lg border border-teal-100">
+                                IV. ESTUDIOS Y LABORATORIOS REALIZADOS
+                            </h3>
+                            <div class="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 min-h-[70px] whitespace-pre-line">
+                                {{ form.diagnostic_tests or 'Ver resultados anexos al expediente.' }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- IV. DIAGNÓSTICOS -->
+                    <div class="space-y-2">
+                        <h3 class="text-xs font-extrabold uppercase tracking-wider text-teal-800 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-100">
+                            V. DIAGNÓSTICOS CLÍNICOS
+                        </h3>
+                        <div class="p-3 bg-slate-50/70 rounded-xl border border-slate-200 text-xs grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <span class="font-bold text-slate-400 block text-[10px]">DIAGNÓSTICO PRESUNTIVO:</span>
+                                <span class="font-bold text-slate-800">{{ form.presumptive_diagnosis or 'En estudio' }}</span>
+                            </div>
+                            <div>
+                                <span class="font-bold text-slate-400 block text-[10px]">DIAGNÓSTICO DEFINITIVO (CIE-10):</span>
+                                <span class="font-black text-teal-900">{{ form.definitive_diagnosis or 'No especificado' }}</span>
+                            </div>
+                            {% if form.secondary_diagnoses %}
+                            <div class="sm:col-span-2">
+                                <span class="font-bold text-slate-400 block text-[10px]">OTROS DIAGNÓSTICOS:</span>
+                                <span class="text-slate-700">{{ form.secondary_diagnoses }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- V. PROCEDIMIENTOS SOLICITADOS -->
+                    <div class="space-y-2">
+                        <h3 class="text-xs font-extrabold uppercase tracking-wider text-teal-800 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-100">
+                            VI. PROCEDIMIENTOS SOLICITADOS (CÓDIGOS SIMON / CUPS)
+                        </h3>
+                        <div class="overflow-x-auto rounded-xl border border-slate-200">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase">
+                                        <th class="py-2 px-3 w-12">Item</th>
+                                        <th class="py-2 px-3 w-36">Cód. SIMON / CUP</th>
+                                        <th class="py-2 px-3">Procedimiento Quirúrgico / Estudio Autorizado</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    {% if procedures %}
+                                    {% for p in procedures %}
+                                    <tr>
+                                        <td class="py-2 px-3 font-bold text-slate-400">{{ loop.index }}.</td>
+                                        <td class="py-2 px-3 font-mono font-bold text-teal-800">{{ p.code or '---' }}</td>
+                                        <td class="py-2 px-3 font-semibold text-slate-900">{{ p.procedure }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="3" class="py-3 px-3 text-slate-400 italic">Procedimiento conforme a indicación médica adjunta.</td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- VI. TRATAMIENTO Y OBSERVACIONES -->
+                    {% if form.treatment_plan or form.notes %}
+                    <div class="p-3 bg-white rounded-xl border border-slate-200 text-xs space-y-1.5">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase block">VII. TRATAMIENTO PROPUESTO Y OBSERVACIONES:</span>
+                        {% if form.treatment_plan %}
+                        <p class="text-slate-800 font-medium"><strong>Plan:</strong> {{ form.treatment_plan }}</p>
+                        {% endif %}
+                        {% if form.notes %}
+                        <p class="text-slate-600 italic"><strong>Notas:</strong> {{ form.notes }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <!-- PIE CON FIRMA DEL MÉDICO -->
+                    <div class="pt-6 border-t border-slate-200 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                        <div class="text-[11px] text-slate-400">
+                            Documento generado electrónicamente en SSCP Desktop.<br/>
+                            Listo para entrega y radicación física ante la aseguradora médica.
+                        </div>
+                        <div class="text-center sm:text-right">
+                            <div class="inline-block border-t border-slate-400 pt-1.5 px-6">
+                                <span class="font-bold text-xs text-slate-900 block">{{ form.doctor.name if form.doctor else 'Dr. Carlos M. Heredia' }}</span>
+                                <span class="text-[11px] text-slate-500 block">{{ form.doctor.specialty if form.doctor else 'Ginecología y Obstetricia' }}</span>
+                                <span class="text-[11px] font-bold text-teal-800 block">Exequátur / Cód: {{ form.doctor_code or '24241' }}</span>
+                                <span class="text-[10px] text-slate-400 block mt-0.5">Firma y Sello del Médico Tratante</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+{% if autoprint %}
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+    window.open('/insurance-forms/{{ form.id }}/pdf', '_blank');
+});
+</script>
+{% endif %}
+{% endblock %}

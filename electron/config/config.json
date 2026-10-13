@@ -1,0 +1,14 @@
+{
+  "appName": "SSCP Desktop (Electron)",
+  "version": "1.2.1",
+  "backendDir": "../",
+  "pythonExe": "venv/Scripts/python.exe",
+  "defaultPort": 8080,
+  "useIsolatedData": false,
+  "window": {
+    "width": 1360,
+    "height": 860,
+    "minWidth": 1024,
+    "minHeight": 700
+  }
+}

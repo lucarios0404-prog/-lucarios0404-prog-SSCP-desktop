@@ -38,6 +38,12 @@
         </span>
         {% endif %}
 
+        <!-- Enlace QR para Tablet / Móvil (Buzón Relay) -->
+        <button type="button" onclick="openRelayQrModal()" title="Enlazar Tablet de Secretaría vía Código QR" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 transition-all shadow-xs active:scale-95">
+            <i class="fas fa-qrcode text-sky-600 text-xs"></i>
+            <span class="hidden sm:inline">Enlazar Tablet</span>
+        </button>
+
         <!-- Estado Offline / Red Local -->
         <a href="/sync" title="Estado de Red Local & Sincronización P2P" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition-colors">
             <span class="w-1.5 h-1.5 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>

@@ -15,29 +15,60 @@
             <div class="max-w-3xl mx-auto space-y-6">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h1 class="text-2xl font-bold text-slate-900">Emisión de Licencia / Reposo Médico</h1>
+                        <h1 class="text-2xl font-bold text-slate-900">Emisión de Certificado Médico</h1>
                         <p class="text-xs text-slate-500 mt-0.5">Genera un certificado médico oficial con días de reposo y validez legal.</p>
                     </div>
                     <a href="/licenses" class="text-slate-500 hover:text-slate-800 text-xs font-semibold py-2 px-3 rounded-lg border border-slate-200 hover:bg-slate-100">
-                        Volver a Licencias
+                        Volver a Certificados
                     </a>
                 </div>
 
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
                     <form method="post" action="/licenses/create" class="space-y-5">
                         <!-- Selección de Paciente -->
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                Paciente <span class="text-red-500">*</span>
-                            </label>
-                            <select name="patient_id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30">
-                                <option value="">-- Seleccionar paciente --</option>
-                                {% for p in patients %}
-                                <option value="{{ p.id }}" {% if selected_patient and selected_patient.id == p.id %}selected{% endif %}>
-                                    {{ p.first_name }} {{ p.last_name }} (DNI: {{ p.document_id or 'N/D' }})
-                                </option>
-                                {% endfor %}
-                            </select>
+                        <!-- Selección de Paciente con Live Search -->
+                        <div class="patient-live-search-container space-y-2">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                    Paciente <span class="text-red-500">*</span>
+                                </label>
+                                <span class="text-[11px] text-amber-600 font-semibold flex items-center gap-1">
+                                    <i class="fas fa-bolt text-amber-500 text-[10px]"></i> Búsqueda en vivo (Escribe para buscar)
+                                </span>
+                            </div>
+
+                            <!-- Campo de Búsqueda Rápida en Vivo -->
+                            <div class="relative">
+                                <div class="relative flex items-center">
+                                    <span class="absolute left-3.5 text-slate-400 pointer-events-none">
+                                        <i class="fas fa-search text-xs"></i>
+                                    </span>
+                                    <input type="text" autocomplete="off"
+                                        placeholder="Escribe nombre, cédula (ej. 001-...) o teléfono..."
+                                        class="patient-search-input w-full pl-9 pr-10 py-2.5 text-sm border border-slate-300 rounded-xl bg-slate-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 text-slate-900 placeholder-slate-400 font-medium transition-all shadow-2xs">
+                                    <button type="button" class="patient-search-clear hidden absolute right-3 text-slate-400 hover:text-slate-600 p-1">
+                                        <i class="fas fa-times-circle text-sm"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Dropdown flotante con resultados instantáneos -->
+                                <div class="patient-search-dropdown hidden absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
+                                    <div class="patient-search-results p-1.5 space-y-1"></div>
+                                </div>
+                            </div>
+
+                            <!-- Selector tradicional sincronizado -->
+                            <div class="pt-0.5">
+                                <select id="patient_id" name="patient_id" required
+                                    class="patient-target-select w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 text-slate-700 bg-white">
+                                    <option value="">-- O seleccionar manualmente de la lista --</option>
+                                    {% for p in patients %}
+                                    <option value="{{ p.id }}" data-name="{{ p.first_name }} {{ p.last_name }}" data-doc="{{ p.document_id or '' }}" {% if selected_patient and selected_patient.id == p.id %}selected{% endif %}>
+                                        {{ p.first_name }} {{ p.last_name }} (DNI: {{ p.document_id or 'N/D' }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
                         </div>
 
                         <!-- Cargar plantilla si hay -->
@@ -50,7 +81,7 @@
                                     </span>
                                     <div>
                                         <label class="block text-xs font-bold text-amber-950 uppercase tracking-wider">
-                                            Plantilla de Licencia / Reposo Médico
+                                            Plantilla de Certificado Médico
                                         </label>
                                         <span class="text-[11px] text-amber-800">Autocompleta diagnóstico, días de reposo, destinatario e indicaciones</span>
                                     </div>
@@ -61,7 +92,7 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <select id="license_template_select" onchange="applyLicenseTemplate(this)" class="w-full text-xs py-2 px-3 border border-amber-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-2 focus:ring-amber-500">
-                                    <option value="">-- Seleccionar Plantilla de Licencia / Reposo --</option>
+                                    <option value="">-- Seleccionar Plantilla de Certificado Médico --</option>
                                     {% for t in templates %}
                                     <option value="{{ t.id }}" data-title="{{ t.title }}" data-content="{{ t.content }}">{{ t.title }}</option>
                                     {% endfor %}
@@ -122,8 +153,12 @@
                                 class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30"></textarea>
                         </div>
 
-                        <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100">
-                            <button type="submit" class="py-3 px-6 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-lg shadow-amber-600/30 transition-all flex items-center space-x-2">
+                        <div class="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                            <button type="submit" name="print_format" value="talonario" class="py-3 px-5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-lg shadow-amber-600/20 transition-all flex items-center space-x-2" title="Imprime sobre el talonario físico preimpreso (13.6 × 21.7 cm)">
+                                <i class="fas fa-file-medical"></i>
+                                <span>Imprimir en Talonario (13.6 × 21.7 cm)</span>
+                            </button>
+                            <button type="submit" name="print_format" value="full" class="py-3 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-lg shadow-slate-900/20 transition-all flex items-center space-x-2" title="Genera el documento completo en PDF estándar">
                                 <i class="fas fa-file-pdf"></i>
                                 <span>Emitir Certificado y Descargar PDF</span>
                             </button>

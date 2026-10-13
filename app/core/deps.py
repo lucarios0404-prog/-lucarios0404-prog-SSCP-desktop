@@ -40,14 +40,17 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         except JWTError:
             pass
 
-    # Fallback local para visualización y descarga de documentos/PDFs:
-    # Cuando la app de escritorio (PyWebView) abre una receta, informe o licencia con target="_blank",
-    # Windows abre el navegador predeterminado del sistema, el cual no comparte la cookie de sesión.
-    # Si la petición proviene de loopback local (127.0.0.1 / localhost) y es una ruta de descarga/PDF:
+    # Fallback local seguro para visualización de PDFs impresos desde cliente nativo:
+    # Solo aplica para rutas de visualización de PDF si proviene de loopback (127.0.0.1)
+    # y NUNCA si la petición proviene de un sitio web externo en el navegador (cross-site).
     client_host = getattr(request.client, "host", None) if request.client else None
     is_local = client_host in ("127.0.0.1", "localhost", "::1", "testclient")
     path = request.url.path
-    if is_local and ("/pdf" in path or "/export" in path):
+    sec_fetch_site = request.headers.get("sec-fetch-site", "").lower()
+    origin = request.headers.get("origin", "").lower()
+    is_cross_site = sec_fetch_site == "cross-site" or (bool(origin) and "localhost" not in origin and "127.0.0.1" not in origin)
+
+    if is_local and not is_cross_site and path.endswith("/pdf"):
         local_user = db.query(User).filter(User.is_active == True).order_by(
             (User.role == "doctor").desc(),
             (User.role == "admin").desc()

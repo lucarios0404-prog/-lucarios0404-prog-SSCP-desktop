@@ -1,0 +1,560 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Nueva Pre-Autorización ARS & Historia Clínica — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'insurance_forms' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Nueva Historia Clínica & Pre-Autorización ARS" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
+            <div class="max-w-4xl mx-auto space-y-6">
+                <!-- Barra superior de navegación y título -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <a href="/insurance-forms" class="text-xs font-bold text-slate-500 hover:text-slate-800 transition inline-flex items-center mb-1">
+                            <i class="fas fa-arrow-left mr-1.5"></i> Volver al Listado
+                        </a>
+                        <h1 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                            Formulario Unificado de Pre-Autorización (Hoja Carta)
+                        </h1>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Diseñado para solicitud de procedimientos quirúrgicos y cirugías electivas ante SeNaSa, Humano y demás ARS.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- FORMULARIO PRINCIPAL -->
+                <form method="POST" action="/insurance-forms/new" id="form-preauth" class="space-y-5">
+                    {% if consultation %}
+                    <input type="hidden" name="consultation_id" value="{{ consultation.id }}">
+                    {% endif %}
+
+                    <!-- SECCIÓN 1: ASEGURADORA Y DATOS DE LA SOLICITUD -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-7 h-7 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-xs">
+                                    <i class="fas fa-shield-halved"></i>
+                                </span>
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">1. Aseguradora y Tipo de Solicitud</h3>
+                            </div>
+                            <span class="text-[11px] font-semibold text-slate-400">Datos requeridos por la ARS</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">ARS / Seguro Médico <span class="text-red-500">*</span></label>
+                                <select name="ars_name" id="ars_name" onchange="toggleCustomArs(this.value)" required class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                                    {% for ars in ars_options %}
+                                    <option value="{{ ars }}" {% if selected_patient and selected_patient.insurance_name and selected_patient.insurance_name in ars %}selected{% endif %}>
+                                        {{ ars }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <input type="text" name="custom_ars_name" id="custom_ars_name" placeholder="Especifique el nombre de la ARS o Seguro..." class="hidden mt-2 w-full px-3 py-1.5 text-xs bg-amber-50/70 border border-amber-300 rounded-lg text-slate-800 font-bold focus:outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Tipo de Solicitud</label>
+                                <select name="request_type" class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                                    <option value="Cirugía Electiva">Cirugía Electiva</option>
+                                    <option value="Procedimiento Quirúrgico">Procedimiento Quirúrgico</option>
+                                    <option value="Procedimiento Ambulatorio">Procedimiento Ambulatorio</option>
+                                    <option value="Tratamiento Médico / Hospitalización">Tratamiento Médico / Hospitalización</option>
+                                    <option value="Estudios Especiales">Estudios Especiales / Biopsias</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Fecha de Solicitud <span class="text-red-500">*</span></label>
+                                <input type="date" name="request_date" value="{{ today_str }}" required
+                                       class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
+                            <div class="sm:col-span-2">
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Centro donde se realizará el procedimiento <span class="text-red-500">*</span></label>
+                                <input type="text" name="health_center" value="{{ default_center }}" required placeholder="Ej: Centro Médico María Dolores"
+                                       class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            </div>
+                            <div class="flex items-center sm:pt-5">
+                                <label class="flex items-center space-x-2 cursor-pointer bg-slate-50 p-2 rounded-xl border border-slate-200 w-full hover:bg-slate-100 transition">
+                                    <input type="checkbox" name="is_traffic_accident" value="true" class="rounded text-teal-600 focus:ring-teal-500 w-4 h-4">
+                                    <span class="text-xs font-bold text-slate-800">¿Accidente de tránsito?</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 2: DATOS DEL PACIENTE / AFILIADO (AUTO-LLENADO) -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                                    <i class="fas fa-user-check"></i>
+                                </span>
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">2. Datos del Afiliado / Paciente</h3>
+                            </div>
+                            <span class="text-[10px] text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                                Auto-completado con 1 clic
+                            </span>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase">
+                                    Buscar y Seleccionar Paciente <span class="text-red-500">*</span>
+                                </label>
+                                <span class="text-[10px] text-teal-700 font-bold flex items-center gap-1 bg-teal-50/80 px-2 py-0.5 rounded-md border border-teal-200">
+                                    <i class="fas fa-bolt text-amber-500 text-[10px]"></i> Búsqueda en vivo (Nombre, Cédula o Teléfono)
+                                </span>
+                            </div>
+
+                            <!-- Campo Live Search con Autocompletado Flotante -->
+                            <div class="relative">
+                                <div class="relative flex items-center">
+                                    <span class="absolute left-3.5 text-slate-400 pointer-events-none">
+                                        <i class="fas fa-search text-xs"></i>
+                                    </span>
+                                    <input type="text" id="patient_live_search" autocomplete="off"
+                                           value="{% if selected_patient %}{{ selected_patient.first_name }} {{ selected_patient.last_name }} — Cédula: {{ selected_patient.document_id or 'S/D' }}{% endif %}"
+                                           placeholder="Escriba para buscar paciente en tiempo real (ej: Juan Pérez, 001-..., 809-...)" 
+                                           class="w-full pl-9 pr-10 py-2.5 text-xs border border-slate-300 rounded-xl bg-slate-50/70 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 text-slate-900 placeholder-slate-400 font-semibold transition shadow-2xs">
+                                    <button type="button" id="clear_patient_search_btn" onclick="clearPatientSearch()" 
+                                            class="{% if not selected_patient %}hidden{% endif %} absolute right-3 text-slate-400 hover:text-red-600 transition text-xs p-1" title="Limpiar y buscar otro paciente">
+                                        <i class="fas fa-times-circle text-sm"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Input oculto para el POST del formulario -->
+                                <input type="hidden" name="patient_id" id="patient_id" value="{% if selected_patient %}{{ selected_patient.id }}{% endif %}" required>
+
+                                <!-- Dropdown Flotante de Resultados de Búsqueda -->
+                                <div id="patient_search_dropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
+                                    <div id="patient_search_results" class="p-1.5 space-y-1"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fila de Póliza, NSS, Carnet y Contrato -->
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">NSS (Seguridad Social)</label>
+                                <input type="text" name="affiliate_nss" id="affiliate_nss" placeholder="Ej: 102938475"
+                                       class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">No. Carnet / Póliza <span class="text-red-500">*</span></label>
+                                <input type="text" name="affiliate_card_number" id="affiliate_card_number" value="{{ selected_patient.insurance_number if selected_patient else '' }}" placeholder="Ej: 001-928374-1"
+                                       class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">Contrato No.</label>
+                                <input type="text" name="contract_number" id="contract_number" placeholder="Ej: 994820"
+                                       class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">Plan</label>
+                                <input type="text" name="plan_type" id="plan_type" placeholder="Ej: Básico, Royal, Máximo"
+                                       class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            </div>
+                        </div>
+
+                        <!-- Resumen visible de la ficha del paciente -->
+                        <div id="patient-preview-box" class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div><span class="font-bold text-slate-400 block text-[10px]">CÉDULA:</span> <span id="prev-doc">{{ selected_patient.document_id if selected_patient else 'N/D' }}</span></div>
+                            <div><span class="font-bold text-slate-400 block text-[10px]">EDAD / SEXO:</span> <span id="prev-age-gender">{{ selected_patient.age if selected_patient else 'N/D' }} años / {{ selected_patient.gender if selected_patient else 'N/D' }}</span></div>
+                            <div><span class="font-bold text-slate-400 block text-[10px]">TELÉFONO:</span> <span id="prev-phone">{{ selected_patient.phone if selected_patient else 'N/D' }}</span></div>
+                            <div><span class="font-bold text-slate-400 block text-[10px]">ALERGIAS:</span> <span id="prev-allergies" class="text-red-700 font-bold">{{ selected_patient.allergies if selected_patient else 'Ninguna' }}</span></div>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 3: CUADRO CLÍNICO Y ANTECEDENTES -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                        <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
+                            <span class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                                <i class="fas fa-stethoscope"></i>
+                            </span>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">3. Cuadro Clínico & Historia de la Enfermedad</h3>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">¿Desde qué fecha iniciaron los síntomas? (Tiempo de Evolución)</label>
+                            <input type="text" name="symptoms_onset_date" placeholder="Ej: Hace 6 meses / Febrero 2026 / Cuadro progresivo de 3 semanas"
+                                   class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Historia de la Enfermedad Actual <span class="text-red-500">*</span></label>
+                            <textarea name="current_illness_history" rows="3" required placeholder="Describa el cuadro clínico, síntomas principales, evolución y justificación médica de la necesidad del procedimiento..."
+                                      class="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 leading-relaxed font-sans">{% if consultation %}{{ consultation.clinical_history or consultation.reason or '' }}{% endif %}</textarea>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Antecedentes Personales y Familiares</label>
+                                <textarea name="personal_family_history" rows="3" placeholder="Patológicos, quirúrgicos, alérgicos, gineco-obstétricos (G_P_C_A), hereditarios..."
+                                          class="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 leading-relaxed font-sans"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Laboratorios y Estudios Realizados (Anexar resultados)</label>
+                                <textarea name="diagnostic_tests" rows="3" placeholder="Ej: Sonografía pélvica reporta miomatosis uterina / Hemograma Hb 11.2 / Biopsia de endometrio..."
+                                          class="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 leading-relaxed font-sans"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 4: DIAGNÓSTICOS CLÍNICOS (CIE-10) -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                        <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
+                            <span class="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">
+                                <i class="fas fa-notes-medical"></i>
+                            </span>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">4. Diagnósticos Clínicos (CIE-10)</h3>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Diagnóstico Presuntivo</label>
+                                <input type="text" name="presumptive_diagnosis" value="{{ consultation.diagnosis if consultation else '' }}" placeholder="Ej: Miomatosis uterina sintomática"
+                                       class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Diagnóstico Definitivo (con CIE-10) <span class="text-red-500">*</span></label>
+                                <input type="text" name="definitive_diagnosis" value="{{ consultation.diagnosis if consultation else '' }}" required placeholder="Ej: D25.9 Leiomioma del útero, sin otra especificación"
+                                       class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-teal-900 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Otros Diagnósticos Secundarios (Opcional)</label>
+                            <input type="text" name="secondary_diagnoses" placeholder="Ej: D50.0 Anemia secundaria por pérdida de sangre / N92.0 Menorragia"
+                                   class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 5: PROCEDIMIENTOS SOLICITADOS (CÓDIGOS SIMON / CUPS) -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                                    <i class="fas fa-syringe"></i>
+                                </span>
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">5. Procedimientos Solicitados (Códigos SIMON / CUPS)</h3>
+                            </div>
+                            <button type="button" onclick="addProcedureRow()" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg text-xs border border-emerald-200 transition">
+                                <i class="fas fa-plus mr-1"></i> Agregar Procedimiento
+                            </button>
+                        </div>
+
+                        <p class="text-[11px] text-slate-400">
+                            Indique el Código SIMON / Tarifario de la ARS y el nombre exacto de la cirugía o procedimiento solicitado:
+                        </p>
+
+                        <div id="procedures-container" class="space-y-2">
+                            <!-- Fila 1 -->
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center procedure-row">
+                                <div class="sm:col-span-3">
+                                    <input type="text" name="procedures_codes" placeholder="Cód. SIMON (ej. 68.4)"
+                                           class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                                </div>
+                                <div class="sm:col-span-8">
+                                    <input type="text" name="procedures_names" placeholder="Nombre del procedimiento (ej. Histerectomía total abdominal)"
+                                           class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                                </div>
+                                <div class="sm:col-span-1 text-right">
+                                    <button type="button" onclick="removeProcedureRow(this)" class="p-2 text-slate-400 hover:text-red-600 rounded-lg transition" title="Eliminar fila">
+                                        <i class="fas fa-trash-alt text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Fila 2 -->
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center procedure-row">
+                                <div class="sm:col-span-3">
+                                    <input type="text" name="procedures_codes" placeholder="Cód. SIMON (Opcional)"
+                                           class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                                </div>
+                                <div class="sm:col-span-8">
+                                    <input type="text" name="procedures_names" placeholder="Procedimiento adicional (Opcional)"
+                                           class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                                </div>
+                                <div class="sm:col-span-1 text-right">
+                                    <button type="button" onclick="removeProcedureRow(this)" class="p-2 text-slate-400 hover:text-red-600 rounded-lg transition" title="Eliminar fila">
+                                        <i class="fas fa-trash-alt text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 6: TRATAMIENTO, MÉDICO Y OBSERVACIONES -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                        <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
+                            <span class="w-7 h-7 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-xs">
+                                <i class="fas fa-user-md"></i>
+                            </span>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">6. Tratamiento Propuesto & Firma Médica</h3>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Tratamiento Médico / Plan Quirúrgico</label>
+                            <textarea name="treatment_plan" rows="2" placeholder="Indicaciones prequirúrgicas, terapia médica de soporte o plan de recuperación..."
+                                      class="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 leading-relaxed font-sans"></textarea>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Código Prestador ARS / Exequátur</label>
+                                <input type="text" name="doctor_code" value="{{ doctor_code }}" placeholder="Ej: 24241"
+                                       class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Observaciones / Notas para la Aseguradora</label>
+                                <input type="text" name="notes" placeholder="Ej: Procedimiento no postergable debido a cuadro sintomático agudo."
+                                       class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BOTÓN DE ENVÍO -->
+                    <div class="flex items-center justify-end space-x-3 pt-2">
+                        <a href="/insurance-forms" class="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs transition">
+                            Cancelar
+                        </a>
+                        <button type="submit" class="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs shadow-md shadow-teal-600/30 transition flex items-center space-x-2 active:scale-95">
+                            <i class="fas fa-print"></i>
+                            <span>Guardar e Imprimir en Hoja Carta (PDF)</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+// --- LIVE SEARCH AUTOCOMPLETE FOR PATIENT ---
+let patientSearchTimer = null;
+const patientSearchInput = document.getElementById('patient_live_search');
+const patientSearchDropdown = document.getElementById('patient_search_dropdown');
+const patientSearchResults = document.getElementById('patient_search_results');
+const clearPatientBtn = document.getElementById('clear_patient_search_btn');
+const patientIdHidden = document.getElementById('patient_id');
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+if (patientSearchInput) {
+    patientSearchInput.addEventListener('input', function() {
+        const q = this.value.trim();
+        if (clearPatientBtn) clearPatientBtn.classList.toggle('hidden', !q);
+
+        if (patientIdHidden && !q) {
+            patientIdHidden.value = '';
+        }
+
+        clearTimeout(patientSearchTimer);
+        if (q.length < 2) {
+            if (patientSearchDropdown) patientSearchDropdown.classList.add('hidden');
+            return;
+        }
+        patientSearchTimer = setTimeout(() => searchPatientsAjax(q), 200);
+    });
+
+    patientSearchInput.addEventListener('focus', function() {
+        const q = this.value.trim();
+        if (q.length >= 2 && patientSearchResults && patientSearchResults.children.length > 0) {
+            patientSearchDropdown.classList.remove('hidden');
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (patientSearchInput && !patientSearchInput.contains(e.target) && patientSearchDropdown && !patientSearchDropdown.contains(e.target)) {
+            patientSearchDropdown.classList.add('hidden');
+        }
+    });
+}
+
+function clearPatientSearch() {
+    if (patientSearchInput) {
+        patientSearchInput.value = '';
+        patientSearchInput.focus();
+    }
+    if (patientIdHidden) {
+        patientIdHidden.value = '';
+    }
+    if (clearPatientBtn) clearPatientBtn.classList.add('hidden');
+    if (patientSearchDropdown) patientSearchDropdown.classList.add('hidden');
+
+    document.getElementById('prev-doc').textContent = 'N/D';
+    document.getElementById('prev-age-gender').textContent = 'N/D años / N/D';
+    document.getElementById('prev-phone').textContent = 'N/D';
+    document.getElementById('prev-allergies').textContent = 'Ninguna';
+    document.getElementById('affiliate_card_number').value = '';
+}
+
+async function searchPatientsAjax(query) {
+    if (!patientSearchResults || !patientSearchDropdown) return;
+    patientSearchResults.innerHTML = `
+        <div class="p-3 text-center text-xs text-slate-400">
+            <i class="fas fa-spinner fa-spin mr-1.5 text-teal-600"></i> Buscando "${escapeHtml(query)}"...
+        </div>
+    `;
+    patientSearchDropdown.classList.remove('hidden');
+
+    try {
+        const response = await fetch(`/patients/autocomplete?q=${encodeURIComponent(query)}&limit=15`);
+        if (!response.ok) return;
+        const patients = await response.json();
+        renderPatientSearchResults(patients, query);
+    } catch (e) {
+        console.error("Error buscando pacientes:", e);
+    }
+}
+
+function renderPatientSearchResults(patients, query) {
+    if (!patientSearchResults || !patientSearchDropdown) return;
+    patientSearchResults.innerHTML = '';
+
+    if (patients.length === 0) {
+        patientSearchResults.innerHTML = `
+            <div class="p-4 text-center text-xs text-slate-500">
+                <i class="fas fa-user-slash text-slate-300 text-lg mb-1.5 block"></i>
+                No se encontraron pacientes registrados para "<strong>${escapeHtml(query)}</strong>"
+            </div>
+        `;
+    } else {
+        patients.forEach(p => {
+            const item = document.createElement('div');
+            item.className = "px-3.5 py-2.5 hover:bg-teal-50/80 cursor-pointer rounded-xl transition flex items-center justify-between group border border-transparent hover:border-teal-200";
+            const initials = `${(p.first_name || '')[0] || ''}${(p.last_name || '')[0] || ''}`.toUpperCase() || 'P';
+
+            item.innerHTML = `
+                <div class="flex-1 pr-3">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-6 h-6 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-[10px] shrink-0">
+                            ${escapeHtml(initials)}
+                        </span>
+                        <span class="text-xs font-bold text-slate-900 group-hover:text-teal-700">
+                            ${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)}
+                        </span>
+                        ${p.age ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">${p.age} años</span>` : ''}
+                        ${p.gender ? `<span class="text-[10px] bg-slate-100 text-slate-500 px-1 rounded">${escapeHtml(p.gender)}</span>` : ''}
+                    </div>
+                    <div class="mt-1 flex items-center space-x-3 text-[11px] text-slate-500">
+                        <span>Cédula: <strong class="font-mono text-slate-700">${escapeHtml(p.document_id || 'Sin Cédula')}</strong></span>
+                        ${p.phone ? `<span>Tel: <strong class="text-slate-700">${escapeHtml(p.phone)}</strong></span>` : ''}
+                        <span class="text-teal-700 font-semibold truncate max-w-[150px]"><i class="fas fa-shield-alt text-[9px] mr-0.5"></i> ${escapeHtml(p.insurance_name || 'Privado')}</span>
+                    </div>
+                </div>
+                <button type="button" class="text-xs text-teal-700 opacity-0 group-hover:opacity-100 font-bold px-2 py-1 rounded-lg bg-white shadow-xs shrink-0 border border-teal-200">
+                    Seleccionar &rarr;
+                </button>
+            `;
+            item.onclick = () => selectPatientFromLiveSearch(p);
+            patientSearchResults.appendChild(item);
+        });
+    }
+    patientSearchDropdown.classList.remove('hidden');
+}
+
+function selectPatientFromLiveSearch(p) {
+    if (patientIdHidden) {
+        patientIdHidden.value = p.id;
+    }
+    if (patientSearchInput) {
+        patientSearchInput.value = `${p.first_name} ${p.last_name} — Cédula: ${p.document_id || 'S/D'} (${p.insurance_name || 'Privado'})`;
+    }
+    if (clearPatientBtn) clearPatientBtn.classList.remove('hidden');
+    if (patientSearchDropdown) patientSearchDropdown.classList.add('hidden');
+
+    // Actualizar resumen
+    document.getElementById('prev-doc').textContent = p.document_id || 'Sin Cédula';
+    document.getElementById('prev-age-gender').textContent = `${p.age || 'N/D'} años / ${p.gender || 'N/D'}`;
+    document.getElementById('prev-phone').textContent = p.phone || 'No registrado';
+    document.getElementById('prev-allergies').textContent = p.allergies || 'Ninguna';
+
+    if (p.insurance_number) {
+        document.getElementById('affiliate_card_number').value = p.insurance_number;
+    }
+
+    if (p.insurance_name) {
+        const arsSelect = document.getElementById('ars_name');
+        if (arsSelect) {
+            for (let i = 0; i < arsSelect.options.length; i++) {
+                if (arsSelect.options[i].value.toLowerCase().includes(p.insurance_name.toLowerCase())) {
+                    arsSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+// Validación previa al envío
+document.getElementById('form-preauth').addEventListener('submit', function(e) {
+    if (!patientIdHidden || !patientIdHidden.value) {
+        e.preventDefault();
+        alert('Por favor busque y seleccione un paciente registrado antes de guardar la solicitud.');
+        if (patientSearchInput) patientSearchInput.focus();
+        return false;
+    }
+});
+
+function addProcedureRow() {
+    const container = document.getElementById('procedures-container');
+    const row = document.createElement('div');
+    row.className = 'grid grid-cols-1 sm:grid-cols-12 gap-2 items-center procedure-row';
+    row.innerHTML = `
+        <div class="sm:col-span-3">
+            <input type="text" name="procedures_codes" placeholder="Cód. SIMON"
+                   class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+        </div>
+        <div class="sm:col-span-8">
+            <input type="text" name="procedures_names" placeholder="Procedimiento adicional"
+                   class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+        </div>
+        <div class="sm:col-span-1 text-right">
+            <button type="button" onclick="removeProcedureRow(this)" class="p-2 text-slate-400 hover:text-red-600 rounded-lg transition" title="Eliminar fila">
+                <i class="fas fa-trash-alt text-xs"></i>
+            </button>
+        </div>
+    `;
+    container.appendChild(row);
+}
+
+function removeProcedureRow(btn) {
+    const rows = document.querySelectorAll('.procedure-row');
+    if (rows.length > 1) {
+        btn.closest('.procedure-row').remove();
+    } else {
+        const inputs = btn.closest('.procedure-row').querySelectorAll('input');
+        inputs.forEach(i => i.value = '');
+    }
+}
+
+function toggleCustomArs(val) {
+    const customInput = document.getElementById('custom_ars_name');
+    if (val.includes('Otro') || val.includes('Privado') || val.includes('Internacional')) {
+        customInput.classList.remove('hidden');
+        customInput.focus();
+    } else {
+        customInput.classList.add('hidden');
+        customInput.value = '';
+    }
+}
+</script>
+{% endblock %}

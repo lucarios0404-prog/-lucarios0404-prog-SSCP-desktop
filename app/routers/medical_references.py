@@ -11,7 +11,7 @@ from app.models.medical_reference import MedicalReference
 from app.models.setting import Setting
 from app.models.template import ClinicalTemplate
 from app.core.deps import require_current_user, require_permission
-from app.services.pdf_service import generate_medical_reference_pdf
+from app.services.pdf_service import generate_medical_reference_pdf, generate_medical_reference_talonario_pdf
 
 router = APIRouter(prefix="/references", tags=["references"])
 from app.core.templates import templates
@@ -67,6 +67,7 @@ def submit_reference(
     reason_for_referral: str = Form(...),
     clinical_summary: str = Form(None),
     notes: str = Form(None),
+    print_format: str = Form("full"),
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('references'))
 ):
@@ -88,6 +89,8 @@ def submit_reference(
     db.commit()
     db.refresh(ref_obj)
 
+    if print_format == "talonario":
+        return RedirectResponse(url=f"/references/{ref_obj.id}/talonario/pdf", status_code=303)
     return RedirectResponse(url=f"/references/{ref_obj.id}/pdf", status_code=303)
 
 @router.get("/{reference_id}/pdf")
@@ -109,3 +112,24 @@ def download_reference_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"inline; filename={filename}"}
     )
+
+@router.get("/{reference_id}/talonario/pdf")
+def download_reference_talonario_pdf(
+    reference_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    ref_obj = db.query(MedicalReference).filter(MedicalReference.id == reference_id).first()
+    if not ref_obj:
+        raise HTTPException(status_code=404, detail="Carta de referencia no encontrada")
+
+    setting = db.query(Setting).first()
+    pdf_buffer = generate_medical_reference_talonario_pdf(ref_obj, setting)
+
+    filename = f"Talonario_Referencia_{ref_obj.patient_id}_{ref_obj.id}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
+

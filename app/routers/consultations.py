@@ -492,6 +492,7 @@ def download_consultation_talonario_pdf(
         patient=consultation.patient,
         prescription_text=consultation.prescription or "",
         setting=setting,
+        patient_instructions=consultation.treatment or ""
     )
     
     filename = f"Talonario_Consulta_{consultation.id}.pdf"

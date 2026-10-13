@@ -1,0 +1,93 @@
+<!-- Modal de Enlace QR para Tablet y Dispositivos Móviles (SSCP Buzón Relay Local-First) -->
+<div id="relayQrModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 transition-opacity duration-200">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-150">
+        <!-- Header del Modal -->
+        <div class="bg-gradient-to-r from-sky-600 to-indigo-700 p-5 text-white flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-xl shadow-inner">
+                    <i class="fas fa-qrcode"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-base leading-tight">Enlazar Tablet / Móvil</h3>
+                    <p class="text-xs text-sky-100 font-medium mt-0.5">Buzón Cloud Relay por Internet</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeRelayQrModal()" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm transition-colors" title="Cerrar ventana">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Cuerpo del Modal -->
+        <div class="p-6 text-center space-y-4">
+            <div class="inline-block p-2 bg-white rounded-2xl shadow-md border border-slate-200">
+                <img id="relayQrImage" src="/api/relay/qr-link" alt="Código QR de Vinculación" class="w-56 h-56 object-contain rounded-xl">
+            </div>
+
+            <div class="bg-sky-50 dark:bg-slate-700/50 rounded-xl p-3 border border-sky-100 dark:border-slate-600 text-left space-y-2">
+                <div class="flex items-start gap-2.5">
+                    <span class="w-5 h-5 rounded-full bg-sky-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                    <p class="text-xs text-slate-700 dark:text-slate-200"><span class="font-semibold">Abre la app en la Tablet</span> o apunta la cámara del dispositivo móvil.</p>
+                </div>
+                <div class="flex items-start gap-2.5">
+                    <span class="w-5 h-5 rounded-full bg-sky-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                    <p class="text-xs text-slate-700 dark:text-slate-200"><span class="font-semibold">Escanea este código QR</span> para enlazar este consultorio en 2 segundos.</p>
+                </div>
+                <div class="flex items-start gap-2.5">
+                    <span class="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">✓</span>
+                    <p class="text-xs text-emerald-800 dark:text-emerald-300 font-medium">Funciona en redes Wi-Fi diferentes, chips 4G o sin compartir red local.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+            <span class="text-[11px] text-slate-400">Canal: <strong id="relayChannelBadge" class="text-slate-600 dark:text-slate-300">dr_carlos_heredia</strong></span>
+            <button type="button" onclick="closeRelayQrModal()" class="px-4 py-1.5 text-xs font-semibold bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors">
+                Entendido
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openRelayQrModal() {
+        const modal = document.getElementById('relayQrModal');
+        if (modal) {
+            // Refrescar imagen con timestamp para asegurar carga limpia
+            const img = document.getElementById('relayQrImage');
+            if (img) {
+                img.src = '/api/relay/qr-link?t=' + new Date().getTime();
+            }
+            fetch('/api/relay/status')
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.clinic_id) {
+                        const tag = document.getElementById('relayChannelBadge');
+                        if (tag) tag.textContent = data.clinic_id;
+                    }
+                })
+                .catch(() => {});
+            modal.classList.remove('hidden');
+        }
+    }
+
+
+    function closeRelayQrModal() {
+        const modal = document.getElementById('relayQrModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    // Cerrar al hacer click fuera
+    document.addEventListener('DOMContentLoaded', function() {
+        const modal = document.getElementById('relayQrModal');
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeRelayQrModal();
+                }
+            });
+        }
+    });
+</script>

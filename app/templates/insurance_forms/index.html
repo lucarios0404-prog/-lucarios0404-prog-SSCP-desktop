@@ -1,0 +1,142 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Pre-Autorizaciones ARS & Seguros — SSCP Desktop{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-slate-50 overflow-hidden">
+    {% set active_menu = 'insurance_forms' %}
+    {% include "partials/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {% set page_title = "Pre-Autorizaciones ARS & Seguros Médicos" %}
+        {% include "partials/header.html" %}
+
+        <main class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
+            <div class="max-w-6xl mx-auto space-y-6">
+                <!-- Encabezado y Acción Principal -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase bg-teal-100 text-teal-800">
+                                Seguros Médicos • ARS
+                            </span>
+                            <span class="text-xs text-slate-400 font-semibold">Formato Hoja Carta Oficial</span>
+                        </div>
+                        <h1 class="text-2xl font-black text-slate-900 tracking-tight mt-1">
+                            Historias Clínicas & Pre-Autorizaciones
+                        </h1>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Formulario médico unificado para SeNaSa, Humano, Universal y demás ARS para cirugías electivas y procedimientos.
+                        </p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <a href="/insurance-forms/new" class="inline-flex items-center px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md shadow-teal-600/30 transition-all active:scale-95">
+                            <i class="fas fa-file-signature mr-2"></i> Nueva Pre-Autorización
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Barra de Búsqueda y Filtros -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <form method="GET" action="/insurance-forms" class="flex-1 flex items-center space-x-2">
+                        <div class="relative flex-1">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i class="fas fa-search text-xs"></i>
+                            </span>
+                            <input type="text" name="q" value="{{ q }}" placeholder="Buscar por paciente, cédula, ARS o diagnóstico..."
+                                   class="w-full pl-9 pr-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-800 font-medium">
+                        </div>
+                        <button type="submit" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
+                            Filtrar
+                        </button>
+                        {% if q %}
+                        <a href="/insurance-forms" class="px-2.5 py-2 text-xs text-slate-500 hover:text-slate-800 font-bold">
+                            Limpiar
+                        </a>
+                        {% endif %}
+                    </form>
+
+                    <div class="text-[11px] font-bold text-slate-400 shrink-0">
+                        Total emitidas: <span class="text-slate-800">{{ forms|length }}</span>
+                    </div>
+                </div>
+
+                <!-- Tabla de Solicitudes Emitidas -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                    <th class="py-3 px-4">Fecha</th>
+                                    <th class="py-3 px-4">Paciente / Afiliado</th>
+                                    <th class="py-3 px-4">ARS / Seguro</th>
+                                    <th class="py-3 px-4">Diagnóstico Definitivo</th>
+                                    <th class="py-3 px-4">Procedimientos</th>
+                                    <th class="py-3 px-4 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
+                                {% if not forms %}
+                                <tr>
+                                    <td colspan="6" class="py-12 text-center text-slate-400">
+                                        <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-xl mb-2">
+                                            <i class="fas fa-file-medical"></i>
+                                        </div>
+                                        <p class="font-bold text-slate-600">No hay solicitudes de pre-autorización emitidas</p>
+                                        <p class="text-[11px] text-slate-400 mt-1">Haz clic en "Nueva Pre-Autorización" para completar el formulario oficial en Hoja Carta.</p>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% for f in forms %}
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-3.5 px-4 font-semibold text-slate-600 whitespace-nowrap">
+                                        {{ f.request_date.strftime('%d/%m/%Y') if f.request_date else f.created_at.strftime('%d/%m/%Y') }}
+                                        <div class="text-[10px] text-slate-400">#{{ f.id }}</div>
+                                    </td>
+                                    <td class="py-3.5 px-4 font-bold text-slate-900">
+                                        {{ f.patient.first_name }} {{ f.patient.last_name }}
+                                        <div class="text-[10px] text-slate-400 font-normal">
+                                            Cédula: {{ f.patient.document_id or 'N/D' }} • Tel: {{ f.patient.phone or 'N/D' }}
+                                        </div>
+                                    </td>
+                                    <td class="py-3.5 px-4 whitespace-nowrap">
+                                        <span class="px-2.5 py-1 rounded-lg text-[10px] font-black {% if 'SeNaSa' in f.ars_name %}bg-emerald-50 text-emerald-800 border border-emerald-200{% elif 'Humano' in f.ars_name %}bg-blue-50 text-blue-800 border border-blue-200{% else %}bg-slate-100 text-slate-800 border border-slate-200{% endif %}">
+                                            {{ f.ars_name }}
+                                        </span>
+                                        <div class="text-[10px] text-slate-400 mt-0.5 font-medium">
+                                            Carnet: {{ f.affiliate_card_number or 'N/D' }}
+                                        </div>
+                                    </td>
+                                    <td class="py-3.5 px-4 max-w-[220px]">
+                                        <span class="font-bold text-slate-800 block truncate" title="{{ f.definitive_diagnosis or f.presumptive_diagnosis }}">
+                                            {{ f.definitive_diagnosis or f.presumptive_diagnosis or 'En estudio' }}
+                                        </span>
+                                        <span class="text-[10px] text-slate-400">
+                                            Centro: {{ f.health_center or 'Clínica' }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3.5 px-4 whitespace-nowrap">
+                                        <span class="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                                            {{ f.request_type }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3.5 px-4 text-right whitespace-nowrap space-x-1.5">
+                                        <a href="/insurance-forms/{{ f.id }}" class="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition inline-block" title="Ver detalle">
+                                            <i class="fas fa-eye text-xs"></i>
+                                        </a>
+                                        <a href="/insurance-forms/{{ f.id }}/pdf" target="_blank" class="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold rounded-lg border border-teal-200 text-xs transition inline-flex items-center space-x-1 shadow-2xs" title="Imprimir en Hoja Carta">
+                                            <i class="fas fa-print text-xs"></i>
+                                            <span>PDF Carta</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

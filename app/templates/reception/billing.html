@@ -1,0 +1,310 @@
+{% extends "reception/base_reception.html" %}
+
+{% block title %}Resumen General de Cobros — Secretaría{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+
+    <!-- Selector de Período y Botón de Cobro Rápido (Foto 1) -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 p-2 sm:p-3 flex items-center justify-between gap-2">
+        <form id="filterForm" method="GET" action="/reception/billing" class="flex items-center gap-2">
+            <select name="year" onchange="document.getElementById('filterForm').submit()" class="touch-action-btn rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-sm font-bold text-slate-700 cursor-pointer focus:ring-2 focus:ring-sky-500">
+                {% for y in available_years %}
+                <option value="{{ y }}" {% if y == target_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="month" onchange="document.getElementById('filterForm').submit()" class="touch-action-btn rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-sm font-bold text-slate-700 cursor-pointer focus:ring-2 focus:ring-sky-500">
+                {% for m in months_options %}
+                <option value="{{ m.num }}" {% if m.num == target_month %}selected{% endif %}>{{ m.name }}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        <button onclick="openPaymentModal()" class="touch-action-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg text-sm font-bold shadow-sm flex items-center gap-1.5 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Nuevo Cobro</span>
+        </button>
+    </div>
+
+    <!-- Panel de Resumen General — Cuadre de Caja -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
+        <div class="bg-slate-100/80 px-4 py-2.5 border-b border-slate-200 text-slate-700 font-bold text-base tracking-tight">
+            Resumen General {{ month_name }} / {{ target_year }}
+        </div>
+
+        <div class="p-3 sm:p-4 space-y-2 text-slate-800">
+            <!-- Total -->
+            <div class="flex items-center justify-between py-1 text-base sm:text-lg font-bold border-b border-slate-100">
+                <span>Total</span>
+                <span id="labelTotalGeneral" class="font-extrabold text-slate-900 tracking-tight">
+                    {{ "{:,.2f}".format(total_general) }}
+                </span>
+            </div>
+
+            <!-- Pagados -->
+            <div class="flex items-center justify-between py-1 text-base sm:text-lg font-semibold text-emerald-700 border-b border-slate-100">
+                <span class="flex items-center gap-1">Pagados ▾</span>
+                <span id="labelTotalPagados" class="font-bold">
+                    {{ "{:,.2f}".format(total_pagados) }}
+                </span>
+            </div>
+
+            <!-- No Pagados -->
+            <div class="flex items-center justify-between py-1 text-base sm:text-lg font-semibold text-rose-600">
+                <span class="flex items-center gap-1">No Pagados ▾</span>
+                <span id="labelTotalNoPagados" class="font-bold">
+                    {{ "{:,.2f}".format(total_no_pagados) }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección NO PAGADOS (Pendientes de Cobro) -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
+        <div class="bg-rose-50/70 px-4 py-2.5 border-b border-rose-100 text-rose-800 font-bold text-sm sm:text-base flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                <span>No Pagados (Pendientes) ▾</span>
+            </span>
+            <span id="badgeUnpaidCount" class="text-xs bg-rose-200/80 text-rose-900 px-2 py-0.5 rounded-full font-bold">
+                {{ unpaid_items|length }}
+            </span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                        <th class="py-2 px-3 sm:px-4 w-12 text-center">Día</th>
+                        <th class="py-2 px-3 sm:px-4">Nombre</th>
+                        <th class="py-2 px-3 sm:px-4 text-right">Valor (RD$)</th>
+                        <th class="py-2 px-3 sm:px-4 w-14 text-center">Cobrar</th>
+                    </tr>
+                </thead>
+                <tbody id="unpaidTableBody" class="divide-y divide-slate-100">
+                    {% if unpaid_items %}
+                        {% for item in unpaid_items %}
+                        <tr id="payment-row-{{ item.id }}" class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-2.5 px-3 sm:px-4 text-center font-bold text-slate-700 text-sm">
+                                {{ item.day }}
+                            </td>
+                            <td class="py-2.5 px-3 sm:px-4 font-semibold text-slate-900 text-sm sm:text-base">
+                                <div>{{ item.patient_name }}</div>
+                                <div class="text-[11px] text-slate-400 font-normal">{{ item.service_name }}</div>
+                            </td>
+                            <td class="py-2.5 px-3 sm:px-4 text-right font-extrabold text-slate-800 text-sm sm:text-base whitespace-nowrap">
+                                {{ "{:,.2f}".format(item.amount) }}
+                            </td>
+                            <td class="py-2.5 px-3 sm:px-4 text-center">
+                                <input type="checkbox" onchange="togglePayment({{ item.id }}, this)" data-amount="{{ item.amount }}" data-name="{{ item.patient_name }}" class="w-6 h-6 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer transition-transform hover:scale-110">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr id="emptyUnpaidRow">
+                            <td colspan="4" class="py-6 text-center text-sm font-semibold text-emerald-600 bg-emerald-50/40">
+                                ✓ ¡Excelente! No hay cobros pendientes registrados en este período.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Sección PAGADOS (Cobrados) -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
+        <div class="bg-emerald-50/70 px-4 py-2.5 border-b border-emerald-100 text-emerald-800 font-bold text-sm sm:text-base flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span>Pagados ▾</span>
+            </span>
+            <span id="badgePaidCount" class="text-xs bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full font-bold">
+                {{ paid_items|length }}
+            </span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                        <th class="py-2 px-3 sm:px-4 w-12 text-center">Día</th>
+                        <th class="py-2 px-3 sm:px-4">Nombre</th>
+                        <th class="py-2 px-3 sm:px-4 text-right">Valor (RD$)</th>
+                        <th class="py-2 px-3 sm:px-4 w-14 text-center">Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="paidTableBody" class="divide-y divide-slate-100">
+                    {% if paid_items %}
+                        {% for item in paid_items %}
+                        <tr id="payment-row-{{ item.id }}" class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-2.5 px-3 sm:px-4 text-center font-bold text-slate-700 text-sm">
+                                {{ item.day }}
+                            </td>
+                            <td class="py-2.5 px-3 sm:px-4 font-semibold text-slate-900 text-sm sm:text-base">
+                                <div>{{ item.patient_name }}</div>
+                                <div class="text-[11px] text-slate-400 font-normal">{{ item.service_name }}</div>
+                            </td>
+                            <td class="py-2.5 px-3 sm:px-4 text-right font-extrabold text-slate-800 text-sm sm:text-base whitespace-nowrap">
+                                {{ "{:,.2f}".format(item.amount) }}
+                            </td>
+                            <td class="py-2.5 px-3 sm:px-4 text-center">
+                                <input type="checkbox" checked onchange="togglePayment({{ item.id }}, this)" data-amount="{{ item.amount }}" data-name="{{ item.patient_name }}" class="w-6 h-6 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer transition-transform hover:scale-110" title="Desmarcar si no pagó">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr id="emptyPaidRow">
+                            <td colspan="4" class="py-6 text-center text-sm font-semibold text-slate-400">
+                                No hay cobros completados en este período aún.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal Flotante Táctil para Registrar Cobro Rápido -->
+<div id="paymentModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h3 class="font-black text-lg text-slate-900 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span>Registrar Cobro Rápido</span>
+            </h3>
+            <button onclick="closePaymentModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center font-bold">✕</button>
+        </div>
+
+        <form id="quickPaymentForm" onsubmit="submitQuickPayment(event)" class="mt-4 space-y-3.5">
+            <div>
+                <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Paciente *</label>
+                <select name="patient_id" required class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    <option value="">-- Seleccionar Paciente --</option>
+                    {% for p in patients %}
+                    <option value="{{ p.id }}">{{ p.first_name }} {{ p.last_name }} {% if p.cedula %}({{ p.cedula }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Concepto / Servicio *</label>
+                <select name="service_name" required class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-sky-500">
+                    <option value="Consulta Médica General">Consulta Médica General</option>
+                    <option value="Consulta Prenatal Especializada">Consulta Prenatal Especializada</option>
+                    <option value="Sonografía Pélvica">Sonografía Pélvica</option>
+                    <option value="Sonografía Obstétrica">Sonografía Obstétrica</option>
+                    <option value="Copago de Seguro Médico (ARS)">Copago de Seguro Médico (ARS)</option>
+                    <option value="Procedimiento Electivo">Procedimiento Electivo</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Monto (RD$) *</label>
+                <input type="number" step="50" name="amount" required placeholder="Ej: 1500" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base font-bold text-slate-800 focus:ring-2 focus:ring-sky-500">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Estado Inicial</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="flex items-center gap-2 p-2.5 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+                        <input type="radio" name="status" value="paid" checked class="text-emerald-600 focus:ring-emerald-500">
+                        <span class="text-xs font-bold text-emerald-800">✓ Cobrado Ahora</span>
+                    </label>
+                    <label class="flex items-center gap-2 p-2.5 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+                        <input type="radio" name="status" value="pending" class="text-rose-600 focus:ring-rose-500">
+                        <span class="text-xs font-bold text-rose-800">⏳ Por Cobrar (Deuda)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="pt-2 flex items-center justify-end gap-2">
+                <button type="button" onclick="closePaymentModal()" class="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">Cancelar</button>
+                <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#0288d1] hover:bg-sky-700 text-white shadow-md">Guardar Cobro</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+    function openPaymentModal() {
+        document.getElementById('paymentModal').classList.remove('hidden');
+    }
+    function closePaymentModal() {
+        document.getElementById('paymentModal').classList.add('hidden');
+    }
+
+    async function togglePayment(paymentId, checkboxElem) {
+        const row = document.getElementById(`payment-row-${paymentId}`);
+        const patientName = checkboxElem.getAttribute('data-name') || 'el paciente';
+        const amount = parseFloat(checkboxElem.getAttribute('data-amount') || 0);
+
+        try {
+            const resp = await fetch(`/reception/payments/${paymentId}/toggle`, {
+                method: 'POST'
+            });
+            const data = await resp.json();
+
+            if (data.success) {
+                if (data.is_paid) {
+                    showToast(`✓ Cobro de RD$ ${amount.toLocaleString('es-DO', {minimumFractionDigits: 2})} registrado a ${patientName}`, true);
+                    // Mover la fila a la tabla de pagados
+                    row.remove();
+                    const paidBody = document.getElementById('paidTableBody');
+                    const emptyPaidRow = document.getElementById('emptyPaidRow');
+                    if (emptyPaidRow) emptyPaidRow.remove();
+                    
+                    paidBody.prepend(row);
+                    checkboxElem.checked = true;
+                } else {
+                    showToast(`Marcado como pendiente: ${patientName}`, false);
+                    // Mover la fila a la tabla de no pagados
+                    row.remove();
+                    const unpaidBody = document.getElementById('unpaidTableBody');
+                    const emptyUnpaidRow = document.getElementById('emptyUnpaidRow');
+                    if (emptyUnpaidRow) emptyUnpaidRow.remove();
+
+                    unpaidBody.prepend(row);
+                    checkboxElem.checked = false;
+                }
+                setTimeout(() => window.location.reload(), 800);
+            } else {
+                showToast(data.error || 'Error al cambiar estado', false);
+                checkboxElem.checked = !checkboxElem.checked;
+            }
+        } catch (e) {
+            showToast('Error de conexión', false);
+            checkboxElem.checked = !checkboxElem.checked;
+        }
+    }
+
+    async function submitQuickPayment(e) {
+        e.preventDefault();
+        const form = document.getElementById('quickPaymentForm');
+        const formData = new FormData(form);
+
+        try {
+            const resp = await fetch('/reception/payments/quick', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showToast('¡Cobro registrado correctamente!', true);
+                closePaymentModal();
+                setTimeout(() => window.location.reload(), 600);
+            } else {
+                showToast(data.error || 'Error al registrar cobro', false);
+            }
+        } catch (e) {
+            showToast('Error de conexión', false);
+        }
+    }
+</script>
+{% endblock %}

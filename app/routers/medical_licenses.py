@@ -12,7 +12,7 @@ from app.models.medical_license import MedicalLicense
 from app.models.setting import Setting
 from app.models.template import ClinicalTemplate
 from app.core.deps import require_permission
-from app.services.pdf_service import generate_medical_license_pdf
+from app.services.pdf_service import generate_medical_license_pdf, generate_medical_license_talonario_pdf
 
 router = APIRouter(prefix="/licenses", tags=["licenses"])
 from app.core.templates import templates
@@ -71,6 +71,7 @@ def submit_license(
     end_date: str = Form(...),
     workplace_or_school: str = Form(None),
     notes: str = Form(None),
+    print_format: str = Form("full"),
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('licenses'))
 ):
@@ -96,6 +97,8 @@ def submit_license(
     db.commit()
     db.refresh(license_obj)
 
+    if print_format == "talonario":
+        return RedirectResponse(url=f"/licenses/{license_obj.id}/talonario/pdf", status_code=303)
     return RedirectResponse(url=f"/licenses/{license_obj.id}/pdf", status_code=303)
 
 @router.get("/{license_id}/pdf")
@@ -117,3 +120,24 @@ def download_license_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"inline; filename={filename}"}
     )
+
+@router.get("/{license_id}/talonario/pdf")
+def download_license_talonario_pdf(
+    license_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('licenses'))
+):
+    license_obj = db.query(MedicalLicense).filter(MedicalLicense.id == license_id).first()
+    if not license_obj:
+        raise HTTPException(status_code=404, detail="Licencia médica no encontrada")
+
+    setting = db.query(Setting).first()
+    pdf_buffer = generate_medical_license_talonario_pdf(license_obj, setting)
+
+    filename = f"Talonario_Licencia_{license_obj.patient_id}_{license_obj.id}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
+

@@ -52,8 +52,8 @@
                         <a href="/consultations/{{ consultation.id }}/prescription/pdf" target="_blank" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md shadow-teal-600/20 transition-all" title="Descargar o imprimir receta oficial en PDF">
                             <i class="fas fa-print mr-1.5"></i> Receta Completa
                         </a>
-                        <a href="/consultations/{{ consultation.id }}/prescription/talonario/pdf" target="_blank" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md shadow-amber-600/20 transition-all" title="Imprimir texto sobre talonario físico preimpreso (21.7 × 13.6 cm)">
-                            <i class="fas fa-file-medical mr-1.5"></i> Talonario (21.7×13.6)
+                        <a href="/consultations/{{ consultation.id }}/prescription/talonario/pdf" target="_blank" class="inline-flex items-center px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md shadow-amber-600/20 transition-all" title="Imprimir exclusivamente receta e indicaciones para el paciente sobre el talonario físico preimpreso (13.6 × 21.7 cm)">
+                            <i class="fas fa-file-medical mr-1.5"></i> Talonario Paciente (13.6×21.7)
                         </a>
                         {% endif %}
                         <!-- Botón Informe Clínico PDF -->
@@ -64,6 +64,10 @@
                         <!-- Botón Solicitud de Laboratorio (Fase 3 v1.2.0) -->
                         <a href="/lab-results/orders/new?patient_id={{ consultation.patient_id }}&consultation_id={{ consultation.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-sm transition-all" title="Emitir orden de análisis de laboratorio en PDF">
                             <i class="fas fa-flask mr-1.5"></i> Solicitar Laboratorio
+                        </a>
+                        <!-- Botón Pre-Autorización ARS -->
+                        <a href="/insurance-forms/new?patient_id={{ consultation.patient_id }}&consultation_id={{ consultation.id }}" class="inline-flex items-center px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all" title="Emitir Historia Clínica y Solicitud de Pre-Autorización para el Seguro (Hoja Carta)">
+                            <i class="fas fa-file-signature mr-1.5"></i> Pre-Autorización ARS
                         </a>
                         {% endif %}
                         <button onclick="window.print()" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold shadow-sm transition-all">

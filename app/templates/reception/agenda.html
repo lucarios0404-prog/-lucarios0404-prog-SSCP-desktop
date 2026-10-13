@@ -1,0 +1,226 @@
+{% extends "reception/base_reception.html" %}
+
+{% block title %}Agenda de Citas — Secretaría{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+
+    <!-- Barra de Navegación de Fecha — Secretaría Express -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 p-2 sm:p-3 flex items-center justify-between gap-2">
+        <a href="/reception/agenda?date_str={{ prev_date }}" class="touch-action-btn w-11 h-11 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors" title="Día Anterior">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+
+        <!-- Selector central de fecha con botón de calendario -->
+        <div class="flex items-center gap-2 relative">
+            <label for="datePickerInput" class="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-50 border border-sky-200 text-[#0288d1] hover:bg-sky-100 transition-colors">
+                <svg class="w-5 h-5 text-[#0288d1]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <span class="font-bold text-base sm:text-lg tracking-tight">{{ date_formatted }}</span>
+            </label>
+            <input type="date" id="datePickerInput" value="{{ target_date_str }}" class="absolute opacity-0 pointer-events-none" onchange="window.location.href='/reception/agenda?date_str=' + this.value">
+            
+            <a href="/reception/agenda?date_str={{ target_date_str }}" class="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors" title="Refrescar">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </a>
+            
+            {% if target_date_str != today_str %}
+            <a href="/reception/agenda?date_str={{ today_str }}" class="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 py-1 rounded font-semibold transition-colors">
+                Hoy
+            </a>
+            {% endif %}
+        </div>
+
+        <a href="/reception/agenda?date_str={{ next_date }}" class="touch-action-btn w-11 h-11 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors" title="Día Siguiente">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </a>
+    </div>
+
+    <!-- Indicador de Citas del Día -->
+    <div class="flex items-center justify-between px-1">
+        <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            Total programadas: <span class="text-slate-800 font-bold">{{ total_citas }}</span>
+        </div>
+        <button onclick="openQuickModal()" class="touch-action-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg text-sm font-bold shadow-sm flex items-center gap-1.5 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Nueva Cita</span>
+        </button>
+    </div>
+
+    <!-- Lista de Turnos Diarios estilo consultorio.me -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 divide-y divide-slate-100 overflow-hidden">
+        {% if agenda_items %}
+            {% for item in agenda_items %}
+            <div class="p-3 sm:p-4 hover:bg-slate-50/80 transition-colors flex items-center justify-between gap-3 group">
+                <!-- Hora e Info Principal -->
+                <div class="flex items-start sm:items-center gap-3.5 min-w-0">
+                    <div class="font-extrabold text-base sm:text-lg text-slate-800 tracking-tight w-14 shrink-0">
+                        {{ item.time }}
+                    </div>
+                    <div class="min-w-0">
+                        <div class="font-bold text-slate-900 text-base sm:text-lg truncate">
+                            {{ item.patient_name }}
+                        </div>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <!-- Indicador de color con motivo estilo consultorio.me -->
+                            <span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {{ item.color }};"></span>
+                            <span class="text-xs sm:text-sm font-medium text-slate-600 truncate">{{ item.reason }}</span>
+                            
+                            {% if item.price and item.price > 0 %}
+                            <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                RD$ {{ "{:,.2f}".format(item.price) }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción Táctiles Rápidos -->
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <!-- Selector de Estado con 1 toque -->
+                    <select onchange="updateStatus({{ item.id }}, this.value)" class="text-xs font-semibold rounded-lg border border-slate-200 px-2 py-1.5 bg-slate-50 text-slate-700 cursor-pointer focus:ring-1 focus:ring-sky-500">
+                        <option value="Pendiente" {% if item.status == 'Pendiente' %}selected{% endif %}>⏳ Pendiente</option>
+                        <option value="En Espera" {% if item.status == 'En Espera' %}selected{% endif %}>🪑 En Espera</option>
+                        <option value="En Consulta" {% if item.status == 'En Consulta' %}selected{% endif %}>🩺 En Consulta</option>
+                        <option value="Completada" {% if item.status == 'Completada' %}selected{% endif %}>✓ Completada</option>
+                        <option value="Cancelada" {% if item.status == 'Cancelada' %}selected{% endif %}>✕ Cancelada</option>
+                    </select>
+
+                    <!-- Botón WhatsApp si tiene teléfono -->
+                    {% if item.phone %}
+                    <a href="https://wa.me/{{ item.phone|replace('-', '')|replace(' ', '') }}" target="_blank" class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors" title="Avisar por WhatsApp">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.007c.106.005.249-.04.39.299.144.347.491 1.2.534 1.288.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.087-.179.182-.077.357.101.174.452.746.97 1.208.667.594 1.229.778 1.403.865.174.087.275.072.376-.043.101-.116.433-.506.549-.679.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.043.073.043.419-.101.824z"/></svg>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <!-- Estado vacío con invitación a agendar -->
+            <div class="p-10 text-center text-slate-400">
+                <svg class="w-12 h-12 mx-auto mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <p class="text-base font-bold text-slate-600">No hay citas registradas para este día</p>
+                <p class="text-xs text-slate-400 mt-1">Usa las flechas para navegar o pulsa el botón de abajo para agendar un turno.</p>
+                <button onclick="openQuickModal()" class="mt-4 bg-[#0288d1] hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition-colors inline-flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    <span>Agendar Cita en esta fecha</span>
+                </button>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- Modal Flotante Táctil para Agendar Cita Rápida -->
+<div id="quickModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h3 class="font-black text-lg text-slate-900 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span>Agendar Cita Rápida</span>
+            </h3>
+            <button onclick="closeQuickModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center font-bold">✕</button>
+        </div>
+
+        <form id="quickApptForm" onsubmit="submitQuickAppt(event)" class="mt-4 space-y-3.5">
+            <div>
+                <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Paciente *</label>
+                <select name="patient_id" required class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    <option value="">-- Seleccionar Paciente --</option>
+                    {% for p in patients %}
+                    <option value="{{ p.id }}">{{ p.first_name }} {{ p.last_name }} {% if p.cedula %}({{ p.cedula }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Fecha</label>
+                    <input type="date" name="date_str" value="{{ target_date_str }}" required class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Hora</label>
+                    <input type="time" name="start_time_str" value="08:00" required class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Motivo de Consulta *</label>
+                <select name="reason" required class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-sky-500">
+                    <option value="Consulta General">🟢 Consulta General</option>
+                    <option value="Consulta prenatal">🌸 Consulta prenatal / Control Gineco-Obstétrico</option>
+                    <option value="Resultados">🟠 Entrega de Resultados / Laboratorios</option>
+                    <option value="Seguimiento">⚫ Seguimiento / Control</option>
+                    <option value="Sonografía Pélvica / Obstétrica">🟣 Sonografía</option>
+                    <option value="Procedimiento Electivo">🔵 Procedimiento Electivo</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Costo / Tarifa (Opcional, RD$)</label>
+                <input type="number" step="50" name="price" placeholder="Ej: 1500" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500">
+                <span class="text-[11px] text-slate-400">Si colocas un valor, se agregará a la lista de cobros automáticamente.</span>
+            </div>
+
+            <div class="pt-2 flex items-center justify-end gap-2">
+                <button type="button" onclick="closeQuickModal()" class="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">Cancelar</button>
+                <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#0288d1] hover:bg-sky-700 text-white shadow-md">Guardar Cita</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+    function openQuickModal() {
+        document.getElementById('quickModal').classList.remove('hidden');
+    }
+    function closeQuickModal() {
+        document.getElementById('quickModal').classList.add('hidden');
+    }
+
+    async function updateStatus(appointmentId, newStatus) {
+        const formData = new FormData();
+        formData.append('status', newStatus);
+
+        try {
+            const resp = await fetch(`/reception/appointments/${appointmentId}/status`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showToast(`Estado cambiado a "${newStatus}"`, true);
+            } else {
+                showToast(data.error || 'Error al actualizar estado', false);
+            }
+        } catch (e) {
+            showToast('Error de conexión con el servidor', false);
+        }
+    }
+
+    async function submitQuickAppt(e) {
+        e.preventDefault();
+        const form = document.getElementById('quickApptForm');
+        const formData = new FormData(form);
+
+        try {
+            const resp = await fetch('/reception/appointments/quick', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showToast('¡Cita agendada correctamente!', true);
+                closeQuickModal();
+                setTimeout(() => window.location.reload(), 600);
+            } else {
+                showToast(data.error || 'Error al agendar cita', false);
+            }
+        } catch (e) {
+            showToast('Error de conexión', false);
+        }
+    }
+</script>
+{% endblock %}

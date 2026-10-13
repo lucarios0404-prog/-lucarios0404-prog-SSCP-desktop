@@ -6,6 +6,8 @@
     <title>SSCP Móvil — Doctor &amp; Secretaria</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Standalone QR Code & Barcode Scanner Engine -->
+    <script src="/static/js/html5-qrcode.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -58,55 +60,93 @@
 </head>
 <body class="h-full flex flex-col bg-slate-50 text-slate-800 antialiased select-none">
 
-    <!-- PANTALLA: CONFIGURACIÓN DE SERVIDOR (Si se requiere cambiar IP) -->
+    <!-- PANTALLA: CONFIGURACIÓN DE SERVIDOR Y BUZÓN RELAY -->
     <div id="screen-config" class="hidden fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-200">
-            <div class="flex items-center justify-between mb-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center space-x-2">
-                    <div class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                    <div class="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
                         <i class="fas fa-network-wired text-sm"></i>
                     </div>
-                    <h3 class="font-bold text-slate-900 text-base">Servidor SSCP</h3>
+                    <h3 class="font-bold text-slate-900 text-base">Conexión & Sincronización</h3>
                 </div>
                 <button onclick="closeConfigModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
             </div>
-            <p class="text-xs text-slate-500 mb-3 leading-relaxed">
-                El sistema detecta automáticamente la computadora del doctor conectada a la misma red Tailscale o Wi-Fi:
-            </p>
-            <div class="space-y-2.5">
-                <!-- Botón de Auto-Detección 1-Clic -->
-                <button type="button" onclick="autoDetectServer()" id="btn-auto-detect"
-                        class="w-full py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs border border-emerald-300 transition flex items-center justify-center space-x-1.5 active:scale-95">
-                    <i class="fas fa-wand-magic-sparkles text-emerald-600"></i>
-                    <span>Auto-Detectar en Red Tailscale</span>
-                </button>
 
-                <!-- Accesos Rápidos de Red -->
+            <!-- SECCIÓN 1: BUZÓN CLOUD RELAY POR INTERNET (RECOMENDADO) -->
+            <div class="p-3.5 bg-gradient-to-br from-sky-50 to-indigo-50/50 border border-sky-200/90 rounded-2xl space-y-2.5 mb-3.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-black text-sky-900 flex items-center gap-1.5">
+                        <i class="fas fa-cloud text-sky-600 text-sm"></i>
+                        <span>Buzón Cloud Relay (Internet Directo)</span>
+                    </span>
+                    <span class="text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">24/7 Nube</span>
+                </div>
                 <div>
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Accesos Rápidos:</span>
-                    <div class="grid grid-cols-2 gap-1.5">
-                        <button type="button" onclick="setServerPreset('http://100.91.251.86:8080')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold border border-slate-200 transition text-left truncate flex items-center">
-                            <i class="fas fa-shield-halved text-emerald-600 mr-1.5 text-xs shrink-0"></i>
-                            <span class="truncate">PC Doctor (Tailscale)</span>
-                        </button>
-                        <button type="button" onclick="setServerPreset('https://sscp.laxarusdevs.com')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold border border-slate-200 transition text-left truncate flex items-center">
-                            <i class="fas fa-cloud text-indigo-600 mr-1.5 text-xs shrink-0"></i>
-                            <span class="truncate">Nube 24/7 (SSCP)</span>
+                    <label class="block text-[10px] font-bold text-sky-900 uppercase mb-1">Canal de Consultorio del Doctor</label>
+                    <div class="flex items-center gap-1.5">
+                        <input type="text" id="config-relay-clinic-id" placeholder="dr_carlos_heredia" value="dr_carlos_heredia" 
+                               class="flex-1 px-3 py-2 text-xs bg-white border border-sky-300 rounded-xl font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        <button type="button" onclick="activateRelayMode()" class="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl text-xs transition shadow-sm active:scale-95 shrink-0">
+                            Activar
                         </button>
                     </div>
                 </div>
+                <!-- Selección Rápida de Doctor -->
+                <div class="pt-1">
+                    <span class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Cambiar a Doctor:</span>
+                    <div class="flex flex-wrap gap-1">
+                        <button type="button" onclick="selectDoctorChannel('dr_carlos_heredia')" class="px-2 py-1 bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-800 border border-slate-200 hover:border-sky-300 rounded-lg text-[10px] font-semibold transition active:scale-95">
+                            Dr. Carlos Heredia
+                        </button>
+                        <button type="button" onclick="selectDoctorChannel('dr_manuel_ramirez')" class="px-2 py-1 bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-800 border border-slate-200 hover:border-sky-300 rounded-lg text-[10px] font-semibold transition active:scale-95">
+                            Dr. Manuel Ramírez
+                        </button>
+                        <button type="button" onclick="selectDoctorChannel('dra_laura_gomez')" class="px-2 py-1 bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-800 border border-slate-200 hover:border-sky-300 rounded-lg text-[10px] font-semibold transition active:scale-95">
+                            Dra. Laura Gómez
+                        </button>
+                    </div>
+                </div>
+                <div id="relay-status-pill" class="text-[10px] font-semibold text-sky-700 flex items-center gap-1 pt-0.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Canal activo: <strong id="relay-active-channel-name">dr_carlos_heredia</strong></span>
+                </div>
+            </div>
+
+            <!-- SECCIÓN 2: CONEXIÓN DIRECTA EN RED (OPCIONAL) -->
+            <div class="space-y-2.5 pt-1 border-t border-slate-100">
+                <span class="block text-[10px] font-bold text-slate-400 uppercase">Conexión Directa en Red:</span>
+
+                <!-- Botón de Auto-Detección 1-Clic -->
+                <button type="button" onclick="autoDetectServer()" id="btn-auto-detect"
+                        class="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs border border-slate-200 transition flex items-center justify-center space-x-1.5 active:scale-95">
+                    <i class="fas fa-wand-magic-sparkles text-indigo-600"></i>
+                    <span>Buscar PC en Red Local</span>
+                </button>
+
+                <!-- Accesos Rápidos de Red -->
+                <div class="grid grid-cols-2 gap-1.5">
+                    <button type="button" onclick="setServerPreset('http://192.168.10.73:8080')" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-[11px] font-bold border border-slate-200 transition text-left truncate flex items-center">
+                        <i class="fas fa-desktop text-indigo-600 mr-1.5 text-xs shrink-0"></i>
+                        <span class="truncate">PC Doctor (Red Local)</span>
+                    </button>
+                    <button type="button" onclick="setServerPreset('https://sscp.laxarusdevs.com')" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-[11px] font-bold border border-slate-200 transition text-left truncate flex items-center">
+                        <i class="fas fa-cloud text-sky-600 mr-1.5 text-xs shrink-0"></i>
+                        <span class="truncate">Nube Cloud Relay</span>
+                    </button>
+                </div>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">URL o IP del Servidor</label>
-                    <input type="text" id="config-server-url" placeholder="http://100.91.251.86:8080" 
-                           class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-slate-800">
+                    <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">URL o IP del Servidor</label>
+                    <input type="text" id="config-server-url" placeholder="http://192.168.10.73:8080" 
+                           class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-slate-800">
                 </div>
-                <div id="ping-result" class="text-xs font-semibold py-1"></div>
+                <div id="ping-result" class="text-xs font-semibold py-0.5"></div>
                 <div class="flex space-x-2 pt-1">
-                    <button onclick="testConnection()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
-                        <i class="fas fa-satellite-dish mr-1"></i> Probar Conexión
+                    <button onclick="testConnection()" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
+                        <i class="fas fa-satellite-dish mr-1"></i> Probar
                     </button>
-                    <button onclick="saveServerConfig()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-600/30 transition">
+                    <button onclick="saveServerConfig()" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-600/30 transition">
                         <i class="fas fa-save mr-1"></i> Guardar
                     </button>
                 </div>
@@ -134,8 +174,32 @@
             </div>
         </div>
 
+        <!-- TARJETA DESTACADA: VINCULACIÓN POR CÓDIGO QR CON LA PC -->
+        <div class="bg-gradient-to-br from-sky-500 via-sky-600 to-indigo-700 p-4 rounded-3xl shadow-xl shadow-sky-600/30 text-white mt-4 mb-2 space-y-2.5">
+            <div class="flex items-center space-x-3">
+                <div class="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center text-2xl shrink-0 shadow-inner">
+                    <i class="fas fa-qrcode"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-sm font-black leading-tight">Enlazar con Consultorio</h2>
+                    <p class="text-[11px] text-sky-100 font-medium truncate">Apunta la cámara a la pantalla de la PC</p>
+                </div>
+            </div>
+            <button type="button" onclick="openQrScannerModal()" id="btn-open-qr-scanner"
+                    class="w-full py-3 px-4 bg-white hover:bg-sky-50 text-sky-800 font-black rounded-2xl shadow-md flex items-center justify-center space-x-2 transition active:scale-[0.98]">
+                <i class="fas fa-camera text-base text-sky-600"></i>
+                <span class="text-xs">Escanear Código QR de la PC</span>
+            </button>
+        </div>
+
+        <div class="relative flex items-center justify-center my-3">
+            <div class="border-t border-slate-200 w-full"></div>
+            <span class="bg-slate-50 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">O ingresar con credenciales</span>
+            <div class="border-t border-slate-200 w-full"></div>
+        </div>
+
         <!-- Formulario Login -->
-        <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xl shadow-slate-200/40 my-6">
+        <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xl shadow-slate-200/40 mb-6">
             <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100">
                 Iniciar Sesión
             </h2>
@@ -233,17 +297,17 @@
 
         </header>
 
-        <!-- Barra de Estado de Conexión & Sincronización P2P / Tailscale (Local-First) -->
+        <!-- Barra de Estado de Conexión & Sincronización Cloud Relay (Local-First) -->
         <div id="sync-status-bar" class="w-full bg-emerald-50 border-b border-emerald-100 px-4 py-1.5 flex items-center justify-between text-[11px] transition-all shrink-0">
             <div class="flex items-center space-x-1.5" id="sync-status-indicator">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="sync-dot"></span>
-                <span class="font-bold text-emerald-800" id="sync-text">Conectado a Central (Doctor)</span>
+                <span class="font-bold text-emerald-800" id="sync-text">Conectado a Cloud Relay (<span id="sync-clinic-tag">dr_carlos_heredia</span>)</span>
             </div>
             <div class="flex items-center space-x-2">
                 <span id="sync-queue-badge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-200 text-amber-900 animate-bounce">
                     0 en cola
                 </span>
-                <button onclick="OfflineSyncManager.checkAndSync()" title="Comprobar conexión y sincronizar con la PC" class="text-slate-500 hover:text-indigo-600 font-semibold flex items-center active:scale-95 transition">
+                <button onclick="OfflineSyncManager.checkAndSync()" title="Comprobar conexión y sincronizar con la nube" class="text-slate-500 hover:text-indigo-600 font-semibold flex items-center active:scale-95 transition">
                     <i class="fas fa-arrows-rotate text-xs mr-1" id="sync-icon"></i>
                     <span id="sync-action-btn">Sincronizar</span>
                 </button>
@@ -275,13 +339,29 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN 1: SALA DE ESPERA (PRIORITARIA PARA DOCTOR Y SECRETARIA) -->
-                <div id="waiting-room-section" class="space-y-2">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center">
-                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2 pulse-waiting"></span>
-                            Sala de Espera (Atención Inmediata)
-                        </h3>
+                <!-- SELECTOR DE VISTA SIMPLIFICADO PARA LA SECRETARIA (SIN DUPLICADOS) -->
+                <div class="bg-slate-200/80 p-1 rounded-2xl flex gap-1 shadow-inner">
+                    <button type="button" id="subtab-btn-waiting" onclick="switchTodayView('waiting')" 
+                            class="flex-1 py-2 px-3 rounded-xl font-bold text-xs transition bg-white text-emerald-800 shadow-sm flex items-center justify-center gap-1.5 active:scale-95">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>En Sala de Espera</span>
+                        <span id="tab-waiting-count" class="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-black">0</span>
+                    </button>
+                    <button type="button" id="subtab-btn-all" onclick="switchTodayView('all')" 
+                            class="flex-1 py-2 px-3 rounded-xl font-semibold text-xs transition text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 active:scale-95">
+                        <i class="fas fa-calendar-alt text-xs text-slate-400"></i>
+                        <span>Agenda del Día</span>
+                        <span id="tab-all-count" class="px-1.5 py-0.2 bg-slate-300/70 text-slate-700 rounded-full text-[10px] font-black">0</span>
+                    </button>
+                </div>
+
+                <!-- CONTENEDOR 1: SALA DE ESPERA (SOLO PACIENTES QUE YA LLEGARON) -->
+                <div id="subtab-content-waiting" class="space-y-2">
+                    <div class="flex items-center justify-between px-1">
+                        <span class="text-[11px] font-bold text-emerald-800 flex items-center gap-1">
+                            <i class="fas fa-user-clock text-emerald-600"></i>
+                            <span>Pacientes en recepción esperando turno:</span>
+                        </span>
                         <span id="waiting-badge" class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">0 Pacientes</span>
                     </div>
                     <div id="waiting-list-container" class="space-y-2">
@@ -289,13 +369,13 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN 2: AGENDA COMPLETA DEL DÍA -->
-                <div class="space-y-2 pt-1">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center">
-                            <i class="fas fa-calendar-day text-indigo-600 mr-2"></i>
-                            Todas las Citas de Hoy
-                        </h3>
+                <!-- CONTENEDOR 2: TODAS LAS CITAS DEL DÍA -->
+                <div id="subtab-content-all" class="hidden space-y-2">
+                    <div class="flex items-center justify-between px-1">
+                        <span class="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                            <i class="fas fa-calendar-day text-indigo-600"></i>
+                            <span>Todas las citas programadas para hoy:</span>
+                        </span>
                         <span id="today-date-str" class="text-[11px] font-bold text-slate-400"></span>
                     </div>
                     <div id="appointments-list-container" class="space-y-2.5">
@@ -533,23 +613,29 @@
             </div>
         </main>
 
-        <!-- BOTÓN FLOTANTE PARA SECRETARIA: NUEVO PACIENTE / CITA / COBRO (UBICADO ARRIBA DEL NAV INFERIOR) -->
-        <div id="secretary-floating-bar" class="hidden fixed bottom-16 inset-x-4 max-w-md mx-auto z-20">
-            <div class="flex space-x-2">
+        <!-- BOTÓN FLOTANTE PARA SECRETARIA: NUEVO PACIENTE / CITA / COBRO / PRE-AUTORIZACIÓN ARS -->
+        <div id="secretary-floating-bar" class="hidden fixed bottom-16 inset-x-3 max-w-md mx-auto z-20">
+            <div class="grid grid-cols-4 gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl shadow-2xl border border-slate-700/60">
                 <button onclick="openNewPatientModal()" 
-                        class="px-3 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-xl shadow-indigo-600/30 flex items-center justify-center space-x-1.5 text-xs transition active:scale-95">
-                    <i class="fas fa-user-plus"></i>
+                        class="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex flex-col items-center justify-center text-[10px] transition active:scale-95">
+                    <i class="fas fa-user-plus text-xs mb-0.5"></i>
                     <span>+ Paciente</span>
                 </button>
                 <button onclick="openQuickApptModal()" 
-                        class="flex-1 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-xl shadow-teal-600/30 flex items-center justify-center space-x-1.5 text-xs transition active:scale-95">
-                    <i class="fas fa-calendar-plus"></i>
-                    <span>Agendar Cita</span>
+                        class="py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl flex flex-col items-center justify-center text-[10px] transition active:scale-95">
+                    <i class="fas fa-calendar-plus text-xs mb-0.5"></i>
+                    <span>Cita</span>
                 </button>
                 <button onclick="openQuickPaymentModal()" 
-                        class="px-3.5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/30 flex items-center justify-center space-x-1.5 text-xs transition active:scale-95">
-                    <i class="fas fa-cash-register"></i>
+                        class="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex flex-col items-center justify-center text-[10px] transition active:scale-95">
+                    <i class="fas fa-cash-register text-xs mb-0.5"></i>
                     <span>Cobro</span>
+                </button>
+                <button onclick="openPreauthModal()" 
+                        class="py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl flex flex-col items-center justify-center text-[10px] transition active:scale-95"
+                        title="Formulario de Pre-Autorización ARS (Hoja Carta)">
+                    <i class="fas fa-file-medical text-xs mb-0.5"></i>
+                    <span>ARS Carta</span>
                 </button>
             </div>
         </div>
@@ -569,7 +655,13 @@
             <button id="nav-btn-reports" onclick="switchMainTab('reports')" 
                     class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-600 font-medium text-[11px] transition">
                 <i class="fas fa-chart-pie text-base mb-0.5"></i>
-                <span>Reportes &amp; Cuadre</span>
+                <span>Reportes</span>
+            </button>
+            <button id="nav-btn-reception" onclick="openReceptionExpressWebView()" 
+                    class="flex flex-col items-center justify-center flex-1 py-1 text-sky-600 hover:text-sky-800 font-bold text-[11px] transition"
+                    title="Abrir SSCP Secretaría Express">
+                <i class="fas fa-desktop text-base mb-0.5"></i>
+                <span>Recepción</span>
             </button>
         </nav>
     </div>
@@ -877,7 +969,10 @@
                             <label class="block text-xs font-bold text-teal-900 uppercase">
                                 <i class="fas fa-book-medical text-teal-600 mr-1"></i> Talonario de Servicios (1-Clic)
                             </label>
-                            <span class="text-[10px] font-bold text-teal-700 bg-white border border-teal-200 px-2 py-0.5 rounded-full">27 Oficiales</span>
+                            <button type="button" onclick="openServicesManagementModal()" class="text-[10px] font-bold text-teal-800 bg-white hover:bg-teal-100 border border-teal-300 px-2 py-0.5 rounded-full transition flex items-center space-x-1 shadow-sm">
+                                <i class="fas fa-sliders text-[9px] text-teal-600"></i>
+                                <span>Gestionar / + Nuevo</span>
+                            </button>
                         </div>
                         <select id="qa-service-select" onchange="onQaServiceSelect(this)"
                                 class="w-full px-3 py-2 text-xs bg-white border border-teal-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-semibold text-slate-800">
@@ -902,6 +997,70 @@
                         <input type="text" id="qa-reason" placeholder="Consulta General, Chequeo, Control..."
                                class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
                     </div>
+
+                    <!-- SECCIÓN: DECISIÓN DE COBRO INMEDIATO VS COBRAR MÁS TARDE -->
+                    <div class="p-3.5 bg-gradient-to-r from-slate-50 to-emerald-50/50 border-2 border-emerald-200/90 rounded-2xl space-y-2.5 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-xs font-bold text-slate-800 uppercase flex items-center">
+                                <i class="fas fa-cash-register text-emerald-600 mr-1.5 text-sm"></i>
+                                ¿Desea cobrar esta cita?
+                            </label>
+                            <span id="qa-pay-badge" class="text-[10px] font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-full shadow-sm">
+                                Pendiente
+                            </span>
+                        </div>
+
+                        <!-- Selector de 2 Opciones Claras -->
+                        <div class="grid grid-cols-2 p-1 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-inner">
+                            <button type="button" id="qa-pay-btn-later" onclick="setQaPaymentChoice(false)"
+                                    class="py-2.5 rounded-lg transition bg-slate-100 text-slate-800 shadow-sm flex items-center justify-center space-x-1.5">
+                                <i class="fas fa-clock text-slate-500"></i>
+                                <span>Cobrar Más Tarde</span>
+                            </button>
+                            <button type="button" id="qa-pay-btn-now" onclick="setQaPaymentChoice(true)"
+                                    class="py-2.5 rounded-lg transition text-slate-500 hover:text-emerald-700 flex items-center justify-center space-x-1.5">
+                                <i class="fas fa-hand-holding-dollar text-emerald-600"></i>
+                                <span>Cobrar Ahora</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="qa-collect-now" value="0">
+
+                        <!-- Campos Desplegables de Cobro Inmediato (Se abren si elige Cobrar Ahora) -->
+                        <div id="qa-payment-box" class="hidden pt-2 border-t border-emerald-200 space-y-2.5">
+                            <div class="p-2 bg-emerald-100/70 border border-emerald-300 rounded-xl text-[11px] text-emerald-950 font-semibold flex items-center space-x-2">
+                                <i class="fas fa-receipt text-emerald-700 text-sm"></i>
+                                <span>Se registrará la cita y el pago de una vez en el cuadre de caja.</span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Monto a Cobrar (RD$) <span class="text-red-500">*</span></label>
+                                    <div class="relative">
+                                        <span class="absolute inset-y-0 left-0 flex items-center pl-2.5 text-emerald-700 font-bold text-xs">RD$</span>
+                                        <input type="number" step="0.01" id="qa-payment-amount" placeholder="0.00" oninput="updateQaSubmitBtnText()"
+                                               class="w-full pl-10 pr-2 py-2 text-xs bg-white border border-emerald-300 rounded-xl focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-900 focus:outline-none">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Método de Pago</label>
+                                    <select id="qa-payment-method"
+                                            class="w-full px-2 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 font-semibold text-slate-800 focus:outline-none">
+                                        <option value="Efectivo">Efectivo</option>
+                                        <option value="Tarjeta">Tarjeta de Débito / Crédito</option>
+                                        <option value="Transferencia">Transferencia Bancaria</option>
+                                        <option value="Seguro Médico">Seguro Médico / ARS</option>
+                                        <option value="Copago ARS">Copago / Diferencia ARS</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Comprobante o Nota (Opcional)</label>
+                                <input type="text" id="qa-payment-notes" placeholder="Ej: Recibo manual #..., pago consulta presencial"
+                                       class="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <button type="submit" id="btn-qa-submit" class="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-lg shadow-teal-600/30 text-sm flex items-center justify-center space-x-2 transition active:scale-95">
@@ -914,15 +1073,22 @@
 
     <!-- MODAL 4: COBRO RÁPIDO (SECRETARIA) -->
     <div id="modal-quick-payment" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto shadow-2xl space-y-4">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 class="font-bold text-slate-900 text-base flex items-center">
-                    <i class="fas fa-cash-register text-emerald-600 mr-2"></i> Registrar Cobro de Consulta
-                </h3>
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-base shadow-sm">
+                        <i class="fas fa-cash-register"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-base leading-tight">Registrar Cobro de Caja</h3>
+                        <p class="text-xs text-slate-400">Servicios clínicos o artículos e insumos por fuera</p>
+                    </div>
+                </div>
                 <button onclick="closeModal('modal-quick-payment')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
             </div>
 
-            <form onsubmit="handleSaveQuickPayment(event)" class="space-y-3">
+            <form onsubmit="handleSaveQuickPayment(event)" class="space-y-3.5">
+                <!-- Selector de Paciente -->
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Buscar Paciente</label>
                     <input type="text" id="qp-patient-search" placeholder="Escriba nombre o cédula..."
@@ -937,16 +1103,37 @@
                         <span class="font-bold text-emerald-900 block" id="qp-selected-name">Paciente</span>
                         <span class="text-emerald-700 text-[11px]" id="qp-selected-doc">Doc</span>
                     </div>
-                    <button type="button" onclick="clearSelectedPatient()" class="text-red-500 font-bold">&times; Cambiar</button>
+                    <button type="button" onclick="clearSelectedPatient()" class="text-red-500 font-bold hover:underline">&times; Cambiar</button>
                 </div>
 
-                <!-- Talonario de Servicios Oficial (1-Clic) -->
-                <div class="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-1.5">
+                <!-- TIPO DE COBRO: SERVICIO CLÍNICO VS ARTÍCULO EXTERNO -->
+                <div class="space-y-2">
+                    <label class="block text-[11px] font-bold text-slate-700 uppercase">Concepto del Cobro</label>
+                    <div class="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs font-bold shadow-inner">
+                        <button type="button" id="qp-tab-service" onclick="switchQpType('servicio')"
+                                class="py-2.5 rounded-lg transition bg-white text-emerald-800 shadow-sm flex items-center justify-center space-x-1.5">
+                            <i class="fas fa-stethoscope text-emerald-600"></i>
+                            <span>Servicio Clínico</span>
+                        </button>
+                        <button type="button" id="qp-tab-article" onclick="switchQpType('articulo')"
+                                class="py-2.5 rounded-lg transition text-slate-500 hover:text-indigo-700 flex items-center justify-center space-x-1.5">
+                            <i class="fas fa-box-open text-indigo-600"></i>
+                            <span>Artículo / Insumo</span>
+                        </button>
+                    </div>
+                    <input type="hidden" id="qp-item-type" value="servicio">
+                </div>
+
+                <!-- SECCIÓN A: SERVICIO CLÍNICO (TALONARIO OFICIAL) -->
+                <div id="qp-box-service" class="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
                     <div class="flex items-center justify-between">
-                        <label class="block text-xs font-bold text-emerald-950 uppercase">
-                            <i class="fas fa-book-medical text-emerald-600 mr-1"></i> Talonario de Servicios (1-Clic)
+                        <label class="block text-xs font-bold text-emerald-950 uppercase flex items-center">
+                            <i class="fas fa-book-medical text-emerald-600 mr-1.5"></i> Talonario de Servicios
                         </label>
-                        <span class="text-[10px] font-bold text-emerald-700 bg-white border border-emerald-200 px-2 py-0.5 rounded-full">Tarifas Oficiales</span>
+                        <button type="button" onclick="openServicesManagementModal()" class="text-[10px] font-bold text-teal-800 bg-white border border-teal-300 hover:bg-teal-50 px-2 py-0.5 rounded-full shadow-sm flex items-center space-x-1 transition">
+                            <i class="fas fa-cog text-teal-600"></i>
+                            <span>Gestionar Talonario</span>
+                        </button>
                     </div>
                     <select id="qp-service-select" onchange="onQpServiceSelect(this)"
                            class="w-full px-3.5 py-2.5 text-xs bg-white border border-emerald-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold text-slate-800">
@@ -956,6 +1143,31 @@
                     <input type="hidden" id="qp-service-name" value="Consulta Médica General">
                 </div>
 
+                <!-- SECCIÓN B: ARTÍCULOS O INSUMOS EXTERNOS -->
+                <div id="qp-box-article" class="hidden p-3 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-indigo-950 uppercase flex items-center">
+                            <i class="fas fa-box text-indigo-600 mr-1.5"></i> Artículo o Insumo Externo
+                        </label>
+                        <span class="text-[10px] font-bold text-indigo-700 bg-white border border-indigo-200 px-2 py-0.5 rounded-full shadow-sm">Cobro por Fuera</span>
+                    </div>
+                    <div>
+                        <input type="text" id="qp-article-name" placeholder="Ej: Kit de Sutura, Férula / Yeso, Medicamento, Insumo..."
+                               class="w-full px-3.5 py-2 text-xs bg-white border border-indigo-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-semibold text-slate-800">
+                    </div>
+                    <!-- Chips de artículos frecuentes para cobro rápido con 1 toque -->
+                    <div>
+                        <span class="block text-[10px] font-bold text-indigo-700 uppercase mb-1">Insumos Frecuentes (1-Toque):</span>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button type="button" onclick="setQpArticle('Kit de Curación y Sutura', 850)" class="px-2 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[10px] font-bold rounded-lg transition active:scale-95">+ Kit Sutura (RD$850)</button>
+                            <button type="button" onclick="setQpArticle('Material de Yeso / Férula', 1200)" class="px-2 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[10px] font-bold rounded-lg transition active:scale-95">+ Inmovilización / Yeso (RD$1,200)</button>
+                            <button type="button" onclick="setQpArticle('Certificado Médico Oficial', 1500)" class="px-2 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[10px] font-bold rounded-lg transition active:scale-95">+ Certificado (RD$1,500)</button>
+                            <button type="button" onclick="setQpArticle('Medicamento Suministrado', 500)" class="px-2 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[10px] font-bold rounded-lg transition active:scale-95">+ Medicamento (RD$500)</button>
+                            <button type="button" onclick="setQpArticle('Prueba Rápida Insumo', 600)" class="px-2 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[10px] font-bold rounded-lg transition active:scale-95">+ Prueba Rápida (RD$600)</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Cobertura ARS en Cobro -->
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase mb-1">
@@ -963,32 +1175,35 @@
                     </label>
                     <select id="qp-insurance-select"
                            class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium text-slate-800">
-                        <option value="Privado / Particular">Privado / Particular (Sin Seguro)</option>
+                        <option value="Privado / Particular (Sin Seguro)">Privado / Particular (Sin Seguro)</option>
                     </select>
                 </div>
 
+                <!-- Monto a Cobrar -->
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Monto a Cobrar <span class="text-red-500">*</span></label>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Monto a Cobrar (RD$) <span class="text-red-500">*</span></label>
                     <div class="relative">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 font-bold text-sm" id="qp-currency-symbol">RD$</span>
-                        <input type="number" step="0.01" id="qp-amount" required placeholder="1500"
-                               class="w-full pl-14 pr-3.5 py-2.5 text-base font-bold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-emerald-700 font-bold text-sm" id="qp-currency-symbol">RD$</span>
+                        <input type="number" step="0.01" id="qp-amount" required placeholder="0.00"
+                               class="w-full pl-14 pr-3.5 py-2.5 text-base font-extrabold bg-slate-50 border border-emerald-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-emerald-950 focus:outline-none">
                     </div>
                 </div>
 
+                <!-- Método de Pago -->
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Método de Pago</label>
-                    <select id="qp-method" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    <select id="qp-method" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold text-slate-800">
                         <option value="Efectivo">Efectivo</option>
                         <option value="Tarjeta">Tarjeta de Débito / Crédito</option>
                         <option value="Transferencia">Transferencia Bancaria</option>
                         <option value="Seguro Médico">Seguro Médico / ARS</option>
+                        <option value="Copago ARS">Copago / Diferencia ARS</option>
                     </select>
                 </div>
 
-                <button type="submit" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-lg shadow-emerald-600/30 text-sm flex items-center justify-center space-x-2">
-                    <i class="fas fa-check"></i>
-                    <span>Confirmar y Guardar Pago</span>
+                <button type="submit" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-lg shadow-emerald-600/30 text-sm flex items-center justify-center space-x-2 transition active:scale-95">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Confirmar y Guardar Cobro</span>
                 </button>
             </form>
         </div>
@@ -1263,34 +1478,271 @@
         </div>
     </div>
 
-    <!-- JAVASCRIPT: LÓGICA MÓVIL Y CLIENTE API -->
+    <!-- MODAL 7: GESTIÓN DE SERVICIOS Y TALONARIO (CREAR Y EDITAR) -->
+    <div id="modal-manage-services" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-base shadow-sm">
+                        <i class="fas fa-book-medical"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-base leading-tight">Talonario de Servicios</h3>
+                        <p class="text-xs text-slate-400">Crear nuevos servicios o modificar existentes</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-manage-services')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <!-- Formulario: Crear o Editar Servicio -->
+            <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <div class="flex items-center justify-between">
+                    <span id="service-form-title" class="text-xs font-bold text-slate-800 uppercase flex items-center">
+                        <i class="fas fa-plus-circle text-teal-600 mr-1.5"></i>
+                        <span>Nuevo Servicio Clínico</span>
+                    </span>
+                    <button type="button" id="service-cancel-edit-btn" onclick="resetServiceForm()" class="hidden text-[10px] font-bold text-rose-600 hover:underline">
+                        Cancelar Edición
+                    </button>
+                </div>
+
+                <form onsubmit="handleSaveServiceForm(event)" class="space-y-2.5">
+                    <input type="hidden" id="manage-service-id" value="">
+                    
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nombre del Servicio <span class="text-red-500">*</span></label>
+                        <input type="text" id="manage-service-name" required placeholder="Ej: Consulta Especializada, Lavado de Oído..."
+                               class="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 font-semibold text-slate-800 focus:outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Tarifa (RD$) <span class="text-red-500">*</span></label>
+                            <input type="number" step="0.01" id="manage-service-price" required placeholder="1500"
+                                   class="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 font-bold text-slate-900 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Categoría</label>
+                            <select id="manage-service-category"
+                                    class="w-full px-2 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 font-semibold text-slate-800 focus:outline-none">
+                                <option value="Consulta">Consulta</option>
+                                <option value="Procedimiento">Procedimiento</option>
+                                <option value="Cirugía Menor">Cirugía Menor</option>
+                                <option value="Certificado">Certificado Médico</option>
+                                <option value="Laboratorio">Laboratorio</option>
+                                <option value="Estudio">Estudio / EKG</option>
+                                <option value="Seguimiento">Control / Seguimiento</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-save-service" class="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs shadow-md shadow-teal-600/20 flex items-center justify-center space-x-1.5 transition active:scale-95">
+                        <i class="fas fa-save"></i>
+                        <span id="btn-save-service-text">Guardar Servicio en Talonario</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Listado de Servicios Actuales -->
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-black uppercase text-slate-700 tracking-wider">Servicios en Catálogo</span>
+                    <span id="manage-services-count" class="text-[10px] font-bold text-slate-400">0 servicios</span>
+                </div>
+                <div id="manage-services-list" class="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+                    <!-- Dinámico -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 8: SOLICITUD DE PRE-AUTORIZACIÓN MÉDICA PARA ARS (HOJA CARTA) -->
+    <div id="modal-preauth" class="hidden fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-base shadow-sm">
+                        <i class="fas fa-file-medical"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-base leading-tight">Pre-Autorización ARS (Hoja Carta)</h3>
+                        <p class="text-xs text-slate-400">Válido para todas las ARS dominicanas</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-preauth')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <form onsubmit="handleGeneratePreauth(event)" class="space-y-3">
+                <!-- Paciente -->
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Paciente <span class="text-red-500">*</span></label>
+                    <input type="text" id="preauth-patient-name" required placeholder="Nombre completo del paciente"
+                           class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 font-semibold text-slate-800 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Cédula / Documento</label>
+                        <input type="text" id="preauth-patient-doc" placeholder="402-XXXXXXX-X"
+                               class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 font-mono text-slate-800 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Teléfono</label>
+                        <input type="text" id="preauth-patient-phone" placeholder="809-555-0100"
+                               class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 text-slate-800 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Aseguradora ARS -->
+                <div class="p-3 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-2">
+                    <div>
+                        <label class="block text-[11px] font-bold text-amber-900 uppercase mb-1">Aseguradora (ARS) <span class="text-red-500">*</span></label>
+                        <select id="preauth-ars-select" onchange="onPreauthArsChange(this.value)" required
+                                class="w-full px-3 py-2 text-xs bg-white border border-amber-300 rounded-xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            <option value="SeNaSa (Régimen Contributivo)">SeNaSa (Régimen Contributivo)</option>
+                            <option value="SeNaSa (Régimen Subsidiado)">SeNaSa (Régimen Subsidiado)</option>
+                            <option value="Primera ARS de Humano">Primera ARS de Humano</option>
+                            <option value="ARS Universal">ARS Universal</option>
+                            <option value="Mapfre Salud ARS">Mapfre Salud ARS</option>
+                            <option value="ARS Monumental">ARS Monumental</option>
+                            <option value="ARS Renacer">ARS Renacer</option>
+                            <option value="ARS Simag">ARS Simag</option>
+                            <option value="ARS Futuro">ARS Futuro</option>
+                            <option value="ARS Yunen">ARS Yunen</option>
+                            <option value="ARS Reservas">ARS Reservas</option>
+                            <option value="GMA - Grupo Médico Asociado">GMA - Grupo Médico Asociado</option>
+                            <option value="ARS Meta Salud">ARS Meta Salud</option>
+                            <option value="ARS Plan Salud">ARS Plan Salud</option>
+                            <option value="ARS CMD (Colegio Médico)">ARS CMD (Colegio Médico)</option>
+                            <option value="OTRA">Otra Aseguradora / Internacional...</option>
+                        </select>
+                    </div>
+
+                    <div id="preauth-custom-ars-box" class="hidden">
+                        <label class="block text-[10px] font-bold text-amber-900 uppercase mb-1">Nombre de la ARS Personalizada</label>
+                        <input type="text" id="preauth-custom-ars-name" placeholder="Escriba el nombre de la aseguradora"
+                               class="w-full px-3 py-1.5 text-xs bg-white border border-amber-300 rounded-xl text-slate-800 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-amber-900 uppercase mb-1">No. Carnet / Póliza / Afiliado</label>
+                        <input type="text" id="preauth-card-number" placeholder="Ej: 001-9876543-2"
+                               class="w-full px-3 py-1.5 text-xs bg-white border border-amber-300 rounded-xl font-mono text-slate-800 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Servicio y Estudio Solicitado -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Servicio / Estudio</label>
+                        <select id="preauth-service-type"
+                                class="w-full px-2.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            <option value="Consulta Médica Especializada">Consulta Médica Especializada</option>
+                            <option value="Sonografía Obstétrica Anatómica">Sonografía Obstétrica Anatómica</option>
+                            <option value="Sonografía Pélvica Transvaginal">Sonografía Pélvica Transvaginal</option>
+                            <option value="Sonografía Abdominal">Sonografía Abdominal</option>
+                            <option value="Electrocardiograma (EKG)">Electrocardiograma (EKG)</option>
+                            <option value="Procedimiento Quirúrgico Menor">Procedimiento Menor</option>
+                            <option value="Control Prenatal Integral">Control Prenatal Integral</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Diagnóstico (CIE-10)</label>
+                        <select id="preauth-cie10"
+                                class="w-full px-2.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            <option value="Z34.0 - Embarazo normal (primigesta)">Z34.0 Embarazo normal</option>
+                            <option value="Z34.8 - Supervisión de otros embarazos">Z34.8 Otros embarazos</option>
+                            <option value="O24.4 - Diabetes gestacional">O24.4 Diabetes gestacional</option>
+                            <option value="O13 - Hipertensión gestacional">O13 Hipertensión gestacional</option>
+                            <option value="N39.0 - Infección tracto urinario">N39.0 Infección urinaria</option>
+                            <option value="N76.0 - Vaginitis aguda">N76.0 Vaginitis aguda</option>
+                            <option value="N92.0 - Menorragia regular">N92.0 Menorragia</option>
+                            <option value="R10.2 - Dolor pélvico">R10.2 Dolor pélvico</option>
+                            <option value="N97.9 - Infertilidad femenina">N97.9 Infertilidad</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Justificación Clínica / Indicación</label>
+                    <textarea id="preauth-clinical-indication" rows="2" placeholder="Evaluación diagnóstica y manejo clínico especializado..."
+                              class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+                </div>
+
+                <!-- Datos del Médico -->
+                <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 flex items-center justify-between">
+                    <div>
+                        <strong class="text-slate-800">Dr. Carlos Heredia</strong> — Ginecología y Obstetricia
+                        <span class="block text-slate-500 text-[10px]">Exequátur: 4589-12 • SSCP Clínico</span>
+                    </div>
+                    <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded text-[10px]">Médico Tratante</span>
+                </div>
+
+                <div class="pt-2 flex space-x-2">
+                    <button type="button" onclick="closeModal('modal-preauth')" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow-md shadow-amber-600/30 flex items-center justify-center space-x-1.5 transition active:scale-95">
+                        <i class="fas fa-print"></i>
+                        <span>Generar Hoja Carta</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- VISTA IMPRIMIBLE PARA HOJA CARTA OFICIAL -->
+    <div id="preauth-printable-sheet" class="hidden"></div>
     <script>
-        // Configuración de servidor por defecto y Tailscale
+        // Configuración de servidor por defecto (Nube y Red Local)
         const isNativeApp = window.location.protocol === 'file:' || !window.location.origin.includes('http');
-        const TAILSCALE_DEFAULT_IP = '100.91.251.86';
-        const DEFAULT_TAILSCALE_URL = `http://${TAILSCALE_DEFAULT_IP}:8080`;
-        const defaultHost = window.location.origin.includes('http') ? window.location.origin : DEFAULT_TAILSCALE_URL;
+        const DEFAULT_LOCAL_URL = 'http://127.0.0.1:8080';
+        const DEFAULT_CLOUD_URL = 'https://sscp.laxarusdevs.com';
+        const defaultHost = DEFAULT_CLOUD_URL;
         let serverUrl = localStorage.getItem('sscp_mobile_server_url') || defaultHost;
+        let relayClinicId = localStorage.getItem('sscp_relay_clinic_id') || 'dr_carlos_heredia';
         let authToken = localStorage.getItem('sscp_mobile_token') || null;
         let currentUser = JSON.parse(localStorage.getItem('sscp_mobile_user') || 'null');
         let currentClinic = JSON.parse(localStorage.getItem('sscp_mobile_clinic') || 'null');
 
         // Inicialización al cargar la página
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('config-server-url').value = serverUrl;
-            document.getElementById('qa-date').value = new Date().toISOString().split('T')[0];
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('clinic_id') && urlParams.get('clinic_id').trim()) {
+                relayClinicId = urlParams.get('clinic_id').trim().toLowerCase();
+                localStorage.setItem('sscp_relay_clinic_id', relayClinicId);
+            }
+            if (urlParams.has('server') && urlParams.get('server').trim()) {
+                serverUrl = urlParams.get('server').trim();
+                localStorage.setItem('sscp_mobile_server_url', serverUrl);
+            }
+
+            const serverInput = document.getElementById('config-server-url');
+            if (serverInput) serverInput.value = serverUrl;
+            const qaDate = document.getElementById('qa-date');
+            if (qaDate) qaDate.value = new Date().toISOString().split('T')[0];
+
+            // Cargar canal de relay guardado
+            const savedClinic = localStorage.getItem('sscp_relay_clinic_id') || relayClinicId;
+            const relayInput = document.getElementById('config-relay-clinic-id');
+            if (relayInput) relayInput.value = savedClinic;
+            const channelTag = document.getElementById('relay-active-channel-name');
+            if (channelTag) channelTag.textContent = savedClinic;
+            const syncTag = document.getElementById('sync-clinic-tag');
+            if (syncTag) syncTag.textContent = savedClinic;
 
             if (authToken && currentUser) {
                 showAppScreen();
                 OfflineSyncManager.init();
             } else {
                 showLoginScreen();
-                // Si la app está en el teléfono y nunca se ha configurado, auto-detectar silenciosamente
-                if (isNativeApp && !localStorage.getItem('sscp_mobile_server_url')) {
-                    autoDetectServer(true);
-                }
             }
         });
+
+        function selectDoctorChannel(channel) {
+            activateRelayMode(channel);
+        }
 
         function getApiUrl(path) {
             return `${serverUrl.replace(/\/+$/, '')}${path}`;
@@ -1308,18 +1760,44 @@
             testConnection();
         }
 
+        function activateRelayMode(channelOverride = null) {
+            const input = document.getElementById('config-relay-clinic-id');
+            const target = channelOverride || (input && input.value ? input.value.trim() : '') || 'dr_carlos_heredia';
+            relayClinicId = target.trim().toLowerCase();
+            localStorage.setItem('sscp_relay_clinic_id', relayClinicId);
+            localStorage.setItem('sscp_relay_active', 'true');
+            serverUrl = DEFAULT_CLOUD_URL;
+            localStorage.setItem('sscp_mobile_server_url', serverUrl);
+
+            const serverInput = document.getElementById('config-server-url');
+            if (serverInput) serverInput.value = serverUrl;
+            if (input) input.value = relayClinicId;
+
+            const channelTag = document.getElementById('relay-active-channel-name');
+            if (channelTag) channelTag.textContent = relayClinicId;
+            const syncTag = document.getElementById('sync-clinic-tag');
+            if (syncTag) syncTag.textContent = relayClinicId;
+
+            showSyncToast(`✓ Canal activado: ${relayClinicId} en Cloud Relay`);
+            closeConfigModal();
+            OfflineSyncManager.checkAndSync();
+        }
+
         async function autoDetectServer(silent = false) {
-            const candidates = [
-                DEFAULT_TAILSCALE_URL,
-                'http://ecommerce0:8080',
-                'https://sscp.laxarusdevs.com',
+            const savedUrl = localStorage.getItem('sscp_mobile_server_url');
+            const candidateSet = new Set([
+                ...(savedUrl ? [savedUrl] : []),
+                DEFAULT_CLOUD_URL,
+                DEFAULT_LOCAL_URL,
+                'http://192.168.1.27:8080',
                 'http://127.0.0.1:8080'
-            ];
+            ]);
+            const candidates = Array.from(candidateSet);
 
             const resElem = document.getElementById('ping-result');
             const btn = document.getElementById('btn-auto-detect');
             if (!silent) {
-                if (resElem) resElem.innerHTML = '<span class="text-blue-600"><i class="fas fa-spinner fa-spin mr-1"></i>Buscando PC del doctor en red Tailscale...</span>';
+                if (resElem) resElem.innerHTML = '<span class="text-blue-600"><i class="fas fa-spinner fa-spin mr-1"></i>Buscando conexión con el servidor...</span>';
                 if (btn) btn.disabled = true;
             }
 
@@ -1327,14 +1805,17 @@
                 try {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 2000);
-                    const res = await fetch(`${candidate}/api/mobile/ping`, { signal: controller.signal });
+                    const pingUrl = candidate.includes('laxarusdevs.com')
+                        ? `${candidate}/api/relay/${relayClinicId}/status`
+                        : `${candidate}/api/mobile/ping`;
+                    const res = await fetch(pingUrl, { signal: controller.signal });
                     clearTimeout(timeoutId);
                     if (res.ok) {
                         serverUrl = candidate;
                         localStorage.setItem('sscp_mobile_server_url', serverUrl);
                         document.getElementById('config-server-url').value = serverUrl;
                         if (!silent && resElem) {
-                            resElem.innerHTML = `<span class="text-emerald-600 font-bold"><i class="fas fa-check-circle mr-1"></i>¡PC Central Encontrada! (${candidate})</span>`;
+                            resElem.innerHTML = `<span class="text-emerald-600 font-bold"><i class="fas fa-check-circle mr-1"></i>¡Servidor Encontrado! (${candidate})</span>`;
                             setTimeout(() => closeConfigModal(), 1200);
                         }
                         if (btn) btn.disabled = false;
@@ -1344,42 +1825,84 @@
                 } catch (e) {}
             }
 
-            // Si no respondió ninguno en vivo (PC apagada), preconfigurar la IP fija de Tailscale del doctor
-            serverUrl = DEFAULT_TAILSCALE_URL;
+            // Por defecto usar la nube 24/7
+            serverUrl = DEFAULT_CLOUD_URL;
             localStorage.setItem('sscp_mobile_server_url', serverUrl);
             document.getElementById('config-server-url').value = serverUrl;
             if (!silent) {
-                if (resElem) resElem.innerHTML = `<span class="text-amber-700 font-semibold"><i class="fas fa-info-circle mr-1"></i>PC en reposo. Enlazado a Tailscale (${DEFAULT_TAILSCALE_URL}). Las citas se guardarán en el celular.</span>`;
+                if (resElem) resElem.innerHTML = `<span class="text-amber-700 font-semibold"><i class="fas fa-info-circle mr-1"></i>Conectando a Buzón Nube 24/7. Modo Autónomo activo.</span>`;
                 if (btn) btn.disabled = false;
             }
             return false;
         }
+
+        function cleanInputUrl(raw) {
+            if (!raw) return '';
+            let url = raw.trim();
+            const ipRegex = /^(?:https?:\/\/)?([0-9]{1,3}(?:\.[0-9]{1,3}){3})(:[0-9]+)?(\/.*)?$/;
+            const match = url.match(ipRegex);
+            if (match) {
+                const ip = match[1];
+                let port = match[2] || ':8080';
+                let path = match[3] || '';
+                return `http://${ip}${port}${path}`;
+            }
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+            return url;
+        }
+
         async function testConnection() {
-            const inputUrl = document.getElementById('config-server-url').value.trim();
+            const raw = document.getElementById('config-server-url').value;
+            const inputUrl = cleanInputUrl(raw);
+            document.getElementById('config-server-url').value = inputUrl;
+
+            const clinicInput = document.getElementById('config-relay-clinic-id');
+            const targetClinic = (clinicInput?.value || relayClinicId || 'dr_carlos_heredia').trim().toLowerCase();
+
             const resElem = document.getElementById('ping-result');
             resElem.innerHTML = '<span class="text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i>Probando conexión...</span>';
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 6000);
-                const res = await fetch(`${inputUrl.replace(/\/+$/, '')}/api/mobile/ping`, { signal: controller.signal });
+                const testUrl = inputUrl.includes('laxarusdevs.com')
+                    ? `${inputUrl.replace(/\/+$/, '')}/api/relay/${targetClinic}/status`
+                    : `${inputUrl.replace(/\/+$/, '')}/api/mobile/ping`;
+                const res = await fetch(testUrl, { signal: controller.signal });
                 clearTimeout(timeoutId);
                 const data = await res.json();
                 if (data.status === 'online') {
-                    resElem.innerHTML = `<span class="text-emerald-600"><i class="fas fa-check-circle mr-1"></i>¡Conectado! Clínica: ${data.clinic_name}</span>`;
+                    const label = data.service || data.clinic_name || `Canal: ${data.clinic_id || targetClinic}`;
+                    resElem.innerHTML = `<span class="text-emerald-600 font-bold"><i class="fas fa-check-circle mr-1"></i>¡Conectado! ${label}</span>`;
                 } else {
-                    resElem.innerHTML = `<span class="text-amber-600">Respuesta inesperada del servidor.</span>`;
+                    resElem.innerHTML = `<span class="text-amber-600">Respuesta recibida del servidor.</span>`;
                 }
             } catch (e) {
-                resElem.innerHTML = `<span class="text-red-500"><i class="fas fa-times-circle mr-1"></i>No se pudo conectar a ${inputUrl}. Asegúrate de estar en el mismo Wi-Fi y verificar la IP de tu computadora (ej: http://192.168.1.50:8080).</span>`;
+                resElem.innerHTML = `<span class="text-red-500"><i class="fas fa-times-circle mr-1"></i>No se pudo conectar a ${inputUrl}. Verifica tu conexión a Internet o que la PC esté encendida.</span>`;
             }
         }
+
         function saveServerConfig() {
-            const inputUrl = document.getElementById('config-server-url').value.trim();
+            const raw = document.getElementById('config-server-url').value;
+            const inputUrl = cleanInputUrl(raw);
             if (!inputUrl) return;
+            document.getElementById('config-server-url').value = inputUrl;
             serverUrl = inputUrl;
             localStorage.setItem('sscp_mobile_server_url', serverUrl);
+
+            const clinicInput = document.getElementById('config-relay-clinic-id');
+            if (clinicInput && clinicInput.value.trim()) {
+                relayClinicId = clinicInput.value.trim().toLowerCase();
+                localStorage.setItem('sscp_relay_clinic_id', relayClinicId);
+                const channelTag = document.getElementById('relay-active-channel-name');
+                if (channelTag) channelTag.textContent = relayClinicId;
+                const syncTag = document.getElementById('sync-clinic-tag');
+                if (syncTag) syncTag.textContent = relayClinicId;
+            }
+
             closeConfigModal();
-            alert('Servidor guardado correctamente.');
+            showSyncToast(`✓ Configuración guardada para: ${relayClinicId}`);
             OfflineSyncManager.checkAndSync();
         }
 
@@ -1520,25 +2043,26 @@
 
                 if (!bar || !dot || !text) return;
                 const pending = this.getPendingCount();
+                const activeCid = localStorage.getItem('sscp_relay_clinic_id') || relayClinicId || 'dr_carlos_heredia';
 
                 if (this.isSyncing) {
                     bar.className = 'w-full bg-blue-50 border-b border-blue-200 px-4 py-1.5 flex items-center justify-between text-[11px] transition-all shrink-0';
                     dot.className = 'w-2 h-2 rounded-full bg-blue-500 animate-ping';
-                    text.innerHTML = '<span class="font-bold text-blue-900">Transfiriendo a la PC Central...</span>';
+                    text.innerHTML = `<span class="font-bold text-blue-900">Transfiriendo a Cloud Relay (${activeCid})...</span>`;
                     if (icon) icon.className = 'fas fa-arrows-rotate fa-spin text-blue-600 text-xs mr-1';
                     if (btnTxt) btnTxt.textContent = 'Enviando...';
                 } else if (this.serverOnline) {
                     bar.className = 'w-full bg-emerald-50 border-b border-emerald-100 px-4 py-1.5 flex items-center justify-between text-[11px] transition-all shrink-0';
                     dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
-                    text.innerHTML = '<span class="font-bold text-emerald-800">Conectado a Central (Doctor)</span>';
-                    if (icon) icon.className = 'fas fa-arrows-rotate text-emerald-600 text-xs mr-1';
+                    text.innerHTML = `<span class="font-bold text-emerald-800">Conectado a Cloud Relay (${activeCid})</span>`;
+                    if (icon) icon.className = 'fas fa-cloud text-emerald-600 text-xs mr-1';
                     if (btnTxt) btnTxt.textContent = 'Sincronizar';
                 } else {
-                    bar.className = 'w-full bg-amber-50 border-b border-amber-200 px-4 py-1.5 flex items-center justify-between text-[11px] transition-all shrink-0';
-                    dot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
-                    text.innerHTML = '<span class="font-bold text-amber-900">PC Doctor Apagada / Fuera de Línea</span>';
-                    if (icon) icon.className = 'fas fa-cloud-arrow-up text-amber-700 text-xs mr-1';
-                    if (btnTxt) btnTxt.textContent = 'Reintentar';
+                    bar.className = 'w-full bg-sky-50 border-b border-sky-200 px-4 py-1.5 flex items-center justify-between text-[11px] transition-all shrink-0';
+                    dot.className = 'w-2 h-2 rounded-full bg-sky-500 animate-pulse';
+                    text.innerHTML = `<span class="font-bold text-sky-900">Modo Local Autónomo (${activeCid}) - Guardando en Memoria</span>`;
+                    if (icon) icon.className = 'fas fa-shield-alt text-sky-600 text-xs mr-1';
+                    if (btnTxt) btnTxt.textContent = 'Verificar';
                 }
 
                 if (badge) {
@@ -1552,25 +2076,43 @@
             },
 
             async checkAndSync() {
-                if (!authToken || this.isSyncing) return;
+                if (this.isSyncing) return;
+                const clinicId = localStorage.getItem('sscp_relay_clinic_id') || relayClinicId || 'dr_carlos_heredia';
+                let isOnline = false;
+
+                // 1. Chequeo prioritario en Buzón Cloud Relay por Internet
                 try {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 4000);
-                    const res = await fetch(getApiUrl('/api/mobile/ping'), { signal: controller.signal });
+                    const rRelay = await fetch(`https://sscp.laxarusdevs.com/api/relay/${clinicId}/status`, { signal: controller.signal });
                     clearTimeout(timeoutId);
-
-                    if (res.ok) {
-                        this.setOnlineStatus(true);
-                        const pending = this.getPendingCount();
-                        if (pending > 0) {
-                            await this.flushOutbox();
-                        }
-                    } else {
-                        this.setOnlineStatus(false);
+                    if (rRelay.ok) {
+                        const data = await rRelay.json();
+                        if (data.status === 'online') isOnline = true;
                     }
-                } catch (e) {
-                    this.setOnlineStatus(false);
+                } catch (e) {}
+
+                // 2. Si no conectó por la nube y se configuró servidor local directo
+                if (!isOnline && !serverUrl.includes('laxarusdevs.com')) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 3000);
+                        const res = await fetch(getApiUrl('/api/mobile/ping'), { signal: controller.signal });
+                        clearTimeout(timeoutId);
+                        if (res.ok) isOnline = true;
+                    } catch (e) {}
                 }
+
+                this.setOnlineStatus(isOnline);
+
+                // Vaciar cola outbox si hay registros pendientes
+                const pending = this.getPendingCount();
+                if (pending > 0) {
+                    await this.flushOutbox();
+                }
+
+                // Descargar cambios pendientes del buzón relay si hay red
+                await this.pullRelayUpdates();
             },
 
             async flushOutbox() {
@@ -1584,42 +2126,263 @@
                 this.isSyncing = true;
                 this.updateSyncUI();
 
+                let synced = false;
+                const clinicId = localStorage.getItem('sscp_relay_clinic_id') || relayClinicId || 'dr_carlos_heredia';
+
+                // Prioridad 1: Depositar en el Buzón Cloud Relay (Internet Directo 24/7)
                 try {
-                    const payload = {
-                        patients: ob.patients || [],
-                        appointments: ob.appointments || [],
-                        last_synced_at: localStorage.getItem(this.LAST_SYNC_KEY) || null
-                    };
-
-                    const res = await fetch(getApiUrl('/api/mobile/sync/batch'), {
+                    const relayEndpoint = `https://sscp.laxarusdevs.com/api/relay/${clinicId}/push`;
+                    const relayRes = await fetch(relayEndpoint, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${authToken}`
-                        },
-                        body: JSON.stringify(payload)
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            device_id: 'tablet_secretaria_mobile',
+                            message_type: 'delta',
+                            data: {
+                                patients: ob.patients || [],
+                                appointments: ob.appointments || [],
+                                payments: ob.payments || []
+                            }
+                        })
                     });
-
-                    if (res.ok) {
-                        const data = await res.json();
-                        console.log('✓ Sincronización exitosa con PC Central:', data);
-                        this.saveOutbox({ patients: [], appointments: [] });
-                        localStorage.setItem(this.LAST_SYNC_KEY, new Date().toISOString());
-
-                        showSyncToast(`✓ ¡Conexión con Central lista! Se transfirieron ${data.processed_appointments} citas y ${data.processed_patients} pacientes.`);
-                        loadDashboardData();
-                        loadQaPatientsList();
-                    } else {
-                        console.warn('Servidor respondió error en batch sync:', res.status);
+                    if (relayRes.ok) {
+                        const rData = await relayRes.json();
+                        if (rData.success) {
+                            synced = true;
+                            showSyncToast(`✓ ¡Guardado en Cloud Relay (${clinicId})! La PC del doctor lo descargará al abrir.`);
+                        }
                     }
                 } catch (e) {
-                    console.warn('Error al vaciar cola outbox:', e);
-                } finally {
-                    this.isSyncing = false;
-                    this.updateSyncUI();
+                    console.warn('Buzón Cloud Relay momentáneamente no accesible:', e);
                 }
+
+                // Prioridad 2: Si no hubo nube y hay red local con token, intentar directo a la PC
+                if (!synced && authToken && !serverUrl.includes('laxarusdevs.com')) {
+                    try {
+                        const res = await fetch(getApiUrl('/api/mobile/sync/batch'), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${authToken}`
+                            },
+                            body: JSON.stringify({
+                                patients: ob.patients || [],
+                                appointments: ob.appointments || [],
+                                last_synced_at: localStorage.getItem(this.LAST_SYNC_KEY) || null
+                            })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            synced = true;
+                            showSyncToast(`✓ ¡Transferido directamente a la PC del doctor!`);
+                        }
+                    } catch (e) {}
+                }
+
+                if (synced) {
+                    this.saveOutbox({ patients: [], appointments: [] });
+                    localStorage.setItem(this.LAST_SYNC_KEY, new Date().toISOString());
+                    loadDashboardData();
+                    loadQaPatientsList();
+                }
+
+                this.isSyncing = false;
+                this.updateSyncUI();
+            },
+
+            async pullRelayUpdates() {
+                try {
+                    const clinicId = localStorage.getItem('sscp_relay_clinic_id') || relayClinicId || 'dr_carlos_heredia';
+                    const lastSync = localStorage.getItem(this.LAST_SYNC_KEY) || '2026-01-01T00:00:00';
+                    const pullEndpoint = `https://sscp.laxarusdevs.com/api/relay/${clinicId}/pull?device_id=tablet_secretaria_mobile&since=${encodeURIComponent(lastSync)}`;
+                    const res = await fetch(pullEndpoint);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.deltas_count > 0) {
+                            localStorage.setItem(this.LAST_SYNC_KEY, new Date().toISOString());
+                            loadDashboardData();
+                            loadQaPatientsList();
+                        }
+                    }
+                } catch (e) {}
             }
         };
+
+        // --- FUNCIONES DE PRE-AUTORIZACIÓN ARS (HOJA CARTA) & RELAY ---
+        function openPreauthModal(patient = null) {
+            if (patient) {
+                document.getElementById('preauth-patient-name').value = patient.name || '';
+                document.getElementById('preauth-patient-doc').value = patient.document_id || '';
+                document.getElementById('preauth-patient-phone').value = patient.phone || '';
+                if (patient.insurance_name) {
+                    const sel = document.getElementById('preauth-ars-select');
+                    let found = false;
+                    for (let i = 0; i < sel.options.length; i++) {
+                        if (sel.options[i].value.toLowerCase().includes(patient.insurance_name.toLowerCase())) {
+                            sel.selectedIndex = i;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found && patient.insurance_name !== 'Privado / Particular') {
+                        sel.value = 'OTRA';
+                        document.getElementById('preauth-custom-ars-box').classList.remove('hidden');
+                        document.getElementById('preauth-custom-ars-name').value = patient.insurance_name;
+                    }
+                }
+                if (patient.insurance_number) {
+                    document.getElementById('preauth-card-number').value = patient.insurance_number;
+                }
+            } else {
+                document.getElementById('preauth-patient-name').value = '';
+                document.getElementById('preauth-patient-doc').value = '';
+                document.getElementById('preauth-patient-phone').value = '';
+                document.getElementById('preauth-card-number').value = '';
+                document.getElementById('preauth-custom-ars-name').value = '';
+                document.getElementById('preauth-custom-ars-box').classList.add('hidden');
+            }
+            document.getElementById('modal-preauth').classList.remove('hidden');
+        }
+
+        function onPreauthArsChange(val) {
+            const customBox = document.getElementById('preauth-custom-ars-box');
+            if (val === 'OTRA') {
+                customBox.classList.remove('hidden');
+                document.getElementById('preauth-custom-ars-name').focus();
+            } else {
+                customBox.classList.add('hidden');
+            }
+        }
+
+        function handleGeneratePreauth(e) {
+            e.preventDefault();
+            const pName = document.getElementById('preauth-patient-name').value.trim();
+            const pDoc = document.getElementById('preauth-patient-doc').value.trim() || 'No especificado';
+            const pPhone = document.getElementById('preauth-patient-phone').value.trim() || 'No especificado';
+            let ars = document.getElementById('preauth-ars-select').value;
+            if (ars === 'OTRA') {
+                ars = document.getElementById('preauth-custom-ars-name').value.trim() || 'Aseguradora Privada';
+            }
+            const cardNum = document.getElementById('preauth-card-number').value.trim() || 'Pendiente de afiliación';
+            const svc = document.getElementById('preauth-service-type').value;
+            const cie = document.getElementById('preauth-cie10').value;
+            const ind = document.getElementById('preauth-clinical-indication').value.trim() || 'Evaluación diagnóstica y manejo clínico integral.';
+            const dateStr = new Date().toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            const printContainer = document.getElementById('preauth-printable-sheet');
+            printContainer.className = 'fixed inset-0 z-[100] bg-white p-8 overflow-y-auto text-slate-900 font-sans leading-relaxed';
+            printContainer.innerHTML = `
+                <div class="max-w-2xl mx-auto border-2 border-slate-300 p-8 rounded-xl shadow-sm text-xs bg-white" style="min-height: 9.8in;">
+                    <div class="border-b-2 border-slate-800 pb-4 mb-4 flex items-center justify-between">
+                        <div>
+                            <h1 class="text-xl font-black text-slate-900 tracking-tight">DR. CARLOS HEREDIA</h1>
+                            <p class="font-bold text-slate-700">ESPECIALISTA EN GINECOLOGÍA Y OBSTETRICIA</p>
+                            <p class="text-[11px] text-slate-500">Exequátur No. 4589-12 &bull; Miembro Sociedad Dominicana de Ginecología</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="inline-block px-3 py-1 bg-slate-900 text-white font-black text-[10px] rounded uppercase tracking-wider">
+                                Solicitud Médica ARS
+                            </span>
+                            <p class="text-[11px] font-bold text-slate-600 mt-1">Fecha: ${dateStr}</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-4 grid grid-cols-2 gap-3">
+                        <div>
+                            <span class="font-bold text-slate-500 uppercase text-[10px] block">Aseguradora / ARS:</span>
+                            <strong class="text-sm text-slate-900">${ars}</strong>
+                        </div>
+                        <div>
+                            <span class="font-bold text-slate-500 uppercase text-[10px] block">No. Carnet / Póliza:</span>
+                            <strong class="text-sm font-mono text-slate-900">${cardNum}</strong>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-4 grid grid-cols-3 gap-3">
+                        <div class="col-span-2">
+                            <span class="font-bold text-slate-500 uppercase text-[10px] block">Nombre del Paciente:</span>
+                            <strong class="text-sm text-slate-900">${pName}</strong>
+                        </div>
+                        <div>
+                            <span class="font-bold text-slate-500 uppercase text-[10px] block">Cédula / Documento:</span>
+                            <span class="font-mono font-bold text-slate-800">${pDoc}</span>
+                        </div>
+                        <div class="col-span-3">
+                            <span class="font-bold text-slate-500 uppercase text-[10px] block">Teléfono de Contacto:</span>
+                            <span class="text-slate-800">${pPhone}</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 mb-6">
+                        <div class="p-3 border-l-4 border-indigo-600 bg-indigo-50/50 rounded-r-lg">
+                            <span class="font-bold text-indigo-900 uppercase text-[10px] block">Servicio o Estudio Solicitado:</span>
+                            <p class="text-sm font-black text-indigo-950 mt-0.5">${svc}</p>
+                        </div>
+
+                        <div class="p-3 border-l-4 border-emerald-600 bg-emerald-50/50 rounded-r-lg">
+                            <span class="font-bold text-emerald-900 uppercase text-[10px] block">Diagnóstico Presuntivo (CIE-10):</span>
+                            <p class="text-sm font-bold text-emerald-950 mt-0.5">${cie}</p>
+                        </div>
+
+                        <div class="p-3 border border-slate-200 rounded-lg">
+                            <span class="font-bold text-slate-600 uppercase text-[10px] block mb-1">Justificación Clínica / Observaciones:</span>
+                            <p class="text-xs text-slate-800 leading-relaxed">${ind}</p>
+                        </div>
+                    </div>
+
+                    <div class="pt-10 mt-8 border-t border-slate-200 grid grid-cols-2 gap-6 text-center">
+                        <div>
+                            <div class="w-48 mx-auto border-b border-slate-400 pb-1 mb-1"></div>
+                            <span class="text-[10px] font-bold text-slate-500 uppercase">Firma del Paciente / Afiliado</span>
+                        </div>
+                        <div>
+                            <div class="w-48 mx-auto border-b-2 border-slate-900 pb-1 mb-1 font-bold">
+                                Dr. Carlos Heredia
+                            </div>
+                            <span class="text-[10px] font-black text-slate-800 uppercase block">Firma y Sello Médico</span>
+                            <span class="text-[9px] text-slate-500">Exequátur No. 4589-12</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-8 text-center text-[10px] text-slate-400 border-t border-slate-100 pt-3 flex items-center justify-between">
+                        <span>SSCP &bull; Sistema Clínico</span>
+                        <span>Documento expedido en formato Hoja Carta Oficial</span>
+                    </div>
+                </div>
+
+                <div class="max-w-2xl mx-auto mt-4 flex items-center justify-end space-x-3 print:hidden">
+                    <button onclick="document.getElementById('preauth-printable-sheet').className='hidden'" 
+                            class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">
+                        Cerrar Vista Previa
+                    </button>
+                    <button onclick="window.print()" 
+                            class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center space-x-1.5">
+                        <i class="fas fa-print"></i>
+                        <span>Imprimir Hoja Carta</span>
+                    </button>
+                </div>
+            `;
+
+            closeModal('modal-preauth');
+            showSyncToast('✓ Solicitud para ARS generada en formato Hoja Carta.');
+        }
+
+        function openReceptionExpressWebView() {
+            const url = getApiUrl('/reception/agenda');
+            window.location.href = url;
+        }
+
+        function activateRelayMode() {
+            const channel = document.getElementById('config-relay-clinic-id').value.trim() || 'dr_carlos_heredia';
+            localStorage.setItem('sscp_relay_clinic_id', channel);
+            const pill = document.getElementById('relay-status-pill');
+            if (pill) {
+                pill.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span><span>Canal activo: <strong>${channel}</strong></span>`;
+            }
+            showSyncToast(`✓ Buzón Relay activado para el consultorio: ${channel}`);
+            closeConfigModal();
+            OfflineSyncManager.checkAndSync();
+        }
 
         function showSyncToast(message, type = 'success') {
             let toast = document.getElementById('sscp-sync-toast');
@@ -1737,11 +2500,54 @@
             switchMainTab('today');
         }
 
-        // --- CATÁLOGOS GLOBALES: TALONARIO DE SERVICIOS Y ARS ---
-        window.mobileServicesCatalog = [];
-        window.mobileArsList = [];
+        // --- CATÁLOGOS POR DEFECTO Y FALLBACK OFFLINE INMEDIATO ---
+        const DEFAULT_OFFICIAL_ARS = [
+            { id: 1, name: "Privado / Particular (Sin Seguro)" },
+            { id: 2, name: "Primera ARS de Humano" },
+            { id: 3, name: "ARS Universal" },
+            { id: 4, name: "ARS Palic / Mapfre Salud" },
+            { id: 5, name: "ARS Senasa Contributivo" },
+            { id: 6, name: "ARS Senasa Subsidiado" },
+            { id: 7, name: "ARS Monumental" },
+            { id: 8, name: "ARS Simag" },
+            { id: 9, name: "ARS Renacer" },
+            { id: 10, name: "ARS Futuro" },
+            { id: 11, name: "ARS Yunen" },
+            { id: 12, name: "ARS Meta Salud" },
+            { id: 13, name: "ARS Asemap" },
+            { id: 14, name: "ARS CMD (Colegio Médico Dominicano)" },
+            { id: 15, name: "Seguro Internacional / Otros" }
+        ];
+
+        const DEFAULT_SERVICES_CATALOG = [
+            { id: 1, name: "Consulta Médica General", price: 1500, category: "Consulta", is_active: 1 },
+            { id: 2, name: "Consulta de Especialidad", price: 2500, category: "Consulta", is_active: 1 },
+            { id: 3, name: "Control / Seguimiento", price: 800, category: "Seguimiento", is_active: 1 },
+            { id: 4, name: "Certificado Médico Oficial", price: 1500, category: "Certificado", is_active: 1 },
+            { id: 5, name: "Curación y Sutura Menor", price: 1800, category: "Procedimiento", is_active: 1 },
+            { id: 6, name: "Retiro de Puntos / Sutura", price: 600, category: "Procedimiento", is_active: 1 },
+            { id: 7, name: "Electrocardiograma (EKG)", price: 1200, category: "Estudio", is_active: 1 },
+            { id: 8, name: "Nebulización / Terapia Respiratoria", price: 700, category: "Procedimiento", is_active: 1 },
+            { id: 9, name: "Lavado de Oído / Extracción", price: 1000, category: "Procedimiento", is_active: 1 },
+            { id: 10, name: "Inmovilización / Férula", price: 2000, category: "Procedimiento", is_active: 1 }
+        ];
+
+        // Cargar desde caché persistente si existe, o usar predeterminados de inmediato
+        try {
+            const cachedServices = JSON.parse(localStorage.getItem('sscp_mobile_cached_services') || 'null');
+            window.mobileServicesCatalog = (Array.isArray(cachedServices) && cachedServices.length > 0) ? cachedServices : DEFAULT_SERVICES_CATALOG;
+            const cachedArs = JSON.parse(localStorage.getItem('sscp_mobile_cached_ars') || 'null');
+            window.mobileArsList = (Array.isArray(cachedArs) && cachedArs.length > 0) ? cachedArs : DEFAULT_OFFICIAL_ARS;
+        } catch (e) {
+            window.mobileServicesCatalog = DEFAULT_SERVICES_CATALOG;
+            window.mobileArsList = DEFAULT_OFFICIAL_ARS;
+        }
 
         async function loadMobileCatalogs() {
+            // Inicializar siempre con lo que haya de inmediato para no dejar selects vacíos
+            populateMobileServicesSelects();
+            populateMobileArsSelects();
+
             try {
                 const [resServices, resArs] = await Promise.all([
                     fetch(getApiUrl('/api/mobile/services'), {
@@ -1753,16 +2559,25 @@
                 ]);
                 if (resServices.ok) {
                     const data = await resServices.json();
-                    window.mobileServicesCatalog = data.services || [];
-                    populateMobileServicesSelects();
+                    if (data.services && data.services.length > 0) {
+                        window.mobileServicesCatalog = data.services;
+                        localStorage.setItem('sscp_mobile_cached_services', JSON.stringify(data.services));
+                        populateMobileServicesSelects();
+                        if (document.getElementById('modal-manage-services') && !document.getElementById('modal-manage-services').classList.contains('hidden')) {
+                            renderServicesManagementList();
+                        }
+                    }
                 }
                 if (resArs.ok) {
                     const data = await resArs.json();
-                    window.mobileArsList = data.ars || [];
-                    populateMobileArsSelects();
+                    if (data.ars && data.ars.length > 0) {
+                        window.mobileArsList = data.ars;
+                        localStorage.setItem('sscp_mobile_cached_ars', JSON.stringify(data.ars));
+                        populateMobileArsSelects();
+                    }
                 }
             } catch (e) {
-                console.warn('Error cargando catálogos móviles:', e);
+                console.warn('Catálogos usando almacenamiento local (PC sin conexión):', e);
             }
         }
 
@@ -1772,17 +2587,21 @@
             const services = window.mobileServicesCatalog || [];
 
             if (qaSelect) {
+                const curVal = qaSelect.value;
                 let html = '<option value="" data-price="" data-name="">-- Seleccionar Servicio del Talonario --</option>';
                 services.forEach(s => {
-                    html += `<option value="${s.id}" data-price="${s.price}" data-name="${s.name}">● ${s.name} — RD$ ${Number(s.price).toLocaleString()}</option>`;
+                    const isSel = (curVal && String(s.id) === String(curVal)) ? 'selected' : '';
+                    html += `<option value="${s.id}" data-price="${s.price}" data-name="${s.name}" ${isSel}>● ${s.name} — RD$ ${Number(s.price).toLocaleString()}</option>`;
                 });
                 qaSelect.innerHTML = html;
             }
 
             if (qpSelect) {
+                const curVal = qpSelect.value;
                 let html = '<option value="" data-price="" data-name="">-- Seleccionar Servicio Oficial --</option>';
                 services.forEach(s => {
-                    html += `<option value="${s.id}" data-price="${s.price}" data-name="${s.name}">● ${s.name} — RD$ ${Number(s.price).toLocaleString()}</option>`;
+                    const isSel = (curVal && String(s.id) === String(curVal)) ? 'selected' : '';
+                    html += `<option value="${s.id}" data-price="${s.price}" data-name="${s.name}" ${isSel}>● ${s.name} — RD$ ${Number(s.price).toLocaleString()}</option>`;
                 });
                 qpSelect.innerHTML = html;
             }
@@ -1794,14 +2613,20 @@
             const npArs = document.getElementById('np-insurance');
             const arsList = window.mobileArsList || [];
 
-            let html = '';
-            arsList.forEach(a => {
-                html += `<option value="${a.name}">${a.name}</option>`;
-            });
+            const fillSelect = (selectEl) => {
+                if (!selectEl) return;
+                const prev = selectEl.value;
+                let html = '';
+                arsList.forEach(a => {
+                    const isSel = (prev && prev === a.name) ? 'selected' : '';
+                    html += `<option value="${a.name}" ${isSel}>${a.name}</option>`;
+                });
+                selectEl.innerHTML = html;
+            };
 
-            if (qaArs && (!qaArs.children || qaArs.children.length <= 1)) qaArs.innerHTML = html;
-            if (qpArs && (!qpArs.children || qpArs.children.length <= 1)) qpArs.innerHTML = html;
-            if (npArs && (!npArs.children || npArs.children.length <= 1)) npArs.innerHTML = html;
+            fillSelect(qaArs);
+            fillSelect(qpArs);
+            fillSelect(npArs);
         }
 
         function onQaServiceSelect(selectEl) {
@@ -1815,6 +2640,13 @@
             document.getElementById('qa-service-price').value = price || '';
             if (name) {
                 document.getElementById('qa-reason').value = name;
+            }
+            if (price && parseFloat(price) > 0) {
+                const payAmtInput = document.getElementById('qa-payment-amount');
+                if (payAmtInput && (!payAmtInput.value || parseFloat(payAmtInput.value) <= 0)) {
+                    payAmtInput.value = parseFloat(price);
+                    updateQaSubmitBtnText();
+                }
             }
         }
 
@@ -1830,6 +2662,241 @@
             if (price && parseFloat(price) >= 0) {
                 document.getElementById('qp-amount').value = parseFloat(price);
             }
+        }
+
+        // --- GESTIÓN DE SERVICIOS Y TALONARIO (CREAR Y EDITAR) ---
+        function openServicesManagementModal() {
+            resetServiceForm();
+            renderServicesManagementList();
+            document.getElementById('modal-manage-services').classList.remove('hidden');
+        }
+
+        function resetServiceForm() {
+            document.getElementById('manage-service-id').value = '';
+            document.getElementById('manage-service-name').value = '';
+            document.getElementById('manage-service-price').value = '';
+            document.getElementById('manage-service-category').value = 'Consulta';
+            document.getElementById('service-form-title').innerHTML = '<i class="fas fa-plus-circle text-teal-600 mr-1.5"></i><span>Nuevo Servicio Clínico</span>';
+            document.getElementById('btn-save-service-text').textContent = 'Guardar Servicio en Talonario';
+            document.getElementById('service-cancel-edit-btn').classList.add('hidden');
+        }
+
+        function editServiceItem(serviceId) {
+            const item = (window.mobileServicesCatalog || []).find(s => String(s.id) === String(serviceId));
+            if (!item) return;
+            document.getElementById('manage-service-id').value = item.id;
+            document.getElementById('manage-service-name').value = item.name;
+            document.getElementById('manage-service-price').value = item.price;
+            document.getElementById('manage-service-category').value = item.category || 'Consulta';
+
+            document.getElementById('service-form-title').innerHTML = `<i class="fas fa-edit text-amber-600 mr-1.5"></i><span>Editando: ${item.name}</span>`;
+            document.getElementById('btn-save-service-text').textContent = 'Actualizar Servicio';
+            document.getElementById('service-cancel-edit-btn').classList.remove('hidden');
+            document.getElementById('manage-service-name').focus();
+        }
+
+        function renderServicesManagementList() {
+            const container = document.getElementById('manage-services-list');
+            const countEl = document.getElementById('manage-services-count');
+            const services = window.mobileServicesCatalog || [];
+            if (!container) return;
+
+            if (countEl) countEl.textContent = `${services.length} servicios`;
+            container.innerHTML = '';
+
+            if (services.length === 0) {
+                container.innerHTML = '<div class="p-4 text-center text-xs text-slate-400">No hay servicios en catálogo actualmente.</div>';
+                return;
+            }
+
+            services.forEach(s => {
+                const card = document.createElement('div');
+                card.className = 'p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between text-xs transition';
+                card.innerHTML = `
+                    <div class="flex-1 min-w-0 pr-2">
+                        <div class="flex items-center space-x-1.5">
+                            <span class="font-bold text-slate-800 truncate">${s.name}</span>
+                            <span class="text-[9px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-md shrink-0">${s.category || 'General'}</span>
+                        </div>
+                        <span class="text-[11px] font-extrabold text-emerald-700 mt-0.5 block">RD$ ${Number(s.price).toLocaleString()}</span>
+                    </div>
+                    <button type="button" onclick="editServiceItem('${s.id}')"
+                            class="px-2.5 py-1.5 bg-white hover:bg-teal-50 text-slate-700 hover:text-teal-700 font-bold border border-slate-200 hover:border-teal-300 rounded-lg text-[11px] shadow-sm flex items-center space-x-1 shrink-0 transition">
+                        <i class="fas fa-edit text-xs text-teal-600"></i>
+                        <span>Editar</span>
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function handleSaveServiceForm(e) {
+            e.preventDefault();
+            const serviceId = document.getElementById('manage-service-id').value;
+            const name = document.getElementById('manage-service-name').value.trim();
+            const priceVal = document.getElementById('manage-service-price').value;
+            const category = document.getElementById('manage-service-category').value;
+            const price = parseFloat(priceVal);
+
+            if (!name) {
+                alert('Ingrese el nombre del servicio.');
+                return;
+            }
+            if (isNaN(price) || price < 0) {
+                alert('Ingrese una tarifa válida.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-save-service');
+            const origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Guardando...';
+
+            try {
+                const isEditing = Boolean(serviceId);
+                const url = isEditing ? getApiUrl(`/api/mobile/services/${serviceId}`) : getApiUrl('/api/mobile/services');
+                const method = isEditing ? 'PUT' : 'POST';
+
+                const res = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ name, price, category })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (isEditing) {
+                        const idx = (window.mobileServicesCatalog || []).findIndex(s => String(s.id) === String(serviceId));
+                        if (idx !== -1) {
+                            window.mobileServicesCatalog[idx] = data.service || { id: parseInt(serviceId), name, price, category };
+                        }
+                    } else {
+                        if (!window.mobileServicesCatalog) window.mobileServicesCatalog = [];
+                        window.mobileServicesCatalog.unshift(data.service || { id: Date.now(), name, price, category });
+                    }
+                } else {
+                    if (isEditing) {
+                        const idx = (window.mobileServicesCatalog || []).findIndex(s => String(s.id) === String(serviceId));
+                        if (idx !== -1) {
+                            window.mobileServicesCatalog[idx] = { ...window.mobileServicesCatalog[idx], name, price, category };
+                        }
+                    } else {
+                        if (!window.mobileServicesCatalog) window.mobileServicesCatalog = [];
+                        window.mobileServicesCatalog.unshift({ id: 'local-' + Date.now(), name, price, category });
+                    }
+                }
+
+                localStorage.setItem('sscp_mobile_cached_services', JSON.stringify(window.mobileServicesCatalog));
+                populateMobileServicesSelects();
+                renderServicesManagementList();
+                resetServiceForm();
+                showSyncToast(isEditing ? '✓ Servicio actualizado correctamente.' : '✓ Nuevo servicio agregado al talonario.');
+            } catch (err) {
+                console.error(err);
+                if (!window.mobileServicesCatalog) window.mobileServicesCatalog = [];
+                window.mobileServicesCatalog.unshift({ id: 'local-' + Date.now(), name, price, category });
+                localStorage.setItem('sscp_mobile_cached_services', JSON.stringify(window.mobileServicesCatalog));
+                populateMobileServicesSelects();
+                renderServicesManagementList();
+                resetServiceForm();
+                showSyncToast('✓ Servicio guardado localmente en el móvil.', 'warning');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        }
+
+        // --- OPCIONES DE COBRO EN AGENDAR CITA: COBRAR AHORA VS MÁS TARDE ---
+        function setQaPaymentChoice(isNow) {
+            const btnLater = document.getElementById('qa-pay-btn-later');
+            const btnNow = document.getElementById('qa-pay-btn-now');
+            const payBox = document.getElementById('qa-payment-box');
+            const hiddenVal = document.getElementById('qa-collect-now');
+            const badge = document.getElementById('qa-pay-badge');
+            const submitText = document.getElementById('qa-submit-text');
+            const mode = document.getElementById('qa-active-mode')?.value || 'existing';
+
+            if (!btnLater || !btnNow || !payBox || !hiddenVal) return;
+
+            if (isNow) {
+                hiddenVal.value = '1';
+                btnNow.className = 'py-2.5 rounded-lg transition bg-emerald-600 text-white shadow-md flex items-center justify-center space-x-1.5';
+                btnLater.className = 'py-2.5 rounded-lg transition text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-1.5';
+                payBox.classList.remove('hidden');
+                if (badge) {
+                    badge.className = 'text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full shadow-sm';
+                    badge.textContent = 'Cobro Inmediato';
+                }
+
+                // Autocompletar con precio del servicio seleccionado o 1500
+                const curPrice = document.getElementById('qa-service-price')?.value;
+                const payAmtInput = document.getElementById('qa-payment-amount');
+                if (payAmtInput && (!payAmtInput.value || parseFloat(payAmtInput.value) <= 0)) {
+                    payAmtInput.value = (curPrice && parseFloat(curPrice) > 0) ? curPrice : '1500';
+                }
+                updateQaSubmitBtnText();
+            } else {
+                hiddenVal.value = '0';
+                btnLater.className = 'py-2.5 rounded-lg transition bg-slate-100 text-slate-800 shadow-sm flex items-center justify-center space-x-1.5';
+                btnNow.className = 'py-2.5 rounded-lg transition text-slate-500 hover:text-emerald-700 flex items-center justify-center space-x-1.5';
+                payBox.classList.add('hidden');
+                if (badge) {
+                    badge.className = 'text-[10px] font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-full shadow-sm';
+                    badge.textContent = 'Cobro Pendiente';
+                }
+                if (submitText) {
+                    submitText.textContent = mode === 'existing' ? 'Agendar Cita en el Sistema' : 'Crear Paciente y Agendar Cita';
+                }
+            }
+        }
+
+        function updateQaSubmitBtnText() {
+            const isNow = document.getElementById('qa-collect-now')?.value === '1';
+            const submitText = document.getElementById('qa-submit-text');
+            if (!submitText) return;
+            if (isNow) {
+                const amt = document.getElementById('qa-payment-amount')?.value;
+                const amtFormatted = amt && parseFloat(amt) > 0 ? ` (Cobro RD$ ${Number(amt).toLocaleString()})` : '';
+                submitText.textContent = `Agendar y Cobrar Ahora${amtFormatted}`;
+            }
+        }
+
+        // --- COBRO DE ARTÍCULOS O INSUMOS EXTERNOS ---
+        function switchQpType(type) {
+            const tabSvc = document.getElementById('qp-tab-service');
+            const tabArt = document.getElementById('qp-tab-article');
+            const boxSvc = document.getElementById('qp-box-service');
+            const boxArt = document.getElementById('qp-box-article');
+            const hiddenType = document.getElementById('qp-item-type');
+            if (!tabSvc || !tabArt || !boxSvc || !boxArt || !hiddenType) return;
+
+            if (type === 'articulo') {
+                hiddenType.value = 'articulo';
+                tabArt.className = 'py-2.5 rounded-lg transition bg-indigo-600 text-white shadow-md flex items-center justify-center space-x-1.5';
+                tabSvc.className = 'py-2.5 rounded-lg transition text-slate-500 hover:text-emerald-700 flex items-center justify-center space-x-1.5';
+                boxSvc.classList.add('hidden');
+                boxArt.classList.remove('hidden');
+                const artNameInput = document.getElementById('qp-article-name');
+                if (artNameInput && !artNameInput.value) {
+                    artNameInput.focus();
+                }
+            } else {
+                hiddenType.value = 'servicio';
+                tabSvc.className = 'py-2.5 rounded-lg transition bg-white text-emerald-800 shadow-sm flex items-center justify-center space-x-1.5';
+                tabArt.className = 'py-2.5 rounded-lg transition text-slate-500 hover:text-indigo-700 flex items-center justify-center space-x-1.5';
+                boxSvc.classList.remove('hidden');
+                boxArt.classList.add('hidden');
+            }
+        }
+
+        function setQpArticle(name, price) {
+            const artInput = document.getElementById('qp-article-name');
+            const amtInput = document.getElementById('qp-amount');
+            if (artInput) artInput.value = name;
+            if (amtInput && price) amtInput.value = price;
         }
 
         // Cargar Datos del Dashboard Móvil
@@ -1869,13 +2936,45 @@
             }
         }
 
+        let currentTodayView = 'waiting';
+
+        function switchTodayView(view) {
+            currentTodayView = view;
+            const btnWaiting = document.getElementById('subtab-btn-waiting');
+            const btnAll = document.getElementById('subtab-btn-all');
+            const contentWaiting = document.getElementById('subtab-content-waiting');
+            const contentAll = document.getElementById('subtab-content-all');
+
+            if (!btnWaiting || !btnAll) return;
+
+            if (view === 'waiting') {
+                btnWaiting.className = "flex-1 py-2 px-3 rounded-xl font-bold text-xs transition bg-white text-emerald-800 shadow-sm flex items-center justify-center gap-1.5 active:scale-95";
+                btnAll.className = "flex-1 py-2 px-3 rounded-xl font-semibold text-xs transition text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 active:scale-95";
+                contentWaiting.classList.remove('hidden');
+                contentAll.classList.add('hidden');
+            } else {
+                btnAll.className = "flex-1 py-2 px-3 rounded-xl font-bold text-xs transition bg-white text-indigo-800 shadow-sm flex items-center justify-center gap-1.5 active:scale-95";
+                btnWaiting.className = "flex-1 py-2 px-3 rounded-xl font-semibold text-xs transition text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 active:scale-95";
+                contentAll.classList.remove('hidden');
+                contentWaiting.classList.add('hidden');
+            }
+        }
+
         function renderDashboard(data) {
             document.getElementById('today-date-str').textContent = data.date;
             document.getElementById('stat-total').textContent = data.stats.total;
             document.getElementById('stat-waiting').textContent = data.stats.waiting;
             document.getElementById('stat-consulting').textContent = data.stats.in_consultation;
             document.getElementById('stat-completed').textContent = data.stats.completed;
-            document.getElementById('waiting-badge').textContent = `${data.stats.waiting} Pacientes`;
+            
+            const waitingBadge = document.getElementById('waiting-badge');
+            if (waitingBadge) waitingBadge.textContent = `${data.stats.waiting} Pacientes`;
+
+            const tabWaitingCount = document.getElementById('tab-waiting-count');
+            if (tabWaitingCount) tabWaitingCount.textContent = data.stats.waiting;
+
+            const tabAllCount = document.getElementById('tab-all-count');
+            if (tabAllCount) tabAllCount.textContent = data.stats.total;
 
             const waitingContainer = document.getElementById('waiting-list-container');
             const allContainer = document.getElementById('appointments-list-container');
@@ -1889,9 +2988,10 @@
             // Renderizar Sala de Espera
             if (waitingAppts.length === 0) {
                 waitingContainer.innerHTML = `
-                    <div class="bg-white p-4 rounded-2xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
-                        <i class="fas fa-mug-hot text-lg mb-1 block text-slate-300"></i>
-                        No hay pacientes esperando en recepción actualmente.
+                    <div class="bg-white p-5 rounded-2xl border border-dashed border-slate-200 text-center text-xs text-slate-400 space-y-1.5">
+                        <i class="fas fa-mug-hot text-xl text-slate-300 block"></i>
+                        <p class="font-semibold text-slate-600">No hay pacientes esperando en recepción actualmente.</p>
+                        <p class="text-[11px] text-slate-400">Cuando llegue un paciente, márcalo en "Agenda del Día" para asignarle su turno de entrada.</p>
                     </div>
                 `;
             } else {
@@ -2392,12 +3492,21 @@
             document.getElementById('qa-reason').value = 'Consulta General';
 
             // Limpiar selector servicio talonario
+            populateMobileServicesSelects();
+            populateMobileArsSelects();
             const svcSel = document.getElementById('qa-service-select');
             if (svcSel) svcSel.value = '';
             const svcId = document.getElementById('qa-service-id');
             if (svcId) svcId.value = '';
             const svcPrice = document.getElementById('qa-service-price');
             if (svcPrice) svcPrice.value = '';
+
+            // Reiniciar opción de cobro a "Cobrar Más Tarde"
+            const payAmt = document.getElementById('qa-payment-amount');
+            if (payAmt) payAmt.value = '';
+            const payNotes = document.getElementById('qa-payment-notes');
+            if (payNotes) payNotes.value = '';
+            setQaPaymentChoice(false);
 
             // Limpiar campos nuevo paciente
             document.getElementById('qa-new-fname').value = '';
@@ -2406,7 +3515,7 @@
             document.getElementById('qa-new-phone').value = '';
             document.getElementById('qa-new-allergies').value = '';
             const qaNewIns = document.getElementById('qa-new-insurance');
-            if (qaNewIns) qaNewIns.value = 'Privado / Particular';
+            if (qaNewIns) qaNewIns.value = 'Privado / Particular (Sin Seguro)';
             const qaNewInsNum = document.getElementById('qa-new-insurance-num');
             if (qaNewInsNum) qaNewInsNum.value = '';
             document.getElementById('qa-new-dup-alert').classList.add('hidden');
@@ -2428,6 +3537,12 @@
             if (svcId) svcId.value = '';
             const svcPrice = document.getElementById('qa-service-price');
             if (svcPrice) svcPrice.value = '';
+
+            const payAmt = document.getElementById('qa-payment-amount');
+            if (payAmt) payAmt.value = '';
+            const payNotes = document.getElementById('qa-payment-notes');
+            if (payNotes) payNotes.value = '';
+            setQaPaymentChoice(false);
 
             document.getElementById('modal-quick-appt').classList.remove('hidden');
             loadQaPatientsList(patientId);
@@ -2455,13 +3570,31 @@
             const serviceIdVal = document.getElementById('qa-service-id') ? document.getElementById('qa-service-id').value : '';
             const servicePriceVal = document.getElementById('qa-service-price') ? document.getElementById('qa-service-price').value : '';
 
+            // Decisión de cobro inmediato vs más tarde
+            const collectNow = document.getElementById('qa-collect-now') ? (document.getElementById('qa-collect-now').value === '1') : false;
+            const payAmountVal = document.getElementById('qa-payment-amount') ? document.getElementById('qa-payment-amount').value : '';
+            const payMethodVal = document.getElementById('qa-payment-method') ? document.getElementById('qa-payment-method').value : 'Efectivo';
+            const payNotesVal = document.getElementById('qa-payment-notes') ? document.getElementById('qa-payment-notes').value.trim() : '';
+
             let payload = {
                 date: dateStr,
                 start_time: timeStr,
                 reason: reason,
                 service_id: serviceIdVal ? parseInt(serviceIdVal) : null,
-                price: servicePriceVal ? parseFloat(servicePriceVal) : null
+                price: servicePriceVal ? parseFloat(servicePriceVal) : null,
+                collect_now: collectNow
             };
+
+            if (collectNow) {
+                const parsedPay = parseFloat(payAmountVal);
+                if (isNaN(parsedPay) || parsedPay <= 0) {
+                    alert('Seleccionó "Cobrar Ahora". Por favor ingrese un monto a cobrar válido mayor a RD$ 0 o cambie a "Cobrar Más Tarde".');
+                    return;
+                }
+                payload.payment_amount = parsedPay;
+                payload.payment_method = payMethodVal;
+                payload.payment_notes = payNotesVal;
+            }
 
             if (mode === 'existing') {
                 if (!patientIdVal) {
@@ -2475,7 +3608,7 @@
                 const doc = document.getElementById('qa-new-doc').value.trim();
                 const phone = document.getElementById('qa-new-phone').value.trim();
                 const allergies = document.getElementById('qa-new-allergies').value.trim();
-                const insName = document.getElementById('qa-new-insurance') ? document.getElementById('qa-new-insurance').value : 'Privado / Particular';
+                const insName = document.getElementById('qa-new-insurance') ? document.getElementById('qa-new-insurance').value : 'Privado / Particular (Sin Seguro)';
                 const insNum = document.getElementById('qa-new-insurance-num') ? document.getElementById('qa-new-insurance-num').value.trim() : '';
 
                 if (!fname || !lname) {
@@ -2499,11 +3632,11 @@
             const submitBtn = document.getElementById('btn-qa-submit');
             const submitText = document.getElementById('qa-submit-text');
             submitBtn.disabled = true;
-            submitText.textContent = 'Guardando cita...';
+            submitText.textContent = collectNow ? 'Guardando cita y cobro...' : 'Guardando cita...';
 
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 4000);
+                const timeoutId = setTimeout(() => controller.abort(), 4500);
                 const res = await fetch(getApiUrl('/api/mobile/appointments/quick-create'), {
                     method: 'POST',
                     headers: {
@@ -2518,7 +3651,10 @@
                 if (res.ok) {
                     const data = await res.json();
                     closeModal('modal-quick-appt');
-                    showSyncToast('✓ Cita agendada directamente en la PC del doctor.');
+                    const msgToast = collectNow 
+                        ? `✓ Cita y Cobro de RD$ ${Number(payload.payment_amount).toLocaleString()} registrados en caja.`
+                        : '✓ Cita agendada directamente en la PC del doctor.';
+                    showSyncToast(msgToast);
                     loadDashboardData();
                     loadQaPatientsList();
                     return;
@@ -2544,8 +3680,10 @@
             window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
         }
 
-        // --- COBRO RÁPIDO ---
+        // --- COBRO RÁPIDO (SERVICIOS Y ARTÍCULOS EXTERNOS) ---
         function openQuickPaymentModal() {
+            populateMobileServicesSelects();
+            populateMobileArsSelects();
             document.getElementById('qp-patient-id').value = '';
             document.getElementById('qp-patient-search').value = '';
             document.getElementById('qp-amount').value = '';
@@ -2555,6 +3693,9 @@
             if (qpSvcId) qpSvcId.value = '';
             const qpSvcName = document.getElementById('qp-service-name');
             if (qpSvcName) qpSvcName.value = 'Consulta Médica General';
+            const qpArtName = document.getElementById('qp-article-name');
+            if (qpArtName) qpArtName.value = '';
+            switchQpType('servicio');
 
             document.getElementById('qp-selected-patient-box').classList.add('hidden');
             document.getElementById('qp-patient-search').classList.remove('hidden');
@@ -2562,6 +3703,8 @@
         }
 
         function openQuickPaymentForPatient(patientId, patientName, patientDoc) {
+            populateMobileServicesSelects();
+            populateMobileArsSelects();
             document.getElementById('qp-patient-id').value = patientId;
             document.getElementById('qp-selected-name').textContent = patientName;
             document.getElementById('qp-selected-doc').textContent = `Doc: ${patientDoc || 'N/A'}`;
@@ -2572,6 +3715,9 @@
             if (qpSvcId) qpSvcId.value = '';
             const qpSvcName = document.getElementById('qp-service-name');
             if (qpSvcName) qpSvcName.value = 'Consulta Médica General';
+            const qpArtName = document.getElementById('qp-article-name');
+            if (qpArtName) qpArtName.value = '';
+            switchQpType('servicio');
 
             document.getElementById('qp-patient-search').classList.add('hidden');
             document.getElementById('qp-search-results').classList.add('hidden');
@@ -2642,10 +3788,25 @@
             const amountVal = document.getElementById('qp-amount').value;
             const amount = parseFloat(amountVal);
             const method = document.getElementById('qp-method').value;
+            const insurance = document.getElementById('qp-insurance-select') ? document.getElementById('qp-insurance-select').value : 'Privado / Particular (Sin Seguro)';
 
-            const serviceId = document.getElementById('qp-service-id') ? document.getElementById('qp-service-id').value : '';
-            const serviceName = document.getElementById('qp-service-name') ? document.getElementById('qp-service-name').value : 'Consulta Médica General';
-            const insurance = document.getElementById('qp-insurance-select') ? document.getElementById('qp-insurance-select').value : 'Privado / Particular';
+            const itemType = document.getElementById('qp-item-type') ? document.getElementById('qp-item-type').value : 'servicio';
+            let serviceId = null;
+            let serviceName = 'Consulta Médica General';
+
+            if (itemType === 'articulo') {
+                const artName = document.getElementById('qp-article-name') ? document.getElementById('qp-article-name').value.trim() : '';
+                if (!artName) {
+                    alert('Por favor ingrese el nombre del artículo o insumo que se va a cobrar.');
+                    return;
+                }
+                serviceId = null;
+                serviceName = artName;
+            } else {
+                const sIdVal = document.getElementById('qp-service-id') ? document.getElementById('qp-service-id').value : '';
+                serviceId = sIdVal ? parseInt(sIdVal) : null;
+                serviceName = document.getElementById('qp-service-name') ? document.getElementById('qp-service-name').value : 'Consulta Médica General';
+            }
 
             if (!patientId || isNaN(patientId)) {
                 alert('Debe seleccionar un paciente de la lista.');
@@ -2675,9 +3836,10 @@
                         patient_id: patientId,
                         amount: amount,
                         payment_method: method,
-                        service_id: serviceId ? parseInt(serviceId) : null,
+                        service_id: serviceId,
                         service_name: serviceName,
-                        insurance_name: insurance
+                        insurance_name: insurance,
+                        item_type: itemType
                     })
                 });
 
@@ -2689,7 +3851,8 @@
 
                 const resData = await res.json().catch(() => ({}));
                 closeModal('modal-quick-payment');
-                alert(resData.message || `¡Pago de RD$ ${amount.toLocaleString()} por ${serviceName} registrado correctamente!`);
+                const conceptLabel = itemType === 'articulo' ? `Artículo/Insumo (${serviceName})` : serviceName;
+                alert(resData.message || `¡Cobro de RD$ ${amount.toLocaleString()} por ${conceptLabel} registrado correctamente!`);
 
                 if (typeof loadMobileDashboard === 'function') loadMobileDashboard();
                 if (typeof loadReportsData === 'function') loadReportsData();
@@ -2894,6 +4057,11 @@
             document.getElementById('np-allergies').value = '';
             document.getElementById('np-emergency-name').value = '';
             document.getElementById('np-emergency-phone').value = '';
+            populateMobileArsSelects();
+            const npIns = document.getElementById('np-insurance');
+            if (npIns) npIns.value = 'Privado / Particular (Sin Seguro)';
+            const npInsNum = document.getElementById('np-insurance-num');
+            if (npInsNum) npInsNum.value = '';
             document.getElementById('np-dup-warning').classList.add('hidden');
             document.getElementById('np-phone-dup-info').classList.add('hidden');
             document.getElementById('np-doc-status').textContent = 'Verificación anti-duplicados';
@@ -3467,6 +4635,263 @@
                 window.location.href = pdfUrl;
             }
         }
+
+        // ========================================================
+        // ESCÁNER DE CÓDIGOS QR & VINCULACIÓN AUTOMÁTICA CON LA PC
+        // ========================================================
+        let html5QrScannerInstance = null;
+        let currentCameraFacing = "environment";
+
+        function playBeep() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } catch (e) {}
+        }
+
+        async function openQrScannerModal() {
+            if (window.AndroidBridge && typeof window.AndroidBridge.requestCameraPermission === 'function') {
+                window.AndroidBridge.requestCameraPermission();
+            }
+
+            const modal = document.getElementById('modal-qr-scanner');
+            if (modal) modal.classList.remove('hidden');
+
+            const statusEl = document.getElementById('qr-scanner-status');
+            if (statusEl) statusEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Iniciando cámara...';
+
+            setTimeout(() => {
+                startQrCamera();
+            }, 100);
+        }
+
+        async function startQrCamera() {
+            const statusEl = document.getElementById('qr-scanner-status');
+            if (typeof Html5Qrcode === 'undefined') {
+                if (statusEl) statusEl.innerHTML = '<span class="text-amber-400">Librería de escáner no cargada aún. Puede subir imagen abajo.</span>';
+                return;
+            }
+
+            try {
+                if (html5QrScannerInstance) {
+                    try { await html5QrScannerInstance.stop(); } catch (e) {}
+                    html5QrScannerInstance = null;
+                }
+
+                html5QrScannerInstance = new Html5Qrcode("qr-reader");
+                const config = {
+                    fps: 12,
+                    qrbox: { width: 220, height: 220 },
+                    aspectRatio: 1.0
+                };
+
+                await html5QrScannerInstance.start(
+                    { facingMode: currentCameraFacing },
+                    config,
+                    (decodedText) => {
+                        handleQrCodeDetected(decodedText);
+                    },
+                    (errorMessage) => {}
+                );
+
+                if (statusEl) statusEl.innerHTML = '<i class="fas fa-eye text-emerald-400 mr-1"></i> Apunte la cámara al código QR de la pantalla de la PC';
+            } catch (err) {
+                console.error("Error al iniciar cámara:", err);
+                if (statusEl) {
+                    statusEl.innerHTML = `
+                        <div class="text-rose-400 text-xs px-2 py-1 text-center">
+                            <p class="font-bold"><i class="fas fa-exclamation-triangle mr-1"></i> Cámara no disponible o permiso pendiente</p>
+                            <p class="text-[11px] text-slate-300 mt-1">Conceda permiso de cámara o use los botones de consultorio abajo.</p>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        async function switchCameraFacing() {
+            currentCameraFacing = (currentCameraFacing === "environment") ? "user" : "environment";
+            await startQrCamera();
+        }
+
+        async function closeQrScannerModal() {
+            if (html5QrScannerInstance) {
+                try {
+                    await html5QrScannerInstance.stop();
+                } catch (e) {}
+                html5QrScannerInstance = null;
+            }
+            const modal = document.getElementById('modal-qr-scanner');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function handleQrFileInput(input) {
+            if (!input.files || input.files.length === 0) return;
+            const file = input.files[0];
+            const statusEl = document.getElementById('qr-scanner-status');
+            if (statusEl) statusEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Analizando imagen...';
+
+            if (!html5QrScannerInstance) {
+                html5QrScannerInstance = new Html5Qrcode("qr-reader");
+            }
+
+            html5QrScannerInstance.scanFile(file, true)
+                .then(decodedText => {
+                    handleQrCodeDetected(decodedText);
+                })
+                .catch(err => {
+                    alert("No se detectó ningún código QR en la imagen. Enfoque bien el código.");
+                    if (statusEl) statusEl.innerHTML = '<span class="text-rose-400">No se detectó QR. Pruebe otra imagen.</span>';
+                });
+        }
+
+        function handleQrCodeDetected(text) {
+            if (!text) return;
+            playBeep();
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+            let clinicId = null;
+            let server = null;
+
+            try {
+                if (text.startsWith("http://") || text.startsWith("https://")) {
+                    const u = new URL(text);
+                    clinicId = u.searchParams.get("clinic_id") || u.searchParams.get("doctor");
+                    server = u.searchParams.get("server") || `${u.protocol}//${u.host}`;
+                } else if (text.startsWith("{") && text.endsWith("}")) {
+                    const j = JSON.parse(text);
+                    clinicId = j.clinic_id || j.doctor || j.channel;
+                    server = j.server || j.url;
+                } else if (text.startsWith("dr_") || text.startsWith("dra_") || text.includes("_")) {
+                    clinicId = text.trim();
+                }
+            } catch (e) {
+                console.warn("Parse QR error:", e);
+            }
+
+            if (!clinicId) {
+                clinicId = text.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'dr_carlos_heredia';
+            }
+
+            if (server) {
+                localStorage.setItem('sscp_server_url', server);
+                serverUrl = server;
+            }
+
+            localStorage.setItem('sscp_relay_clinic_id', clinicId);
+            relayClinicId = clinicId;
+
+            closeQrScannerModal();
+
+            const badge = document.getElementById('relay-active-channel-name');
+            if (badge) badge.textContent = clinicId;
+            const banner = document.getElementById('login-clinic-banner');
+            if (banner) {
+                banner.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span> Enlazado: <strong>${clinicId}</strong>`;
+                banner.className = "mt-2 inline-flex items-center px-3 py-1 bg-emerald-50 text-emerald-800 text-[11px] font-bold rounded-full border border-emerald-200";
+            }
+
+            const screenLogin = document.getElementById('screen-login');
+            if (screenLogin && !screenLogin.classList.contains('hidden')) {
+                fillQuickLogin('secretaria@sscp.com', 'password123');
+                alert(`¡Consultorio Enlazado Exitosamente!\n\nDoctor / Canal: ${clinicId}\nServidor: ${server || 'https://sscp.laxarusdevs.com'}\n\nIngresando a la terminal clínica...`);
+                document.getElementById('btn-login-submit').click();
+            } else {
+                alert(`¡Consultorio enlazado exitosamente a: ${clinicId}!`);
+                if (window.RelaySync && typeof window.RelaySync.syncNow === 'function') {
+                    window.RelaySync.syncNow();
+                }
+            }
+        }
+
+        function connectToDoctor(channelId) {
+            handleQrCodeDetected(channelId);
+        }
+
+        function onCameraPermissionGranted() {
+            startQrCamera();
+        }
     </script>
+
+    <!-- MODAL DEL ESCÁNER DE CÓDIGO QR -->
+    <div id="modal-qr-scanner" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col justify-between p-4 safe-pt safe-pb">
+        <!-- Header del Escáner -->
+        <div class="flex items-center justify-between text-white pb-3 border-b border-white/10">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center text-lg border border-sky-500/30">
+                    <i class="fas fa-qrcode"></i>
+                </div>
+                <div>
+                    <h3 class="font-black text-sm">Vincular con Código QR</h3>
+                    <p class="text-[11px] text-sky-200/80">Enfoca el código de la pantalla de la PC</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeQrScannerModal()" class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm transition">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Visor de la Cámara -->
+        <div class="flex-1 flex flex-col items-center justify-center py-4 relative">
+            <div id="qr-camera-container" class="relative w-full max-w-[280px] aspect-square rounded-3xl overflow-hidden border-2 border-sky-400 shadow-2xl bg-black flex items-center justify-center">
+                <div id="qr-reader" class="w-full h-full"></div>
+                <!-- Animación de mira de escaneo -->
+                <div id="qr-scanner-overlay" class="pointer-events-none absolute inset-0 border-4 border-sky-400/40 rounded-3xl flex flex-col items-center justify-between p-4">
+                    <div class="w-full flex justify-between">
+                        <span class="w-6 h-6 border-t-4 border-l-4 border-sky-400"></span>
+                        <span class="w-6 h-6 border-t-4 border-r-4 border-sky-400"></span>
+                    </div>
+                    <div class="w-4/5 h-0.5 bg-sky-400 shadow-lg shadow-sky-400/80 animate-pulse"></div>
+                    <div class="w-full flex justify-between">
+                        <span class="w-6 h-6 border-b-4 border-l-4 border-sky-400"></span>
+                        <span class="w-6 h-6 border-b-4 border-r-4 border-sky-400"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="qr-scanner-status" class="text-xs text-sky-300 font-bold mt-4 text-center">
+                <i class="fas fa-video mr-1 animate-pulse"></i> Iniciando cámara...
+            </div>
+        </div>
+
+        <!-- Controles Inferiores del Escáner -->
+        <div class="space-y-2.5 max-w-sm mx-auto w-full">
+            <div class="flex gap-2">
+                <button type="button" onclick="switchCameraFacing()" id="btn-switch-camera" class="flex-1 py-2.5 px-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold border border-white/15 flex items-center justify-center gap-1.5 transition">
+                    <i class="fas fa-camera-rotate"></i>
+                    <span>Cambiar Cámara</span>
+                </button>
+                <label class="flex-1 py-2.5 px-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold border border-white/15 flex items-center justify-center gap-1.5 transition cursor-pointer">
+                    <i class="fas fa-image"></i>
+                    <span>Subir Foto QR</span>
+                    <input type="file" id="qr-file-input" accept="image/*" class="hidden" onchange="handleQrFileInput(this)">
+                </label>
+            </div>
+
+            <!-- Acceso rápido a doctores en caso de no tener cámara activa -->
+            <div class="p-3 bg-white/5 rounded-2xl border border-white/10 text-center">
+                <span class="text-[10px] text-slate-400 block mb-1.5 uppercase font-bold">O selecciona el consultorio directamente:</span>
+                <div class="flex flex-wrap justify-center gap-1.5">
+                    <button type="button" onclick="connectToDoctor('dr_carlos_heredia')" class="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-bold rounded-lg shadow-xs transition">
+                        Dr. Carlos Heredia
+                    </button>
+                    <button type="button" onclick="connectToDoctor('dr_manuel_ramirez')" class="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-bold rounded-lg shadow-xs transition">
+                        Dr. Manuel Ramírez
+                    </button>
+                    <button type="button" onclick="connectToDoctor('dra_laura_gomez')" class="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-bold rounded-lg shadow-xs transition">
+                        Dra. Laura Gómez
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

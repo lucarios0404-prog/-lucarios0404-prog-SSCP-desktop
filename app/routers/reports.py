@@ -30,26 +30,83 @@ def calculate_age(dob: date) -> int:
     today = date.today()
     return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
+def parse_date_range(start_date: str = None, end_date: str = None):
+    start_dt = None
+    end_dt = None
+    s_clean = (start_date or "").strip()
+    e_clean = (end_date or "").strip()
+    if s_clean:
+        try:
+            d = datetime.strptime(s_clean, "%Y-%m-%d").date()
+            start_dt = datetime.combine(d, datetime.min.time())
+        except ValueError:
+            s_clean = ""
+    if e_clean:
+        try:
+            d = datetime.strptime(e_clean, "%Y-%m-%d").date()
+            end_dt = datetime.combine(d, datetime.max.time())
+        except ValueError:
+            e_clean = ""
+    return start_dt, end_dt, s_clean, e_clean
+
 @router.get("/")
 def reports_dashboard(
     request: Request,
+    start_date: str = Query(None),
+    end_date: str = Query(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
     """
-    Panel de Inteligencia Clínica y Estadísticas Médicas (F14).
+    Panel de Inteligencia Clínica y Estadísticas Médicas (F14) con filtro dinámico por rango de fechas.
     """
-    total_patients = db.query(Patient).count()
-    total_consultations = db.query(Consultation).count()
-    total_payments = db.query(Payment).count()
-    total_vitals = db.query(VitalSign).count()
+    start_dt, end_dt, s_str, e_str = parse_date_range(start_date, end_date)
+    is_filtered = bool(start_dt or end_dt)
 
-    # 1. Top Diagnósticos Médicos (Morbilidad)
-    consultations = db.query(Consultation).all()
+    # 1. Consultas y Morbilidad (Filtradas por fecha)
+    c_query = db.query(Consultation)
+    if start_dt:
+        c_query = c_query.filter(Consultation.created_at >= start_dt)
+    if end_dt:
+        c_query = c_query.filter(Consultation.created_at <= end_dt)
+    consultations = c_query.all()
+    total_consultations = len(consultations)
+
+    # 2. Signos Vitales
+    v_query = db.query(VitalSign)
+    if start_dt:
+        v_query = v_query.filter(VitalSign.recorded_at >= start_dt)
+    if end_dt:
+        v_query = v_query.filter(VitalSign.recorded_at <= end_dt)
+    total_vitals = v_query.count()
+
+    # 3. Finanzas y Pagos
+    p_query = db.query(Payment)
+    if start_dt:
+        p_query = p_query.filter(Payment.created_at >= start_dt)
+    if end_dt:
+        p_query = p_query.filter(Payment.created_at <= end_dt)
+    payments = p_query.all()
+    total_payments = len(payments)
+    total_collected = sum(p.total for p in payments if p.status == "paid")
+    total_pending = sum(p.total for p in payments if p.status == "pending")
+
+    # 4. Pacientes
+    total_patients = db.query(Patient).count()
+    if is_filtered:
+        pat_query = db.query(Patient)
+        if start_dt:
+            pat_query = pat_query.filter(Patient.created_at >= start_dt)
+        if end_dt:
+            pat_query = pat_query.filter(Patient.created_at <= end_dt)
+        period_patients = pat_query.count()
+    else:
+        period_patients = total_patients
+
+    # 5. Top Diagnósticos Médicos (Morbilidad en el período)
     diag_counter = Counter()
     for c in consultations:
         if c.diagnosis and c.diagnosis.strip():
-            # Extraer diagnósticos limpios
             lines = [d.strip() for d in c.diagnosis.split("\n") if d.strip()]
             for line in lines:
                 diag_counter[line[:60]] += 1
@@ -59,8 +116,13 @@ def reports_dashboard(
         for name, count in diag_counter.most_common(6)
     ]
 
-    # 2. Distribución de Pacientes por Género
-    patients = db.query(Patient).all()
+    # 6. Distribución de Pacientes por Género y Edad
+    if is_filtered and consultations:
+        patient_ids = {c.patient_id for c in consultations if c.patient_id}
+        patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all() if patient_ids else []
+    else:
+        patients = db.query(Patient).all()
+
     gender_counts = {"male": 0, "female": 0, "other": 0}
     age_groups = {"pediatric": 0, "young_adult": 0, "middle_adult": 0, "senior": 0, "unknown": 0}
 
@@ -85,17 +147,13 @@ def reports_dashboard(
         else:
             age_groups["senior"] += 1
 
-    # 3. Finanzas y Pagos
-    payments = db.query(Payment).all()
-    total_collected = sum(p.total for p in payments if p.status == "paid")
-    total_pending = sum(p.total for p in payments if p.status == "pending")
-
     return templates.TemplateResponse(
         request=request,
         name="reports/index.html",
         context={
             "user": current_user,
             "total_patients": total_patients,
+            "period_patients": period_patients,
             "total_consultations": total_consultations,
             "total_payments": total_payments,
             "total_vitals": total_vitals,
@@ -105,25 +163,48 @@ def reports_dashboard(
             "total_collected": total_collected,
             "total_pending": total_pending,
             "today_str": date.today().strftime("%Y-%m-%d"),
+            "start_date": s_str,
+            "end_date": e_str,
+            "is_filtered": is_filtered,
         }
     )
 
 @router.get("/export/pdf")
 def export_executive_pdf(
     request: Request,
+    start_date: str = Query(None),
+    end_date: str = Query(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
     """
-    Exportación del Reporte Ejecutivo Clínico completo a PDF con membrete y logo del doctor.
+    Exportación del Reporte Ejecutivo Clínico completo a PDF con membrete y logo del doctor, respetando el filtro de fechas.
     """
     setting = get_or_create_settings(db)
-    total_patients = db.query(Patient).count()
-    total_consultations = db.query(Consultation).count()
-    total_payments = db.query(Payment).count()
-    total_vitals = db.query(VitalSign).count()
+    start_dt, end_dt, s_str, e_str = parse_date_range(start_date, end_date)
+    is_filtered = bool(start_dt or end_dt)
 
-    consultations = db.query(Consultation).all()
+    c_query = db.query(Consultation)
+    if start_dt: c_query = c_query.filter(Consultation.created_at >= start_dt)
+    if end_dt: c_query = c_query.filter(Consultation.created_at <= end_dt)
+    consultations = c_query.all()
+    total_consultations = len(consultations)
+
+    v_query = db.query(VitalSign)
+    if start_dt: v_query = v_query.filter(VitalSign.recorded_at >= start_dt)
+    if end_dt: v_query = v_query.filter(VitalSign.recorded_at <= end_dt)
+    total_vitals = v_query.count()
+
+    p_query = db.query(Payment)
+    if start_dt: p_query = p_query.filter(Payment.created_at >= start_dt)
+    if end_dt: p_query = p_query.filter(Payment.created_at <= end_dt)
+    payments = p_query.all()
+    total_payments = len(payments)
+    total_collected = sum(p.total for p in payments if p.status == "paid")
+    total_pending = sum(p.total for p in payments if p.status == "pending")
+
+    total_patients = db.query(Patient).count()
+
     diag_counter = Counter()
     for c in consultations:
         if c.diagnosis and c.diagnosis.strip():
@@ -134,7 +215,12 @@ def export_executive_pdf(
         for name, count in diag_counter.most_common(8)
     ]
 
-    patients = db.query(Patient).all()
+    if is_filtered and consultations:
+        patient_ids = {c.patient_id for c in consultations if c.patient_id}
+        patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all() if patient_ids else []
+    else:
+        patients = db.query(Patient).all()
+
     gender_counts = {"male": 0, "female": 0, "other": 0}
     age_groups = {"pediatric": 0, "young_adult": 0, "middle_adult": 0, "senior": 0, "unknown": 0}
     for p in patients:
@@ -149,9 +235,13 @@ def export_executive_pdf(
         elif age <= 60: age_groups["middle_adult"] += 1
         else: age_groups["senior"] += 1
 
-    payments = db.query(Payment).all()
-    total_collected = sum(p.total for p in payments if p.status == "paid")
-    total_pending = sum(p.total for p in payments if p.status == "pending")
+    period_str = ""
+    if s_str and e_str:
+        period_str = f"Desde {s_str} hasta {e_str}"
+    elif s_str:
+        period_str = f"A partir de {s_str}"
+    elif e_str:
+        period_str = f"Hasta {e_str}"
 
     pdf_buffer = generate_executive_report_pdf(
         setting=setting,
@@ -164,6 +254,7 @@ def export_executive_pdf(
         top_diagnoses=top_diagnoses,
         gender_counts=gender_counts,
         age_groups=age_groups,
+        period_str=period_str,
     )
 
     filename = f"reporte_clinico_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
@@ -386,12 +477,15 @@ def export_secretary_daily_pdf(
 
 @router.get("/export/patients")
 def export_patients_csv(
+    start_date: str = Query(None),
+    end_date: str = Query(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('reports'))
 ):
     """
     Exportación de base de datos de pacientes a CSV compatible con Excel.
     """
+    start_dt, end_dt, _, _ = parse_date_range(start_date, end_date)
     output = io.StringIO()
     writer = csv.writer(output, dialect="excel")
     
@@ -399,10 +493,16 @@ def export_patients_csv(
     writer.writerow([
         "ID", "Nombre", "Apellidos", "Cédula / Documento", "Teléfono", "Email",
         "Fecha de Nacimiento", "Género", "Tipo de Sangre", "Alergias Conocidas",
-        "Contacto de Emergencia", "Tel. Emergencia", "Fecha Registro"
+        "ARS / Seguro", "No. Póliza", "Contacto de Emergencia", "Tel. Emergencia", "Fecha Registro"
     ])
 
-    for p in db.query(Patient).order_by(Patient.id).all():
+    q = db.query(Patient)
+    if start_dt:
+        q = q.filter(Patient.created_at >= start_dt)
+    if end_dt:
+        q = q.filter(Patient.created_at <= end_dt)
+
+    for p in q.order_by(Patient.id).all():
         writer.writerow([
             p.id,
             p.first_name,
@@ -414,6 +514,8 @@ def export_patients_csv(
             p.gender or "",
             p.blood_type or "",
             p.allergies or "Ninguna",
+            getattr(p, "insurance_name", "") or "Privado",
+            getattr(p, "insurance_number", "") or "",
             p.emergency_contact_name or "",
             p.emergency_contact_phone or "",
             p.created_at.strftime("%Y-%m-%d %H:%M") if p.created_at else ""
@@ -429,21 +531,30 @@ def export_patients_csv(
 
 @router.get("/export/consultations")
 def export_consultations_csv(
+    start_date: str = Query(None),
+    end_date: str = Query(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('reports'))
 ):
     """
     Exportación de consultas e historias clínicas a CSV compatible con Excel.
     """
+    start_dt, end_dt, _, _ = parse_date_range(start_date, end_date)
     output = io.StringIO()
     writer = csv.writer(output, dialect="excel")
     
     writer.writerow([
         "ID", "Fecha / Hora", "Paciente", "Cédula", "Motivo de Consulta",
-        "Diagnóstico", "Tratamiento / Prescripción", "Sede de Origen"
+        "Diagnóstico", "Tratamiento / Prescripción", "Primera Vez", "Sede de Origen"
     ])
 
-    for c in db.query(Consultation).order_by(Consultation.created_at.desc()).all():
+    q = db.query(Consultation)
+    if start_dt:
+        q = q.filter(Consultation.created_at >= start_dt)
+    if end_dt:
+        q = q.filter(Consultation.created_at <= end_dt)
+
+    for c in q.order_by(Consultation.created_at.desc()).all():
         p_name = f"{c.patient.first_name} {c.patient.last_name}" if c.patient else "N/D"
         doc_id = c.patient.document_id if c.patient else "N/D"
         writer.writerow([
@@ -454,6 +565,7 @@ def export_consultations_csv(
             c.reason or "",
             c.diagnosis or "",
             (c.prescription or c.treatment or "").replace("\n", " | "),
+            "SÍ" if getattr(c, "is_first_visit", False) else "NO",
             c.sede_origen or "local"
         ])
 
@@ -467,12 +579,15 @@ def export_consultations_csv(
 
 @router.get("/export/financial")
 def export_financial_csv(
+    start_date: str = Query(None),
+    end_date: str = Query(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('reports'))
 ):
     """
     Exportación de ingresos y estado de facturación a CSV compatible con Excel.
     """
+    start_dt, end_dt, _, _ = parse_date_range(start_date, end_date)
     output = io.StringIO()
     writer = csv.writer(output, dialect="excel")
     
@@ -481,7 +596,13 @@ def export_financial_csv(
         "Monto (DOP)", "Descuento", "Total (DOP)", "Estado", "Método de Pago"
     ])
 
-    for pay in db.query(Payment).order_by(Payment.created_at.desc()).all():
+    q = db.query(Payment)
+    if start_dt:
+        q = q.filter(Payment.created_at >= start_dt)
+    if end_dt:
+        q = q.filter(Payment.created_at <= end_dt)
+
+    for pay in q.order_by(Payment.created_at.desc()).all():
         p_name = f"{pay.patient.first_name} {pay.patient.last_name}" if pay.patient else "N/D"
         writer.writerow([
             pay.id,

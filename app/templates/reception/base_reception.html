@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}SSCP Recepción — Modo Secretaría{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Custom scrollbar para tablets */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 999px;
+        }
+        .touch-action-btn {
+            min-height: 48px;
+            touch-action: manipulation;
+        }
+    </style>
+    {% block head_extra %}{% endblock %}
+</head>
+<body class="bg-[#f0f4f8] text-slate-800 min-h-screen flex flex-col antialiased select-none md:select-auto">
+
+    <!-- Topbar estilo SSCP Secretaría -->
+    <header class="bg-[#0288d1] text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="/reception/agenda" class="flex items-center gap-2 text-white no-underline">
+                    <span class="text-xl font-black tracking-tight flex items-center gap-1.5">
+                        <span class="bg-white text-[#0288d1] px-1.5 py-0.5 rounded font-black text-sm">SSCP</span>
+                        <span>Secretaría<span class="text-sky-200"> Express</span></span>
+                    </span>
+                    <span class="hidden sm:inline-block text-xs bg-sky-700/60 text-sky-100 px-2 py-0.5 rounded-full font-medium">Recepción</span>
+                </a>
+            </div>
+
+            <!-- Menú central de navegación rápida -->
+            <nav class="flex items-center gap-1 sm:gap-2">
+                <a href="/reception/agenda" class="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 {% if current_tab == 'agenda' %}bg-white/20 text-white shadow-inner font-bold{% else %}text-sky-100 hover:bg-white/10{% endif %}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <span>Agenda</span>
+                </a>
+                <a href="/reception/billing" class="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 {% if current_tab == 'billing' %}bg-white/20 text-white shadow-inner font-bold{% else %}text-sky-100 hover:bg-white/10{% endif %}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Cobros</span>
+                </a>
+                <a href="/patients" class="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all text-sky-100 hover:bg-white/10 flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    <span class="hidden sm:inline">Pacientes</span>
+                </a>
+            </nav>
+
+            <!-- Acciones secundarias -->
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="openRelayQrModal()" title="Enlazar Tablet vía Código QR (Buzón Relay)" class="px-2.5 py-1 text-xs bg-white/20 hover:bg-white/30 text-white rounded-md border border-white/30 flex items-center gap-1.5 transition-colors font-semibold">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                    <span>Enlazar QR</span>
+                </button>
+                <a href="/" title="Regresar a Modo Médico Completo" class="px-2.5 py-1 text-xs bg-sky-900/40 hover:bg-sky-900/60 text-sky-100 rounded-md border border-sky-400/30 flex items-center gap-1 transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    <span class="hidden md:inline">Modo Doctor</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenedor Principal Optimizado para Tablet -->
+    <main class="flex-1 max-w-5xl w-full mx-auto p-2.5 sm:p-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Toast de Notificación Táctil -->
+    <div id="toastNotification" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 border border-slate-700">
+        <div id="toastIcon" class="w-6 h-6 flex items-center justify-center rounded-full bg-emerald-500 text-white text-xs">✓</div>
+        <span id="toastMessage" class="text-sm font-semibold">Operación completada</span>
+    </div>
+
+    <script>
+        function showToast(msg, isSuccess = true) {
+            const toast = document.getElementById('toastNotification');
+            const toastMsg = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+            
+            toastMsg.innerText = msg;
+            if (isSuccess) {
+                toastIcon.className = "w-6 h-6 flex items-center justify-center rounded-full bg-emerald-500 text-white text-xs font-bold";
+                toastIcon.innerText = "✓";
+            } else {
+                toastIcon.className = "w-6 h-6 flex items-center justify-center rounded-full bg-rose-500 text-white text-xs font-bold";
+                toastIcon.innerText = "✕";
+            }
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+                toast.classList.remove('translate-y-0', 'opacity-100');
+            }, 2500);
+        }
+    </script>
+    {% include "partials/relay_qr_modal.html" %}
+    {% block scripts_extra %}{% endblock %}
+</body>
+</html>

@@ -7,6 +7,7 @@ Soporta dos modalidades:
   - Modalidad B (online):  verifica contra servidor + cache local de 7 dias.
 """
 
+import os
 import base64
 import threading
 import time
@@ -147,7 +148,7 @@ def _verify_offline_license(license_key, machine_id):
         return LicenseInfo(LicenseStatus.UNLICENSED, machine_id=machine_id)
 
 
-DESKTOP_LICENSE_API_KEY = "sscp-license-api-sec-2026-laxarus"
+DESKTOP_LICENSE_API_KEY = os.environ.get("SSCP_LICENSE_API_KEY", "sscp-license-api-sec-2026-laxarus")
 
 
 import hmac

@@ -178,7 +178,7 @@ class WhatsAppService:
                 "phone": clean_phone,
                 "message": message,
                 "wa_link": wa_link,
-                "detail": "Despachado automáticamente por el Gateway de WhatsApp."
+                "detail": "Procesado por Gateway local (enlace directo wa.me disponible para entrega garantizada)."
             }
         
         return {

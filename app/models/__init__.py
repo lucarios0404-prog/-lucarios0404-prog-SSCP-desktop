@@ -18,11 +18,14 @@ from app.models.cie10 import Cie10Code
 from app.models.permission_catalog import PermissionCatalog
 from app.models.license_config import LicenseConfig
 from app.models.service import Service
+from app.models.insurance_preauthorization import InsurancePreauthorization
+from app.models.relay_message import RelayMessage
 
 __all__ = [
     "User", "Patient", "Appointment", "Payment", "Consultation",
     "Setting", "VitalSign", "LabResult", "VaccineRecord", "InternalMessage",
     "InventoryItem", "InventoryMovement", "ClinicalTemplate",
     "MedicalLicense", "MedicalReference", "SyncLog", "ClinicalAuditLog",
-    "Cie10Code", "PermissionCatalog", "LicenseConfig", "Service"
+    "Cie10Code", "PermissionCatalog", "LicenseConfig", "Service",
+    "InsurancePreauthorization", "RelayMessage"
 ]

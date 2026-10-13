@@ -40,3 +40,18 @@ def generate_patient_qr_base64(patient) -> str:
     img.save(buffer, format="PNG")
     b64_encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{b64_encoded}"
+
+def generate_qr_code_image_bytes(text_data: str) -> bytes:
+    """Genera una imagen QR en formato PNG binario para streaming HTTP directo."""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=ERROR_CORRECT_M,
+        box_size=8,
+        border=3,
+    )
+    qr.add_data(text_data)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#0284c7", back_color="#ffffff")
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    return buffer.getvalue()

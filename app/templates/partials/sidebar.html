@@ -15,6 +15,15 @@
     <!-- Navigation -->
     <div class="flex-1 py-4 overflow-y-auto px-2.5 space-y-0.5">
 
+        <!-- Acceso directo Modo Secretaría Express -->
+        <a href="/reception/agenda" class="bg-gradient-to-r from-sky-600/30 to-blue-600/20 text-sky-300 hover:from-sky-600/40 hover:to-blue-600/30 border border-sky-500/40 group flex items-center justify-between px-3 py-2 text-sm font-bold rounded-xl transition-all duration-150 mb-2 shadow-sm">
+            <div class="flex items-center">
+                <i class="fas fa-tablet-alt w-4 mr-3 text-base text-sky-400"></i>
+                <span>Modo Secretaría</span>
+            </div>
+            <span class="text-[10px] bg-sky-500/30 text-sky-200 px-1.5 py-0.5 rounded font-bold">Express</span>
+        </a>
+
         <!-- Principal -->
         {% if user.has_permission('dashboard') %}
         <a href="/dashboard" class="{% if active_menu == 'dashboard' %}bg-blue-600/15 text-white border-l-2 border-blue-500{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
@@ -109,6 +118,11 @@
                 Cartas de Referencia
             </a>
             {% endif %}
+
+            <a href="/insurance-forms" class="{% if active_menu == 'insurance_forms' %}bg-teal-600/20 text-white border-l-2 border-teal-500 font-semibold{% else %}text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 border-l-2 border-transparent{% endif %} group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150">
+                <i class="fas fa-file-signature w-4 mr-3 text-base {% if active_menu == 'insurance_forms' %}text-teal-400{% else %}text-slate-500 group-hover:text-slate-300{% endif %}"></i>
+                Pre-Autorizaciones ARS
+            </a>
         {% endif %}
 
         <!-- Divisor — Administración -->

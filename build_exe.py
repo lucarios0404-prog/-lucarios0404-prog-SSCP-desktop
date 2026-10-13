@@ -37,17 +37,14 @@ def build():
     data_dest = dist_dir / "data"
     data_dest.mkdir(parents=True, exist_ok=True)
 
-    print("\n[2/3] Preparando directorio de datos vacío en dist/...")
-    # SECURITY: Never copy sscp.db into the distributable.
-    # The app initialises a fresh database on first run via Alembic migrations.
-    # Shipping sscp.db would include real patient data in the installer.
+    print("\n[2/3] Preparando directorio de datos limpio en dist/...")
+    # SECURITY: Never package an sscp.db in the installer distributable.
+    # SQLite and Alembic initialise the real clinic database in %APPDATA%/SSCP Desktop/data.
     db_dest = data_dest / "sscp.db"
-    if db_dest.exists():
-        print(f"  -> Base de datos ya existe en dist (se conserva): {db_dest}")
-    else:
-        # Create an empty placeholder so the directory structure is correct.
-        db_dest.touch()
-        print(f"  -> Directorio de datos preparado (DB vacía creada): {db_dest}")
+    if db_dest.exists() and db_dest.stat().st_size == 0:
+        db_dest.unlink()
+        print("  -> Eliminado sscp.db dummy (0 bytes) para evitar colisiones.")
+
 
     # 3. Resumen final
     exe_path = dist_dir / "SSCP-Desktop.exe"

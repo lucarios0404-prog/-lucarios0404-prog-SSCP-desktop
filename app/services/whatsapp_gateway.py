@@ -77,7 +77,9 @@ class WhatsAppGatewayManager:
             "connected_at": self.connected_at,
             "has_active_qr": (self.status == "pairing" and self.current_qr_base64 is not None),
             "messages_sent_count": self.messages_sent_count,
-            "last_error": self.last_error
+            "last_error": self.last_error,
+            "mode": "standalone_gateway",
+            "fallback_channel": "wa_me_direct"
         }
 
     def generate_pairing_qr(self, custom_phone: Optional[str] = None) -> Dict[str, Any]:

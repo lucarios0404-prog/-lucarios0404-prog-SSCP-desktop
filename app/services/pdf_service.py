@@ -1,6 +1,7 @@
 import io
 import os
 import json
+import re
 from datetime import datetime, date
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -103,10 +104,195 @@ def _get_styles():
         "footer": footer_style,
     }
 
-def _build_letterhead(story: list, styles: dict, setting=None, subtitle_text: str = "") -> None:
+def _format_cedula(doc: str) -> str:
+    """Formatea cédula dominicana a 000-0000000-0 si consta de 11 dígitos."""
+    if not doc:
+        return ""
+    clean = re.sub(r"[^0-9a-zA-Z]", "", str(doc).strip())
+    if len(clean) == 11 and clean.isdigit():
+        return f"{clean[:3]}-{clean[3:10]}-{clean[10]}"
+    return str(doc).strip()
+
+
+def _extract_patient_display_data(patient) -> dict:
     """
-    Construye el membrete profesional del consultorio con logo opcional.
-    Si setting.doctor_logo_path existe y el archivo es accesible, lo incluye.
+    Extrae y formatea de forma ultra-robusta los datos del paciente para reportes y recetas,
+    soportando instancias de SQLAlchemy Patient, diccionarios y objetos dinámicos.
+    Garantiza que nunca falte la Cédula/DNI, Edad, ARS, ni salgan cadenas vacías o 'None'.
+    """
+    if not patient:
+        return {
+            "name": "Paciente General",
+            "doc_id": "Sin Cédula Registrada",
+            "has_doc": False,
+            "age_str": "",
+            "birth_date_str": "",
+            "gender": "",
+            "phone": "No registrado",
+            "insurance_badge": "Privado / Particular",
+            "allergies": "Ninguna registrada",
+            "blood_type": "No registrado"
+        }
+
+    # 1. Nombre y Apellido
+    fn = getattr(patient, "first_name", None) or (patient.get("first_name") if isinstance(patient, dict) else "") or ""
+    ln = getattr(patient, "last_name", None) or (patient.get("last_name") if isinstance(patient, dict) else "") or ""
+    nm = getattr(patient, "name", None) or (patient.get("name") if isinstance(patient, dict) else "") or getattr(patient, "full_name", None) or (patient.get("full_name") if isinstance(patient, dict) else "") or ""
+    full_name = f"{str(fn).strip()} {str(ln).strip()}".strip() or str(nm).strip() or "Paciente"
+
+    # 2. Cédula / Documento de identidad (búsqueda profunda en múltiples campos)
+    raw_doc = (
+        getattr(patient, "document_id", None)
+        or (patient.get("document_id") if isinstance(patient, dict) else None)
+        or getattr(patient, "cedula", None)
+        or (patient.get("cedula") if isinstance(patient, dict) else None)
+        or getattr(patient, "dni", None)
+        or (patient.get("dni") if isinstance(patient, dict) else None)
+        or getattr(patient, "id_card", None)
+        or (patient.get("id_card") if isinstance(patient, dict) else None)
+    )
+    raw_doc_str = str(raw_doc).strip() if raw_doc is not None else ""
+    if raw_doc_str and raw_doc_str.lower() not in ("none", "null", "n/d", "s/d", ""):
+        doc_id = _format_cedula(raw_doc_str)
+        has_doc = True
+    else:
+        pid = getattr(patient, "id", None) or (patient.get("id") if isinstance(patient, dict) else None)
+        doc_id = f"Sin Cédula (Exp. #{pid})" if pid else "Sin Cédula Registrada"
+        has_doc = False
+
+    # 3. Fecha de nacimiento y cálculo exacto de edad (resuelve date_of_birth y birth_date)
+    bdate = (
+        getattr(patient, "date_of_birth", None)
+        or (patient.get("date_of_birth") if isinstance(patient, dict) else None)
+        or getattr(patient, "birth_date", None)
+        or (patient.get("birth_date") if isinstance(patient, dict) else None)
+    )
+    age_str = ""
+    birth_date_str = ""
+    if bdate:
+        try:
+            if isinstance(bdate, str):
+                bdate = datetime.strptime(str(bdate)[:10], "%Y-%m-%d").date()
+            elif isinstance(bdate, datetime):
+                bdate = bdate.date()
+            birth_date_str = bdate.strftime("%d/%m/%Y")
+            td = datetime.now().date()
+            age = td.year - bdate.year - ((td.month, td.day) < (bdate.month, bdate.day))
+            age_str = f"{age} años"
+        except Exception:
+            age_str = ""
+
+    # 4. ARS / Seguro Médico
+    ins_name = (
+        getattr(patient, "insurance_name", None)
+        or (patient.get("insurance_name") if isinstance(patient, dict) else None)
+        or "Privado / Particular"
+    )
+    ins_num = (
+        getattr(patient, "insurance_number", None)
+        or (patient.get("insurance_number") if isinstance(patient, dict) else None)
+        or ""
+    )
+    ins_badge = f"{ins_name} (No. {ins_num})" if ins_num else str(ins_name)
+
+    # 5. Teléfono
+    phone = (
+        getattr(patient, "phone", None)
+        or (patient.get("phone") if isinstance(patient, dict) else None)
+        or getattr(patient, "mobile", None)
+        or (patient.get("mobile") if isinstance(patient, dict) else None)
+        or "No registrado"
+    )
+
+    # 6. Alergias
+    allergies = (
+        getattr(patient, "allergies", None)
+        or (patient.get("allergies") if isinstance(patient, dict) else None)
+        or "Ninguna registrada"
+    )
+
+    # 7. Tipo de Sangre
+    blood_type = (
+        getattr(patient, "blood_type", None)
+        or (patient.get("blood_type") if isinstance(patient, dict) else None)
+        or "No registrado"
+    )
+
+    # 8. Género
+    gender = (
+        getattr(patient, "gender", None)
+        or (patient.get("gender") if isinstance(patient, dict) else None)
+        or ""
+    )
+
+    return {
+        "name": full_name,
+        "doc_id": doc_id,
+        "has_doc": has_doc,
+        "age_str": age_str,
+        "birth_date_str": birth_date_str,
+        "gender": gender,
+        "phone": phone,
+        "insurance_badge": ins_badge,
+        "allergies": allergies,
+        "blood_type": blood_type
+    }
+
+
+def _get_page_setup(cfg: dict = None):
+    """
+    Retorna (pagesize, left_margin, right_margin, top_margin, bottom_margin, usable_width)
+    basado en la configuración activa de print_config_service.
+    """
+    if cfg is None:
+        try:
+            from app.services.print_config_service import get_print_config
+            cfg = get_print_config()
+        except Exception:
+            cfg = {}
+
+    std_margins = cfg.get("standard_margins", {}) if isinstance(cfg, dict) else {}
+    top_mm = float(std_margins.get("top", cfg.get("print_margin_top", 15.0)) or 15.0)
+    bottom_mm = float(std_margins.get("bottom", cfg.get("print_margin_bottom", 15.0)) or 15.0)
+    left_mm = float(std_margins.get("left", cfg.get("print_margin_left", 20.0)) or 20.0)
+    right_mm = float(std_margins.get("right", cfg.get("print_margin_right", 15.0)) or 15.0)
+    
+    paper_size_name = str(std_margins.get("paperSize", cfg.get("print_paper_size", "Letter"))).strip().lower()
+    
+    if paper_size_name in ("halfletter", "media carta", "halfcarta", "half_letter"):
+        from reportlab.lib.pagesizes import halfletter
+        pagesize = halfletter
+    elif paper_size_name in ("a4",):
+        from reportlab.lib.pagesizes import A4
+        pagesize = A4
+    elif paper_size_name in ("talonario", "custom_talonario"):
+        w = float(cfg.get("paper_width_mm", 136.0) or 136.0) * mm
+        h = float(cfg.get("paper_height_mm", 217.0) or 217.0) * mm
+        pagesize = (w, h)
+    else:
+        from reportlab.lib.pagesizes import letter
+        pagesize = letter
+        
+    left_margin = left_mm * mm
+    right_margin = right_mm * mm
+    top_margin = top_mm * mm
+    bottom_margin = bottom_mm * mm
+    
+    page_w, page_h = pagesize
+    usable_width = page_w - left_margin - right_margin
+    # Proteger contra desbordes si el margen configurado es muy grande
+    if usable_width < 2.5 * inch:
+        usable_width = page_w - (30 * mm)
+        left_margin = 15 * mm
+        right_margin = 15 * mm
+
+    return pagesize, left_margin, right_margin, top_margin, bottom_margin, usable_width
+
+
+def _build_letterhead(story: list, styles: dict, setting=None, subtitle_text: str = "", usable_width: float = None) -> None:
+    """
+    Construye el membrete profesional del consultorio con logo opcional,
+    adaptando su ancho exactamente al área imprimible configurada.
     """
     clinic_name = getattr(setting, "clinic_name", "Centro Médico SSCP") if setting else "Centro Médico SSCP"
     doctor_name = getattr(setting, "doctor_name", "Dr. Especialista") if setting else "Dr. Especialista"
@@ -145,7 +331,12 @@ def _build_letterhead(story: list, styles: dict, setting=None, subtitle_text: st
     else:
         left_col = Paragraph(f"<b>{clinic_name}</b>", styles["title"])
 
-    header_table = Table([[left_col, right_col]], colWidths=[3.8 * inch, 3.2 * inch])
+    if usable_width is None:
+        usable_width = 7.0 * inch
+
+    col1 = usable_width * 0.55
+    col2 = usable_width * 0.45
+    header_table = Table([[left_col, right_col]], colWidths=[col1, col2])
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
@@ -153,74 +344,79 @@ def _build_letterhead(story: list, styles: dict, setting=None, subtitle_text: st
         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
     ]))
     story.append(header_table)
-    story.append(Spacer(1, 6))
-    story.append(HRFlowable(width="100%", thickness=2, color=PRIMARY_COLOR, spaceBefore=2, spaceAfter=10))
+    story.append(Spacer(1, 4))
+    story.append(HRFlowable(width="100%", thickness=2, color=PRIMARY_COLOR, spaceBefore=2, spaceAfter=8))
 
 
 def generate_prescription_pdf(consultation, setting=None) -> io.BytesIO:
     """
-    Genera el PDF oficial de Receta Médica (Prescription) con formato médico profesional.
+    Genera el PDF oficial de Receta Médica (Prescription) con formato médico profesional,
+    respetando exactamente los márgenes y tamaño de papel configurados por el usuario,
+    y garantizando que nunca falte la cédula, edad, ARS ni datos del paciente.
     """
+    pagesize, left_m, right_m, top_m, bottom_m, usable_w = _get_page_setup()
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
-        pagesize=letter,
-        rightMargin=36,
-        leftMargin=36,
-        topMargin=36,
-        bottomMargin=36,
+        pagesize=pagesize,
+        leftMargin=left_m,
+        rightMargin=right_m,
+        topMargin=top_m,
+        bottomMargin=bottom_m,
     )
     
     styles = _get_styles()
     story = []
 
-    # 1. Membrete con logo opcional
-    _build_letterhead(story, styles, setting, subtitle_text="")
+    # 1. Membrete adaptativo
+    _build_letterhead(story, styles, setting, subtitle_text="", usable_width=usable_w)
 
-    # Variables adicionales de la consulta
-    clinic_name = getattr(setting, "clinic_name", "Centro Médico SSCP") if setting else "Centro Médico SSCP"
     doctor_name = getattr(setting, "doctor_name", "Dr. Especialista") if setting else "Dr. Especialista"
     specialty = getattr(setting, "specialty", "Medicina General") if setting else "Medicina General"
-    phone = getattr(setting, "phone", "") if setting else ""
     address = getattr(setting, "address", "") if setting else ""
 
-    # 2. Información del Paciente
+    # 2. Información del Paciente (Extracción robusta sin campos vacíos ni 'None')
     patient = getattr(consultation, "patient", None)
-    patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Paciente General"
-    doc_id = getattr(patient, "document_id", "N/A") if patient else "N/A"
-    age_str = ""
-    if patient and getattr(patient, "birth_date", None):
-        try:
-            today = datetime.now().date()
-            bdate = patient.birth_date
-            age = today.year - bdate.year - ((today.month, today.day) < (bdate.month, bdate.day))
-            age_str = f" • Edad: {age} años"
-        except Exception:
-            pass
-            
-    consultation_date = consultation.created_at.strftime("%d/%m/%Y %H:%M") if consultation.created_at else datetime.now().strftime("%d/%m/%Y")
+    p_info = _extract_patient_display_data(patient)
+    consultation_date = (
+        consultation.created_at.strftime("%d/%m/%Y %H:%M")
+        if getattr(consultation, "created_at", None)
+        else datetime.now().strftime("%d/%m/%Y")
+    )
     
     patient_info_data = [
         [
-            Paragraph(f"<b>Paciente:</b> {patient_name} (ID/DNI: {doc_id}){age_str}", styles["body"]),
+            Paragraph(f"<b>Paciente:</b> {p_info['name']} &nbsp;•&nbsp; <b>Cédula/DNI:</b> {p_info['doc_id']}", styles["body"]),
             Paragraph(f"<b>Fecha:</b> {consultation_date}", styles["body"])
+        ],
+        [
+            Paragraph(f"<b>Edad:</b> {p_info['age_str'] or 'No registrada'} &nbsp;•&nbsp; <b>Tel:</b> {p_info['phone']}", styles["body"]),
+            Paragraph(f"<b>ARS/Cobertura:</b> {p_info['insurance_badge']}", styles["body"])
         ]
     ]
-    p_table = Table(patient_info_data, colWidths=[4.8 * inch, 2.2 * inch])
+
+    # Alerta de alergias si existen
+    if p_info.get("allergies") and p_info["allergies"].strip().lower() not in ("ninguna", "ninguna registrada", "no", "n/a", "no registrada", ""):
+        patient_info_data.append([
+            Paragraph(f"<font color='#b91c1c'><b>⚠️ Alergias Conocidas:</b> {p_info['allergies']}</font>", styles["body"]),
+            Paragraph(f"<b>Consulta:</b> #{getattr(consultation, 'id', '—')}", styles["body"])
+        ])
+
+    p_table = Table(patient_info_data, colWidths=[usable_w * 0.65, usable_w * 0.35])
     p_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), BG_LIGHT),
         ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('PADDING', (0, 0), (-1, -1), 8),
+        ('PADDING', (0, 0), (-1, -1), 6),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     story.append(p_table)
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 10))
     
     # 3. Diagnóstico (si existe)
-    if consultation.diagnosis:
+    if getattr(consultation, "diagnosis", None) and consultation.diagnosis.strip():
         story.append(Paragraph("<b>Diagnóstico:</b>", styles["section"]))
         story.append(Paragraph(consultation.diagnosis.replace("\n", "<br/>"), styles["body"]))
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 8))
         
     # 4. Símbolo Rp. y Prescripción Médica
     story.append(Paragraph("<b>Rp. / Medicación y Prescripción</b>", styles["section"]))
@@ -228,39 +424,41 @@ def generate_prescription_pdf(consultation, setting=None) -> io.BytesIO:
     rx_content = consultation.prescription or "Sin medicamentos prescritos registrados."
     rx_formatted = rx_content.replace("\n", "<br/>")
     
-    rx_table = Table([[Paragraph(rx_formatted, styles["rx"])]], colWidths=[7.0 * inch])
+    rx_table = Table([[Paragraph(rx_formatted, styles["rx"])]], colWidths=[usable_w])
     rx_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#f0fdfa")), # Teal 50
         ('BOX', (0, 0), (-1, -1), 1, SECONDARY_COLOR),
-        ('PADDING', (0, 0), (-1, -1), 12),
+        ('PADDING', (0, 0), (-1, -1), 10),
     ]))
     story.append(rx_table)
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 10))
     
     # 5. Indicaciones Generales y Tratamiento (si existe)
-    if consultation.treatment:
+    if getattr(consultation, "treatment", None) and consultation.treatment.strip():
         story.append(Paragraph("<b>Indicaciones Generales y Cuidados:</b>", styles["section"]))
         story.append(Paragraph(consultation.treatment.replace("\n", "<br/>"), styles["body"]))
-        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 10))
         
-    # 6. Bloque de Firma y Sello Médico (al final de la página)
-    story.append(Spacer(1, 30))
+    # 6. Bloque de Firma y Sello Médico (compacto y proporcionado para no desbordar)
+    story.append(Spacer(1, 14))
     signature_block = [
         [
             Paragraph(f"<font size=8 color='#64748b'>{address}</font>", styles["body"]),
-            Paragraph(f"<br/><br/>________________________________________<br/><b>{doctor_name}</b><br/>{specialty}", styles["body"])
+            Paragraph(f"________________________________________<br/><b>{doctor_name}</b><br/>{specialty}", styles["body"])
         ]
     ]
-    sig_table = Table(signature_block, colWidths=[3.8 * inch, 3.2 * inch])
+    sig_table = Table(signature_block, colWidths=[usable_w * 0.52, usable_w * 0.48])
     sig_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
         ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
     ]))
     story.append(KeepTogether(sig_table))
     
     # 7. Pie de página
-    story.append(Spacer(1, 20))
-    story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER_COLOR, spaceBefore=4, spaceAfter=6))
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER_COLOR, spaceBefore=2, spaceAfter=4))
     story.append(Paragraph("Documento médico oficial generado desde SSCP Desktop • Validez local", styles["footer"]))
     
     doc.build(story)
@@ -269,49 +467,59 @@ def generate_prescription_pdf(consultation, setting=None) -> io.BytesIO:
 
 def generate_consultation_report_pdf(consultation, setting=None, vitals=None) -> io.BytesIO:
     """
-    Genera el informe clínico detallado de la consulta médica en formato PDF.
+    Genera el informe clínico detallado de la consulta médica en formato PDF,
+    respetando la configuración de márgenes y tamaño de papel.
     """
+    pagesize, left_m, right_m, top_m, bottom_m, usable_w = _get_page_setup()
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
-        pagesize=letter,
-        rightMargin=36,
-        leftMargin=36,
-        topMargin=36,
-        bottomMargin=36,
+        pagesize=pagesize,
+        leftMargin=left_m,
+        rightMargin=right_m,
+        topMargin=top_m,
+        bottomMargin=bottom_m,
     )
     
     styles = _get_styles()
     story = []
 
     # Membrete con logo opcional
-    _build_letterhead(story, styles, setting, subtitle_text="INFORME DE CONSULTA CLÍNICA")
+    _build_letterhead(story, styles, setting, subtitle_text="INFORME DE CONSULTA CLÍNICA", usable_width=usable_w)
 
-    clinic_name = getattr(setting, "clinic_name", "Centro Médico SSCP") if setting else "Centro Médico SSCP"
     doctor_name = getattr(setting, "doctor_name", "Dr. Especialista") if setting else "Dr. Especialista"
     specialty = getattr(setting, "specialty", "Medicina General") if setting else "Medicina General"
 
-    # Datos Paciente
+    # Datos Paciente extraídos de forma robusta
     patient = getattr(consultation, "patient", None)
-    patient_name = f"{patient.first_name} {patient.last_name}" if patient else "N/A"
-    doc_id = getattr(patient, "document_id", "N/A") if patient else "N/A"
-    blood_type = getattr(patient, "blood_type", "No registrado") if patient else "No registrado"
-    allergies = getattr(patient, "allergies", "Ninguna registrada") if patient else "Ninguna registrada"
-    consultation_date = consultation.created_at.strftime("%d/%m/%Y %H:%M") if consultation.created_at else datetime.now().strftime("%d/%m/%Y")
+    p_info = _extract_patient_display_data(patient)
+    consultation_date = (
+        consultation.created_at.strftime("%d/%m/%Y %H:%M")
+        if getattr(consultation, "created_at", None)
+        else datetime.now().strftime("%d/%m/%Y")
+    )
     
     p_data = [
         [
-            Paragraph(f"<b>Paciente:</b> {patient_name}", styles["body"]),
-            Paragraph(f"<b>DNI/Cédula:</b> {doc_id}", styles["body"]),
+            Paragraph(f"<b>Paciente:</b> {p_info['name']}", styles["body"]),
+            Paragraph(f"<b>Cédula/DNI:</b> {p_info['doc_id']}", styles["body"]),
             Paragraph(f"<b>Fecha:</b> {consultation_date}", styles["body"]),
         ],
         [
-            Paragraph(f"<b>Grupo Sanguíneo:</b> {blood_type}", styles["body"]),
-            Paragraph(f"<b>Alergias:</b> <font color='#b91c1c'>{allergies}</font>", styles["body"]),
+            Paragraph(f"<b>Edad:</b> {p_info['age_str'] or 'No registrada'}", styles["body"]),
+            Paragraph(f"<b>ARS/Cobertura:</b> {p_info['insurance_badge']}", styles["body"]),
             Paragraph(f"<b>Consulta ID:</b> #{consultation.id}", styles["body"]),
+        ],
+        [
+            Paragraph(f"<b>Grupo Sanguíneo:</b> {p_info['blood_type']}", styles["body"]),
+            Paragraph(f"<b>Alergias:</b> <font color='#b91c1c'>{p_info['allergies']}</font>", styles["body"]),
+            Paragraph(f"<b>Teléfono:</b> {p_info['phone']}", styles["body"]),
         ]
     ]
-    patient_table = Table(p_data, colWidths=[2.6 * inch, 2.4 * inch, 2.0 * inch])
+    col_w1 = usable_w * 0.38
+    col_w2 = usable_w * 0.34
+    col_w3 = usable_w * 0.28
+    patient_table = Table(p_data, colWidths=[col_w1, col_w2, col_w3])
     patient_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), BG_LIGHT),
         ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
@@ -319,7 +527,7 @@ def generate_consultation_report_pdf(consultation, setting=None, vitals=None) ->
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     story.append(patient_table)
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 10))
     
     # Signos Vitales (si se proporcionaron)
     if vitals:
@@ -336,7 +544,8 @@ def generate_consultation_report_pdf(consultation, setting=None, vitals=None) ->
                 f"{getattr(vitals, 'bmi', 'N/A')}",
             ]
         ]
-        vt_table = Table(v_data, colWidths=[1.0 * inch] * 7)
+        vt_col = usable_w / 7.0
+        vt_table = Table(v_data, colWidths=[vt_col] * 7)
         vt_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -350,40 +559,40 @@ def generate_consultation_report_pdf(consultation, setting=None, vitals=None) ->
         
     # Secciones de la consulta adaptadas a Historia Clínica Unificada (v1.2.0)
     sections = [
-        ("Motivo de Consulta", consultation.reason),
+        ("Motivo de Consulta", getattr(consultation, "reason", "")),
     ]
     if getattr(consultation, "clinical_history", None) and consultation.clinical_history.strip():
         sections.append(("Historia Clínica / Evolución Médica", consultation.clinical_history))
     else:
-        if consultation.symptoms:
+        if getattr(consultation, "symptoms", None):
             sections.append(("Síntomas / Anamnesis", consultation.symptoms))
-        if consultation.physical_exam:
+        if getattr(consultation, "physical_exam", None):
             sections.append(("Examen Físico", consultation.physical_exam))
 
-    if consultation.diagnosis and consultation.diagnosis.strip() and consultation.diagnosis.strip() not in ("Historia Clínica Unificada", "Ver Historia Clínica"):
+    if getattr(consultation, "diagnosis", None) and consultation.diagnosis.strip() and consultation.diagnosis.strip() not in ("Historia Clínica Unificada", "Ver Historia Clínica"):
         sections.append(("Diagnóstico Clínico / CIE-10", consultation.diagnosis))
 
     sections.extend([
-        ("Plan Terapéutico y Tratamiento", consultation.treatment),
-        ("Prescripción Médica (Medicamentos)", consultation.prescription),
-        ("Notas Clínicas Adicionales", consultation.notes),
+        ("Plan Terapéutico y Tratamiento", getattr(consultation, "treatment", "")),
+        ("Prescripción Médica (Medicamentos)", getattr(consultation, "prescription", "")),
+        ("Notas Clínicas Adicionales", getattr(consultation, "notes", "")),
     ])
 
     for title, content in sections:
-        if content and content.strip():
+        if content and str(content).strip():
             story.append(Paragraph(f"<b>{title}:</b>", styles["section"]))
-            story.append(Paragraph(content.replace("\n", "<br/>"), styles["body"]))
+            story.append(Paragraph(str(content).replace("\n", "<br/>"), styles["body"]))
             story.append(Spacer(1, 8))
             
     # Firma
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 16))
     sig_data = [
         [
             "",
             Paragraph(f"<br/><br/>________________________________________<br/><b>{doctor_name}</b><br/>{specialty}", styles["body"])
         ]
     ]
-    sig_t = Table(sig_data, colWidths=[4.0 * inch, 3.0 * inch])
+    sig_t = Table(sig_data, colWidths=[usable_w * 0.55, usable_w * 0.45])
     sig_t.setStyle(TableStyle([
         ('ALIGN', (1, 0), (1, 0), 'CENTER'),
     ]))
@@ -395,10 +604,19 @@ def generate_consultation_report_pdf(consultation, setting=None, vitals=None) ->
 
 def generate_quick_prescription_pdf(patient, prescription_text: str, diagnosis: str = None, setting=None, doctor_name: str = None) -> io.BytesIO:
     """
-    Genera el PDF de Receta Rápida (F2) sin necesidad de una consulta médica completa.
+    Genera el PDF de Receta Rápida (F2) sin necesidad de una consulta médica completa,
+    respetando los márgenes y tamaño de papel configurados en el sistema.
     """
+    pagesize, left_m, right_m, top_m, bottom_m, usable_w = _get_page_setup()
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=pagesize,
+        leftMargin=left_m,
+        rightMargin=right_m,
+        topMargin=top_m,
+        bottomMargin=bottom_m,
+    )
     styles = _get_styles()
     story = []
 
@@ -420,59 +638,64 @@ def generate_quick_prescription_pdf(patient, prescription_text: str, diagnosis: 
     tmp.email = email
     tmp.doctor_logo_path = getattr(setting, "doctor_logo_path", None) if setting else None
 
-    _build_letterhead(story, styles, tmp, subtitle_text="RECETA MÉDICA DIRECTA")
+    _build_letterhead(story, styles, tmp, subtitle_text="RECETA MÉDICA DIRECTA", usable_width=usable_w)
 
-    # Paciente
-    p_name = f"{patient.first_name} {patient.last_name}" if patient else "Paciente"
-    doc_id = getattr(patient, "document_id", "N/D") if patient else "N/D"
-    allergies = getattr(patient, "allergies", "Ninguna") or "Ninguna"
+    # Paciente con extracción robusta
+    p_info = _extract_patient_display_data(patient)
     now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
 
     p_data = [
         [
-            Paragraph(f"<b>Paciente:</b> {p_name} (DNI: {doc_id})", styles["body"]),
+            Paragraph(f"<b>Paciente:</b> {p_info['name']} &nbsp;•&nbsp; <b>Cédula/DNI:</b> {p_info['doc_id']}", styles["body"]),
             Paragraph(f"<b>Fecha:</b> {now_str}", styles["body"])
         ],
         [
-            Paragraph(f"<b>Alergias Conocidas:</b> <font color='#b91c1c'>{allergies}</font>", styles["body"]),
-            Paragraph(f"<b>Tipo:</b> Emisión Rápida", styles["body"])
+            Paragraph(f"<b>Edad:</b> {p_info['age_str'] or 'No registrada'} &nbsp;•&nbsp; <b>Tel:</b> {p_info['phone']}", styles["body"]),
+            Paragraph(f"<b>ARS/Cobertura:</b> {p_info['insurance_badge']}", styles["body"])
         ]
     ]
-    ptable = Table(p_data, colWidths=[4.6 * inch, 2.4 * inch])
+
+    if p_info.get("allergies") and p_info["allergies"].strip().lower() not in ("ninguna", "ninguna registrada", "no", "n/a", "no registrada", ""):
+        p_data.append([
+            Paragraph(f"<font color='#b91c1c'><b>⚠️ Alergias Conocidas:</b> {p_info['allergies']}</font>", styles["body"]),
+            Paragraph(f"<b>Tipo:</b> Emisión Rápida", styles["body"])
+        ])
+
+    ptable = Table(p_data, colWidths=[usable_w * 0.65, usable_w * 0.35])
     ptable.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), BG_LIGHT),
         ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
         ('PADDING', (0, 0), (-1, -1), 6),
     ]))
     story.append(ptable)
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 10))
 
     # Diagnóstico
     if diagnosis and diagnosis.strip():
         story.append(Paragraph("<b>Diagnóstico / Indicación Clínica:</b>", styles["section"]))
         story.append(Paragraph(diagnosis.replace("\n", "<br/>"), styles["body"]))
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 8))
 
     # Prescripción
     story.append(Paragraph("<b>Rp. / Medicación y Prescripción</b>", styles["section"]))
     rx_fmt = (prescription_text or "Sin prescripción").replace("\n", "<br/>")
-    rx_t = Table([[Paragraph(rx_fmt, styles["rx"])]], colWidths=[7.0 * inch])
+    rx_t = Table([[Paragraph(rx_fmt, styles["rx"])]], colWidths=[usable_w])
     rx_t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#f0fdfa")),
         ('BOX', (0, 0), (-1, -1), 1, SECONDARY_COLOR),
-        ('PADDING', (0, 0), (-1, -1), 12),
+        ('PADDING', (0, 0), (-1, -1), 10),
     ]))
     story.append(rx_t)
 
-    # Firma
-    story.append(Spacer(1, 40))
+    # Firma compacta y proporcionada
+    story.append(Spacer(1, 16))
     sig_data = [
         [
             Paragraph(f"<font size=8 color='#64748b'>{address}</font>", styles["body"]),
             Paragraph(f"________________________________________<br/><b>{doc_name}</b><br/>{specialty}", styles["body"])
         ]
     ]
-    sig_t = Table(sig_data, colWidths=[3.8 * inch, 3.2 * inch])
+    sig_t = Table(sig_data, colWidths=[usable_w * 0.52, usable_w * 0.48])
     sig_t.setStyle(TableStyle([('ALIGN', (1, 0), (1, 0), 'CENTER')]))
     story.append(KeepTogether(sig_t))
 
@@ -482,56 +705,64 @@ def generate_quick_prescription_pdf(patient, prescription_text: str, diagnosis: 
 
 def generate_medical_license_pdf(license, setting=None) -> io.BytesIO:
     """
-    Genera el Certificado Oficial de Licencia Médica / Reposo Laboral (F5).
+    Genera el Certificado Oficial de Licencia Médica / Reposo Laboral (F5),
+    respetando los márgenes configurados.
     """
+    pagesize, left_m, right_m, top_m, bottom_m, usable_w = _get_page_setup()
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=pagesize,
+        leftMargin=left_m,
+        rightMargin=right_m,
+        topMargin=top_m,
+        bottomMargin=bottom_m,
+    )
     styles = _get_styles()
     story = []
 
     clinic_name = getattr(setting, "clinic_name", "Centro Médico SSCP") if setting else "Centro Médico SSCP"
     doctor_name = getattr(setting, "doctor_name", "Dr. Especialista") if setting else "Dr. Especialista"
     specialty = getattr(setting, "specialty", "Medicina General") if setting else "Medicina General"
-    phone = getattr(setting, "phone", "") if setting else ""
     address = getattr(setting, "address", "") if setting else ""
 
     # Membrete con logo opcional
-    _build_letterhead(story, styles, setting, subtitle_text="")
+    _build_letterhead(story, styles, setting, subtitle_text="", usable_width=usable_w)
 
     # Título del Certificado
-    title_p = Paragraph("<font size=14 color='#0f766e'><b>CERTIFICADO MÉDICO DE LICENCIA / REPOSO</b></font>", styles["title"])
+    title_p = Paragraph("<font size=14 color='#0f766e'><b>CERTIFICADO MÉDICO</b></font>", styles["title"])
     story.append(title_p)
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 10))
 
-    dest = license.workplace_or_school or "A QUIEN PUEDA INTERESAR"
+    dest = getattr(license, "workplace_or_school", None) or "A QUIEN PUEDA INTERESAR"
     story.append(Paragraph(f"<b>Dirigido a:</b> {dest}", styles["body_bold"]))
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 10))
 
-    patient = license.patient
-    p_name = f"{patient.first_name} {patient.last_name}" if patient else "El paciente"
-    doc_id = getattr(patient, "document_id", "N/D") if patient else "N/D"
-    start_str = license.start_date.strftime("%d/%m/%Y")
-    end_str = license.end_date.strftime("%d/%m/%Y")
+    patient = getattr(license, "patient", None)
+    p_info = _extract_patient_display_data(patient)
+    start_str = license.start_date.strftime("%d/%m/%Y") if getattr(license, "start_date", None) else datetime.now().strftime("%d/%m/%Y")
+    end_str = license.end_date.strftime("%d/%m/%Y") if getattr(license, "end_date", None) else ""
 
+    days_cnt = getattr(license, "days_rest", getattr(license, "days", 1))
     cert_text = (
-        f"Por medio de la presente certifico que he examinado clínicamente a <b>{p_name}</b>, "
-        f"portador(a) del documento de identidad <b>{doc_id}</b>, diagnosticándole:<br/><br/>"
-        f"<b>DIAGNÓSTICO:</b> {license.diagnosis}<br/><br/>"
-        f"Por tal motivo, se indica reposo médico por un período de <b>{license.days_rest} día(s)</b>, "
+        f"Por medio de la presente certifico que he examinado clínicamente a <b>{p_info['name']}</b>, "
+        f"identificado(a) con <b>{p_info['doc_id']}</b>, diagnosticándole:<br/><br/>"
+        f"<b>DIAGNÓSTICO:</b> {getattr(license, 'diagnosis', 'Evaluación médica')}<br/><br/>"
+        f"Por tal motivo, se indica reposo médico por un período de <b>{days_cnt} día(s)</b>, "
         f"comprendido desde el día <b>{start_str}</b> hasta el día <b>{end_str}</b> inclusive, "
         f"debiendo reincorporarse a sus labores habituales al término del mismo."
     )
     story.append(Paragraph(cert_text, styles["body"]))
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 12))
 
-    if license.notes and license.notes.strip():
+    if getattr(license, "notes", None) and license.notes.strip():
         story.append(Paragraph(f"<b>Observaciones e Indicaciones Médicas:</b><br/>{license.notes}", styles["body"]))
-        story.append(Spacer(1, 14))
+        story.append(Spacer(1, 12))
 
     # Fecha y lugar
     today_str = datetime.now().strftime("%d de %B de %Y")
     story.append(Paragraph(f"Expedido para los fines pertinentes en fecha {today_str}.", styles["body"]))
-    story.append(Spacer(1, 45))
+    story.append(Spacer(1, 25))
 
     # Firma
     sig_data = [
@@ -540,7 +771,7 @@ def generate_medical_license_pdf(license, setting=None) -> io.BytesIO:
             Paragraph(f"________________________________________<br/><b>{doctor_name}</b><br/>{specialty}", styles["body"])
         ]
     ]
-    sig_t = Table(sig_data, colWidths=[3.8 * inch, 3.2 * inch])
+    sig_t = Table(sig_data, colWidths=[usable_w * 0.52, usable_w * 0.48])
     sig_t.setStyle(TableStyle([('ALIGN', (1, 0), (1, 0), 'CENTER')]))
     story.append(KeepTogether(sig_t))
 
@@ -550,29 +781,34 @@ def generate_medical_license_pdf(license, setting=None) -> io.BytesIO:
 
 def generate_medical_reference_pdf(reference, setting=None) -> io.BytesIO:
     """
-    Genera la Carta Oficial de Referencia e Interconsulta Médica (F10).
+    Genera la Carta Oficial de Referencia e Interconsulta Médica (F10),
+    respetando los márgenes configurados.
     """
+    pagesize, left_m, right_m, top_m, bottom_m, usable_w = _get_page_setup()
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=pagesize,
+        leftMargin=left_m,
+        rightMargin=right_m,
+        topMargin=top_m,
+        bottomMargin=bottom_m,
+    )
     styles = _get_styles()
     story = []
 
-    clinic_name = getattr(setting, "clinic_name", "Centro Médico SSCP") if setting else "Centro Médico SSCP"
     doctor_name = getattr(setting, "doctor_name", "Dr. Especialista") if setting else "Dr. Especialista"
     specialty = getattr(setting, "specialty", "Medicina General") if setting else "Medicina General"
-    phone = getattr(setting, "phone", "") if setting else ""
     address = getattr(setting, "address", "") if setting else ""
 
     # Membrete con logo opcional
-    _build_letterhead(story, styles, setting, subtitle_text="")
+    _build_letterhead(story, styles, setting, subtitle_text="", usable_width=usable_w)
 
     story.append(Paragraph("<font size=14 color='#0f766e'><b>CARTA DE REFERENCIA E INTERCONSULTA MÉDICA</b></font>", styles["title"]))
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 10))
 
-    patient = reference.patient
-    p_name = f"{patient.first_name} {patient.last_name}" if patient else "Paciente"
-    doc_id = getattr(patient, "document_id", "N/D") if patient else "N/D"
-    allergies = getattr(patient, "allergies", "Ninguna") or "Ninguna"
+    patient = getattr(reference, "patient", None)
+    p_info = _extract_patient_display_data(patient)
 
     ref_info = [
         [
@@ -580,18 +816,18 @@ def generate_medical_reference_pdf(reference, setting=None) -> io.BytesIO:
             Paragraph(f"<b>Institución:</b> {reference.institution or 'Centro de Referencia'}", styles["body"])
         ],
         [
-            Paragraph(f"<b>Paciente:</b> {p_name} (DNI: {doc_id})", styles["body"]),
-            Paragraph(f"<b>Alergias:</b> <font color='#b91c1c'>{allergies}</font>", styles["body"])
+            Paragraph(f"<b>Paciente:</b> {p_info['name']} (Doc: {p_info['doc_id']})", styles["body"]),
+            Paragraph(f"<b>Alergias:</b> <font color='#b91c1c'>{p_info['allergies']}</font>", styles["body"])
         ]
     ]
-    rtable = Table(ref_info, colWidths=[3.5 * inch, 3.5 * inch])
+    rtable = Table(ref_info, colWidths=[usable_w * 0.5, usable_w * 0.5])
     rtable.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), BG_LIGHT),
         ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
         ('PADDING', (0, 0), (-1, -1), 6),
     ]))
     story.append(rtable)
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 12))
 
     story.append(Paragraph("<b>Motivo de la Derivación:</b>", styles["section"]))
     story.append(Paragraph(reference.reason_for_referral.replace("\n", "<br/>"), styles["body"]))
@@ -607,14 +843,14 @@ def generate_medical_reference_pdf(reference, setting=None) -> io.BytesIO:
         story.append(Paragraph(reference.notes.replace("\n", "<br/>"), styles["body"]))
         story.append(Spacer(1, 10))
 
-    story.append(Spacer(1, 35))
+    story.append(Spacer(1, 20))
     sig_data = [
         [
             Paragraph(f"<font size=8 color='#64748b'>{address}</font>", styles["body"]),
             Paragraph(f"________________________________________<br/><b>{doctor_name}</b><br/>{specialty}", styles["body"])
         ]
     ]
-    sig_t = Table(sig_data, colWidths=[3.8 * inch, 3.2 * inch])
+    sig_t = Table(sig_data, colWidths=[usable_w * 0.52, usable_w * 0.48])
     sig_t.setStyle(TableStyle([('ALIGN', (1, 0), (1, 0), 'CENTER')]))
     story.append(KeepTogether(sig_t))
 
@@ -634,6 +870,7 @@ def generate_executive_report_pdf(
     top_diagnoses: list = None,
     gender_counts: dict = None,
     age_groups: dict = None,
+    period_str: str = "",
 ) -> io.BytesIO:
     """
     Genera el Reporte Ejecutivo Clínico en PDF con membrete, KPIs, epidemiología y demografía.
@@ -653,15 +890,19 @@ def generate_executive_report_pdf(
     # --- Membrete con logo ---
     _build_letterhead(story, styles, setting, subtitle_text="REPORTE EJECUTIVO CLÍNICO")
 
-    # --- Fecha de generación ---
+    # --- Fecha de generación y período ---
     now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
     doctor_name = getattr(setting, "doctor_name", "Dr. Especialista") if setting else "Dr. Especialista"
     specialty = getattr(setting, "specialty", "Medicina General") if setting else "Medicina General"
     address = getattr(setting, "address", "") if setting else ""
     currency = getattr(setting, "currency", "RD$") if setting else "RD$"
 
+    header_info = f"Generado el {now_str} • Sistema SSCP Desktop"
+    if period_str:
+        header_info += f" &bull; <b>Período: {period_str}</b>"
+
     story.append(Paragraph(
-        f"<font size=8 color='#94a3b8'>Generado el {now_str} • Sistema SSCP Desktop</font>",
+        f"<font size=8 color='#64748b'>{header_info}</font>",
         styles["footer"]
     ))
     story.append(Spacer(1, 14))
@@ -1022,158 +1263,343 @@ def generate_secretary_daily_report_pdf(
     return buffer
 
 
-def generate_talonario_overlay_pdf(patient, prescription_text: str, setting=None) -> io.BytesIO:
+def _get_calibrated_talonario_params(cfg: dict = None):
+    """
+    Obtiene las dimensiones y la función de conversión de coordenadas calibradas
+    para el talonario preimpreso de 13.6 × 21.7 cm (Media Carta Vertical).
+    """
+    if not cfg:
+        try:
+            from app.services.print_config_service import get_print_config
+            cfg = get_print_config()
+        except Exception:
+            cfg = {}
+
+    page_w_mm = float(cfg.get("paper_width_mm", 136.0) or 136.0)
+    page_h_mm = float(cfg.get("paper_height_mm", 217.0) or 217.0)
+    fields = cfg.get("fields", {}) if isinstance(cfg.get("fields"), dict) else {}
+
+    def to_rl_y(y_top_mm: float, font_size_pt: float) -> float:
+        # En CSS top: y_mm coloca la parte superior de la caja.
+        # ReportLab dibuja en la línea base (baseline) desde el fondo:
+        cap_h_mm = font_size_pt * 0.3528 * 0.82
+        y_bottom_mm = page_h_mm - (float(y_top_mm) + cap_h_mm)
+        return y_bottom_mm * mm
+
+    return page_w_mm, page_h_mm, fields, to_rl_y
+
+
+def _draw_talonario_patient_footer(c, patient, fields: dict, to_rl_y, custom_date_str: str = None):
+    """
+    Dibuja los datos del paciente alineados exactamente sobre las líneas físicas
+    preimpresas inferiores del talonario (PACIENTE, EDAD, CED., FECHA).
+    """
+    p_info = _extract_patient_display_data(patient)
+    patient_name = p_info["name"]
+    doc_id = p_info["doc_id"] if p_info["has_doc"] else (f"Exp. #{getattr(patient, 'id', '')}" if getattr(patient, 'id', None) else "S/D")
+    age_str = p_info["age_str"]
+    fecha_str = custom_date_str or datetime.now().strftime("%d/%m/%Y")
+
+    # 1. Línea PACIENTE (preimpresa a ~178.5 mm desde arriba)
+    f_p = fields.get("patient_name", {})
+    p_x = float(f_p.get("x", 28.0)) * mm
+    p_size = float(f_p.get("fontSize", 10.5))
+    p_y = to_rl_y(float(f_p.get("y", 178.5)), p_size)
+    c.setFont("Helvetica-Bold", p_size)
+    c.setFillColor(colors.HexColor("#0f172a"))
+    c.drawString(p_x, p_y, str(patient_name))
+
+    # 2. Línea EDAD / CED. / FECHA (preimpresa a ~187.0 mm desde arriba)
+    f_age = fields.get("age", {})
+    age_size = float(f_age.get("fontSize", 10.0))
+    c.setFont("Helvetica", age_size)
+    c.drawString(float(f_age.get("x", 16.0)) * mm, to_rl_y(float(f_age.get("y", 187.0)), age_size), str(age_str))
+
+    f_id = fields.get("id_card", {})
+    id_size = float(f_id.get("fontSize", 10.0))
+    c.setFont("Helvetica", id_size)
+    c.drawString(float(f_id.get("x", 52.0)) * mm, to_rl_y(float(f_id.get("y", 187.0)), id_size), str(doc_id))
+
+    f_dt = fields.get("date", {})
+    dt_size = float(f_dt.get("fontSize", 10.0))
+    c.setFont("Helvetica", dt_size)
+    c.drawString(float(f_dt.get("x", 102.0)) * mm, to_rl_y(float(f_dt.get("y", 187.0)), dt_size), str(fecha_str))
+
+
+def generate_talonario_overlay_pdf(patient, prescription_text: str, setting=None, patient_instructions: str = None) -> io.BytesIO:
     """
     Genera un PDF de posicionamiento exacto para imprimir encima del talonario
-    preimpreso del Dr. Carlos M. Heredia (21.7 × 13.6 cm).
-
-    El talonario ya tiene el membrete, el símbolo Rp. y las líneas PACIENTE/EDAD/CED/FECHA.
-    Este PDF solo coloca los datos de texto en coordenadas absolutas que coinciden
-    con esos campos impresos en el papel físico.
-
-    Coordenadas medidas desde la esquina inferior-izquierda del papel (sistema ReportLab):
-        y=0 es el fondo del papel, y=PAGE_H es la parte superior.
+    preimpreso del Dr. Carlos M. Heredia (13.6 × 21.7 cm, Media Carta Vertical).
+    Utiliza las coordenadas y márgenes calibrados de print_config_service.
     """
-    # Tamaño real del talonario en puntos (1mm = 2.8346 pt)
-    PAGE_W = 21.7 * mm
-    PAGE_H = 13.6 * mm   # <- se ajusta a cm; ReportLab trabaja en puntos (1cm = 28.35pt)
-
-    # Corregido a puntos reales:
-    PAGE_W_pt = 217 * mm   # 21.7 cm -> 217 mm -> en puntos
-    PAGE_H_pt = 136 * mm   # 13.6 cm -> 136 mm -> en puntos
+    page_w_mm, page_h_mm, fields, to_rl_y = _get_calibrated_talonario_params()
 
     buffer = io.BytesIO()
-    c = rl_canvas.Canvas(buffer, pagesize=(PAGE_W_pt, PAGE_H_pt))
+    c = rl_canvas.Canvas(buffer, pagesize=(page_w_mm * mm, page_h_mm * mm))
 
-    # ── Datos del paciente ─────────────────────────────────────────────────────
-    p = patient
-    patient_name = str(f"{p.first_name or ''} {p.last_name or ''}".strip() or "Paciente") if p else "Paciente"
-    doc_id = str(getattr(p, "document_id", None) or "N/D")
-    today = datetime.now()
-    fecha_str = today.strftime("%d/%m/%Y")
+    # ── Datos del paciente en el pie preimpreso ───────────────────────────────
+    _draw_talonario_patient_footer(c, patient, fields, to_rl_y)
 
-    # Calcular edad
-    age_str = ""
-    birth = getattr(p, "date_of_birth", None) or getattr(p, "birth_date", None)
-    if birth:
-        try:
-            if isinstance(birth, str):
-                birth = datetime.strptime(birth, "%Y-%m-%d").date()
-            td = today.date() if hasattr(today, "date") else today
-            age = td.year - birth.year - ((td.month, td.day) < (birth.month, birth.day))
-            age_str = str(age)
-        except Exception:
-            age_str = ""
+    # ── ZONA Rp. — Cuerpo de la prescripción e indicaciones para el paciente ───
+    f_rx = fields.get("medications", {})
+    rx_x = float(f_rx.get("x", 16.0)) * mm
+    rx_font_size = float(f_rx.get("fontSize", 9.5))
+    rx_y_top = to_rl_y(float(f_rx.get("y", 72.0)), rx_font_size)
+    rx_max_w = float(f_rx.get("width", 108.0)) * mm
+    rx_line_h = rx_font_size * 0.3528 * 1.45 * mm
+    pat_y = float(fields.get("patient_name", {}).get("y", 178.5))
+    stop_y_bottom = to_rl_y(pat_y - 8.0, rx_font_size)
 
-    # ── Configuración de fuentes ───────────────────────────────────────────────
-    c.setFont("Helvetica", 9)
+    # Combinar prescripción con indicaciones del paciente (si existen en la consulta)
+    full_body = (prescription_text or "").strip()
+    if patient_instructions and patient_instructions.strip():
+        if full_body:
+            full_body += "\n\nINDICACIONES:\n" + patient_instructions.strip()
+        else:
+            full_body = "INDICACIONES:\n" + patient_instructions.strip()
+
+    c.setFont("Helvetica", rx_font_size)
     c.setFillColor(colors.HexColor("#1e293b"))
 
-    # ── ZONA Rp. — Cuerpo de la prescripción ──────────────────────────────────
-    # El área en blanco del talonario va desde ~95mm hasta ~55mm del fondo
-    # (medida desde abajo: entre y=55mm y y=95mm del papel de 136mm de alto)
-    rx_x = 12 * mm        # margen izquierdo del área Rp.
-    rx_y_top = 95 * mm    # posición Y superior del área de prescripción
-    rx_line_h = 5 * mm    # interlineado entre líneas de texto
-    rx_max_w = PAGE_W_pt - (rx_x + 8 * mm)   # ancho máximo del texto
-
-    c.setFont("Helvetica", 9)
-    lines = (prescription_text or "").split("\n")
     y_cursor = rx_y_top
-    for line in lines:
-        if y_cursor < 57 * mm:   # no sobrepasar la línea PACIENTE
+    for raw_line in full_body.splitlines():
+        if y_cursor < stop_y_bottom:
             break
-        # Salto de línea automático si la línea es larga
+
+        line = raw_line.rstrip()
+        if not line:
+            y_cursor -= (rx_line_h * 0.7)
+            continue
+
+        is_heading = line.startswith("INDICACIONES:") or line.startswith("Rp.")
+        if is_heading:
+            c.setFont("Helvetica-Bold", rx_font_size)
+            c.setFillColor(colors.HexColor("#0f766e"))
+        else:
+            c.setFont("Helvetica", rx_font_size)
+            c.setFillColor(colors.HexColor("#0f172a"))
+
         words = line.split(" ")
-        current_line = ""
+        current_chunk = ""
         for word in words:
-            test = f"{current_line} {word}".strip()
-            if c.stringWidth(test, "Helvetica", 9) < rx_max_w:
-                current_line = test
+            test_line = f"{current_chunk} {word}".strip()
+            if c.stringWidth(test_line, "Helvetica", rx_font_size) < rx_max_w:
+                current_chunk = test_line
             else:
-                if current_line:
-                    c.drawString(rx_x, y_cursor, str(current_line or ""))
+                if current_chunk:
+                    c.drawString(rx_x, y_cursor, current_chunk)
                     y_cursor -= rx_line_h
-                    if y_cursor < 57 * mm:
+                    if y_cursor < stop_y_bottom:
                         break
-                current_line = word
-        if current_line and y_cursor >= 57 * mm:
-            c.drawString(rx_x, y_cursor, str(current_line or ""))
+                current_chunk = word
+        if current_chunk and y_cursor >= stop_y_bottom:
+            c.drawString(rx_x, y_cursor, current_chunk)
             y_cursor -= rx_line_h
-
-    # ── LÍNEA PACIENTE ─────────────────────────────────────────────────────────
-    # En el talonario: "PACIENTE: _______________"
-    # La línea está a ~22mm del fondo del papel (y=22mm desde abajo)
-    c.setFont("Helvetica", 9)
-    c.drawString(28 * mm, 22 * mm, str(patient_name or ""))
-
-    # ── LÍNEA EDAD / CED. / FECHA ──────────────────────────────────────────────
-    # "EDAD: ___ CED.: ___________________ FECHA: ___________"
-    # La línea está a ~12mm del fondo
-    c.drawString(15 * mm, 12 * mm, str(age_str or ""))        # valor de EDAD
-    c.drawString(50 * mm, 12 * mm, str(doc_id or ""))          # valor de CED.
-    c.drawString(140 * mm, 12 * mm, str(fecha_str or ""))      # valor de FECHA
 
     c.save()
     buffer.seek(0)
     return buffer
 
 
+def generate_medical_license_talonario_pdf(license_obj, setting=None) -> io.BytesIO:
+    """
+    Genera un PDF de posicionamiento exacto para imprimir una Licencia Médica / Certificado
+    de Reposo sobre la misma hoja física del talonario preimpreso (13.6 × 21.7 cm).
+    """
+    page_w_mm, page_h_mm, fields, to_rl_y = _get_calibrated_talonario_params()
+
+    buffer = io.BytesIO()
+    c = rl_canvas.Canvas(buffer, pagesize=(page_w_mm * mm, page_h_mm * mm))
+
+    # Pie del talonario
+    start_d_str = license_obj.start_date.strftime("%d/%m/%Y") if getattr(license_obj, "start_date", None) else datetime.now().strftime("%d/%m/%Y")
+    _draw_talonario_patient_footer(c, getattr(license_obj, "patient", None), fields, to_rl_y, custom_date_str=start_d_str)
+
+    # Cuerpo de la Licencia en el área central útil del talonario
+    f_rx = fields.get("medications", {})
+    rx_x = float(f_rx.get("x", 16.0)) * mm
+    rx_max_w = float(f_rx.get("width", 108.0)) * mm
+    y_cursor = to_rl_y(float(f_rx.get("y", 72.0)), 10.0)
+    pat_y = float(fields.get("patient_name", {}).get("y", 178.5))
+    stop_y_bottom = to_rl_y(pat_y - 8.0, 10.0)
+
+    # Título distintivo de la certificación médica
+    c.setFont("Helvetica-Bold", 10.0)
+    c.setFillColor(colors.HexColor("#0f766e"))
+    c.drawString(rx_x, y_cursor, "CERTIFICADO MÉDICO")
+    y_cursor -= 5.5 * mm
+
+    # Formateo de fechas
+    end_d_str = license_obj.end_date.strftime("%d/%m/%Y") if license_obj.end_date else ""
+    periodo_str = f"Del {start_d_str} al {end_d_str}" if end_d_str else f"A partir de {start_d_str}"
+
+    sections = [
+        ("DIAGNÓSTICO:", str(license_obj.diagnosis or "Evaluación médica general")),
+        ("DÍAS DE REPOSO:", f"{license_obj.days_rest} días ({periodo_str})"),
+    ]
+    if license_obj.workplace_or_school:
+        sections.append(("DIRIGIDO A:", str(license_obj.workplace_or_school)))
+    if license_obj.notes:
+        sections.append(("RECOMENDACIONES:", str(license_obj.notes)))
+
+    c.setFont("Helvetica", 8.5)
+    line_h = 4.2 * mm
+
+    for label, text in sections:
+        if y_cursor < stop_y_bottom:
+            break
+        c.setFont("Helvetica-Bold", 8.5)
+        c.setFillColor(colors.HexColor("#0f766e"))
+        c.drawString(rx_x, y_cursor, label)
+        y_cursor -= line_h
+
+        c.setFont("Helvetica", 8.5)
+        c.setFillColor(colors.HexColor("#1e293b"))
+        for raw_line in text.splitlines():
+            words = raw_line.split(" ")
+            chunk = ""
+            for w in words:
+                test = f"{chunk} {w}".strip()
+                if c.stringWidth(test, "Helvetica", 8.5) < rx_max_w:
+                    chunk = test
+                else:
+                    if chunk:
+                        c.drawString(rx_x + 2.0 * mm, y_cursor, chunk)
+                        y_cursor -= line_h
+                        if y_cursor < stop_y_bottom:
+                            break
+                    chunk = w
+            if chunk and y_cursor >= stop_y_bottom:
+                c.drawString(rx_x + 2.0 * mm, y_cursor, chunk)
+                y_cursor -= line_h
+        y_cursor -= 1.5 * mm
+
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+def generate_medical_reference_talonario_pdf(reference_obj, setting=None) -> io.BytesIO:
+    """
+    Genera un PDF de posicionamiento exacto para imprimir una Carta de Referencia / Interconsulta
+    sobre la misma hoja física del talonario preimpreso (13.6 × 21.7 cm).
+    """
+    page_w_mm, page_h_mm, fields, to_rl_y = _get_calibrated_talonario_params()
+
+    buffer = io.BytesIO()
+    c = rl_canvas.Canvas(buffer, pagesize=(page_w_mm * mm, page_h_mm * mm))
+
+    # Pie del talonario
+    ref_d_str = reference_obj.created_at.strftime("%d/%m/%Y") if reference_obj.created_at else datetime.now().strftime("%d/%m/%Y")
+    _draw_talonario_patient_footer(c, reference_obj.patient, fields, to_rl_y, custom_date_str=ref_d_str)
+
+    # Cuerpo de la Referencia en el área central útil del talonario
+    f_rx = fields.get("medications", {})
+    rx_x = float(f_rx.get("x", 16.0)) * mm
+    rx_max_w = float(f_rx.get("width", 108.0)) * mm
+    y_cursor = to_rl_y(float(f_rx.get("y", 72.0)), 10.0)
+    stop_y_bottom = to_rl_y(float(fields.get("patient_name", {}).get("y", 178.5)) - 4.0, 10.0)
+
+    # Título distintivo de la referencia
+    c.setFont("Helvetica-Bold", 10.0)
+    c.setFillColor(colors.HexColor("#0f766e"))
+    c.drawString(rx_x, y_cursor, "CARTA DE REFERENCIA / INTERCONSULTA")
+    y_cursor -= 5.5 * mm
+
+    sections = [
+        ("DIRIGIDO A:", str(reference_obj.referred_to_doctor_or_specialty or "Especialista tratante")),
+    ]
+    if reference_obj.institution:
+        sections.append(("INSTITUCIÓN / CENTRO:", str(reference_obj.institution)))
+    sections.append(("MOTIVO DE REFERENCIA:", str(reference_obj.reason_for_referral or "")))
+    if reference_obj.clinical_summary:
+        sections.append(("RESUMEN CLÍNICO:", str(reference_obj.clinical_summary)))
+    if reference_obj.notes:
+        sections.append(("NOTAS ADICIONALES:", str(reference_obj.notes)))
+
+    c.setFont("Helvetica", 8.5)
+    line_h = 4.2 * mm
+
+    for label, text in sections:
+        if y_cursor < stop_y_bottom:
+            break
+        c.setFont("Helvetica-Bold", 8.5)
+        c.setFillColor(colors.HexColor("#0f766e"))
+        c.drawString(rx_x, y_cursor, label)
+        y_cursor -= line_h
+
+        c.setFont("Helvetica", 8.5)
+        c.setFillColor(colors.HexColor("#1e293b"))
+        for raw_line in text.splitlines():
+            words = raw_line.split(" ")
+            chunk = ""
+            for w in words:
+                test = f"{chunk} {w}".strip()
+                if c.stringWidth(test, "Helvetica", 8.5) < rx_max_w:
+                    chunk = test
+                else:
+                    if chunk:
+                        c.drawString(rx_x + 2.0 * mm, y_cursor, chunk)
+                        y_cursor -= line_h
+                        if y_cursor < stop_y_bottom:
+                            break
+                    chunk = w
+            if chunk and y_cursor >= stop_y_bottom:
+                c.drawString(rx_x + 2.0 * mm, y_cursor, chunk)
+                y_cursor -= line_h
+        y_cursor -= 1.5 * mm
+
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+
 def generate_lab_order_pdf(order, setting=None) -> io.BytesIO:
     """
-    Genera la Orden / Solicitud Oficial de Estudios de Laboratorio Clínico (Fase 3 v1.2.0).
+    Genera la Orden / Solicitud Oficial de Estudios de Laboratorio Clínico (Fase 3 v1.2.0),
+    respetando los márgenes configurados.
     """
+    pagesize, left_m, right_m, top_m, bottom_m, usable_w = _get_page_setup()
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=pagesize,
+        leftMargin=left_m,
+        rightMargin=right_m,
+        topMargin=top_m,
+        bottomMargin=bottom_m,
+    )
     styles = _get_styles()
     story = []
 
     # Membrete con logo opcional
-    _build_letterhead(story, styles, setting, subtitle_text="ORDEN DE ANÁLISIS CLÍNICOS")
+    _build_letterhead(story, styles, setting, subtitle_text="ORDEN DE ANÁLISIS CLÍNICOS", usable_width=usable_w)
 
     story.append(Paragraph("<font size=14 color='#0f766e'><b>SOLICITUD DE ESTUDIOS DE LABORATORIO</b></font>", styles["title"]))
     story.append(Spacer(1, 10))
 
-    patient = order.patient
-    p_name = f"{patient.last_name}, {patient.first_name}" if patient else "Paciente"
-    doc_id = getattr(patient, "document_id", "Sin DNI") or "Sin DNI"
-    allergies = getattr(patient, "allergies", "Ninguna") or "Ninguna"
-
-    # Cálculo o lectura de edad
-    age_str = "N/D"
-    if patient and getattr(patient, "date_of_birth", None):
-        try:
-            today = datetime.now().date()
-            dob = patient.date_of_birth
-            age_val = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-            age_str = f"{age_val} años"
-        except Exception:
-            age_str = "N/D"
-
-    gender = getattr(patient, "gender", "N/D") or "N/D"
-    insurance = getattr(patient, "insurance_name", "Privado") or "Privado"
-    ins_num = getattr(patient, "insurance_number", "") or ""
-    insurance_full = f"{insurance} (No. {ins_num})" if ins_num else insurance
-
-    order_date_str = order.order_date.strftime("%d/%m/%Y") if order.order_date else datetime.now().strftime("%d/%m/%Y")
+    patient = getattr(order, "patient", None)
+    p_info = _extract_patient_display_data(patient)
+    order_date_str = order.order_date.strftime("%d/%m/%Y") if getattr(order, "order_date", None) else datetime.now().strftime("%d/%m/%Y")
 
     # Ficha de identificación del paciente y solicitud
     patient_info = [
         [
-            Paragraph(f"<b>Paciente:</b> {p_name}", styles["body"]),
-            Paragraph(f"<b>Cédula / DNI:</b> {doc_id}", styles["body"]),
+            Paragraph(f"<b>Paciente:</b> {p_info['name']}", styles["body"]),
+            Paragraph(f"<b>Cédula / DNI:</b> {p_info['doc_id']}", styles["body"]),
         ],
         [
-            Paragraph(f"<b>Edad / Sexo:</b> {age_str} / {gender}", styles["body"]),
-            Paragraph(f"<b>ARS / Seguro:</b> {insurance_full}", styles["body"]),
+            Paragraph(f"<b>Edad / Sexo:</b> {p_info['age_str'] or 'N/D'} / {p_info['gender'] or 'N/D'}", styles["body"]),
+            Paragraph(f"<b>ARS / Seguro:</b> {p_info['insurance_badge']}", styles["body"]),
         ],
         [
             Paragraph(f"<b>Fecha de Solicitud:</b> {order_date_str}", styles["body"]),
-            Paragraph(f"<b>Alergias Conocidas:</b> <font color='#b91c1c'><b>{allergies}</b></font>", styles["body"]),
+            Paragraph(f"<b>Alergias Conocidas:</b> <font color='#b91c1c'><b>{p_info['allergies']}</b></font>", styles["body"]),
         ]
     ]
 
-    p_table = Table(patient_info, colWidths=[3.7 * inch, 3.3 * inch])
+    p_table = Table(patient_info, colWidths=[usable_w * 0.52, usable_w * 0.48])
     p_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), BG_LIGHT),
         ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
@@ -1184,7 +1610,7 @@ def generate_lab_order_pdf(order, setting=None) -> io.BytesIO:
         ('RIGHTPADDING', (0, 0), (-1, -1), 8),
     ]))
     story.append(p_table)
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 12))
 
     # Indicación clínica / Diagnóstico presuntivo
     if order.clinical_indication and order.clinical_indication.strip():
@@ -1413,15 +1839,59 @@ TALONARIO_LAB_COORDS = {
     "Hormona Antimuleriana": (95.3, 60.7),
     "PAPP-A": (95.3, 57.5),
 
-    # ── COLUMNA 3: SONOGRAFÍA (8 items) ──
+    # ── COLUMNA 3: SONOGRAFÍA E IMÁGENES (12 items y variantes) ──
     "Pélvica": (95.3, 48.5),
+    "Sonografía Pélvica": (95.3, 48.5),
+    "Sonografia Pelvica": (95.3, 48.5),
+
     "Transvaginal": (95.3, 45.4),
+    "Sonografía Transvaginal": (95.3, 45.4),
+    "Sonografia Transvaginal": (95.3, 45.4),
+
     "Sonomamografía": (95.3, 42.4),
+    "Sonomamografia": (95.3, 42.4),
+    "Sonografía Mamaria": (95.3, 42.4),
+    "Sonografia Mamaria": (95.3, 42.4),
+
     "Obstetricia": (95.3, 39.3),
+    "Sonografía Obstétrica": (95.3, 39.3),
+    "Sonografia Obstetrica": (95.3, 39.3),
+    "Sonografía Obstetricia": (95.3, 39.3),
+    "Sonografia Obstetricia": (95.3, 39.3),
+
     "Abdominal": (95.3, 36.2),
+    "Sonografía Abdominal": (95.3, 36.2),
+    "Sonografia Abdominal": (95.3, 36.2),
+
     "Genética": (95.3, 33.1),
+    "Sonografía Genética": (95.3, 33.1),
+    "Sonografia Genetica": (95.3, 33.1),
+
     "Morfológica": (95.3, 30.1),
+    "Sonografía Morfológica": (95.3, 30.1),
+    "Sonografia Morfologica": (95.3, 30.1),
+
     "Perfil hemodinámico": (95.3, 27.0),
+    "Perfil hemodinamico": (95.3, 27.0),
+    "Sonografía Perfil Hemodinámico": (95.3, 27.0),
+    "Sonografia Perfil Hemodinamico": (95.3, 27.0),
+
+    "Doppler placentario": (95.3, 23.9),
+    "Doppler Placentario": (95.3, 23.9),
+    "Sonografía Doppler Placentario": (95.3, 23.9),
+    "Sonografia Doppler Placentario": (95.3, 23.9),
+
+    "Radiografía pélvica": (95.3, 20.8),
+    "Radiografía Pélvica": (95.3, 20.8),
+    "Radiografia Pelvica": (95.3, 20.8),
+
+    "Tomografía abdominal": (95.3, 17.7),
+    "Tomografía Abdominal": (95.3, 17.7),
+    "Tomografia Abdominal": (95.3, 17.7),
+
+    "Tomografía pelvica": (95.3, 14.6),
+    "Tomografía Pélvica": (95.3, 14.6),
+    "Tomografia Pelvica": (95.3, 14.6),
 }
 
 
@@ -1471,13 +1941,10 @@ def generate_lab_order_talonario_pdf(order, setting=None) -> io.BytesIO:
 
     # ── Datos del paciente ─────────────────────────────────────────────────────
     p = getattr(order, "patient", None)
-    if p:
-        p_name = f"{getattr(p, 'first_name', '') or ''} {getattr(p, 'last_name', '') or ''}".strip()
-        patient_name = p_name if p_name else "Paciente"
-        gender_raw = getattr(p, "gender", "") or ""
-    else:
-        patient_name = "Paciente"
-        gender_raw = ""
+    p_info = _extract_patient_display_data(p)
+    patient_name = p_info["name"]
+    age_str = p_info["age_str"]
+    gender_raw = p_info["gender"] or ""
 
     # Formateo de sexo (Femenino / Masculino)
     if str(gender_raw).upper() in ("F", "FEMENINO", "FEMALE"):
@@ -1493,19 +1960,6 @@ def generate_lab_order_talonario_pdf(order, setting=None) -> io.BytesIO:
         fecha_str = ord_date.strftime("%d/%m/%Y")
     else:
         fecha_str = datetime.now().strftime("%d/%m/%Y")
-
-    # Cálculo de edad
-    age_str = ""
-    birth = getattr(p, "date_of_birth", None) or getattr(p, "birth_date", None) if p else None
-    if birth:
-        try:
-            if isinstance(birth, str):
-                birth = datetime.strptime(birth, "%Y-%m-%d").date()
-            td = datetime.now().date()
-            age = td.year - birth.year - ((td.month, td.day) < (birth.month, birth.day))
-            age_str = f"{age} años"
-        except Exception:
-            age_str = ""
 
     # Parsear lista de análisis solicitados
     tests_list = []
@@ -1601,5 +2055,307 @@ def generate_lab_order_talonario_pdf(order, setting=None) -> io.BytesIO:
     c.save()
     buffer.seek(0)
     return buffer
+
+
+def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesIO:
+    """
+    Genera el Formulario Oficial Unificado de Historia Clínica y Pre-Autorización
+    para compañías aseguradoras (ARS SeNaSa, Humano, Universal, Mapfre, etc.)
+    en formato HOJA CARTA (Letter 8.5 × 11 pulg) conforme a los estándares de la Rep. Dominicana.
+    """
+    pagesize, left_m, right_m, top_m, bottom_m, usable_w = _get_page_setup()
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=pagesize,
+        leftMargin=left_m,
+        rightMargin=right_m,
+        topMargin=top_m,
+        bottomMargin=bottom_m,
+    )
+    styles = _get_styles()
+    story = []
+
+    # Membrete superior del médico y clínica
+    ars_title = str(getattr(auth_obj, "ars_name", "SEGURO NACIONAL DE SALUD (SeNaSa)")).upper()
+    _build_letterhead(story, styles, setting, subtitle_text=f"SOLICITUD DE COBERTURA • {ars_title}", usable_width=usable_w)
+
+    # Título Principal del Formulario
+    title_html = f"<font size=12 color='#0f766e'><b>{ars_title}</b></font><br/>" \
+                 f"<font size=11 color='#1e293b'><b>HISTORIA CLÍNICA & SOLICITUD DE PRE-AUTORIZACIÓN</b></font><br/>" \
+                 f"<font size=8 color='#64748b'><i>(Para fines de solicitud de procedimientos, cirugías electivas y estudios especiales)</i></font>"
+    story.append(Paragraph(title_html, ParagraphStyle("FormHeader", parent=styles["body"], alignment=1, leading=14)))
+    story.append(Spacer(1, 8))
+
+    patient = getattr(auth_obj, "patient", None)
+    p_info = _extract_patient_display_data(patient)
+
+    # Formateo de fecha de solicitud
+    req_date = getattr(auth_obj, "request_date", None)
+    if isinstance(req_date, (datetime, date)):
+        fecha_str = req_date.strftime("%d/%m/%Y")
+    else:
+        fecha_str = datetime.now().strftime("%d/%m/%Y")
+
+    # Datos del Afiliado / Póliza
+    nss_val = getattr(auth_obj, "affiliate_nss", None) or "N/D"
+    card_val = getattr(auth_obj, "affiliate_card_number", None) or p_info.get("insurance_badge", "N/D")
+    contr_val = getattr(auth_obj, "contract_number", None) or "N/D"
+    plan_val = getattr(auth_obj, "plan_type", None) or "Básico"
+    center_val = getattr(auth_obj, "health_center", None) or (getattr(setting, "clinic_name", "Centro Médico"))
+    traffic_acc = "SÍ" if getattr(auth_obj, "is_traffic_accident", False) else "NO"
+
+    # ── BLOQUE 1: DATOS GENERALES DEL AFILIADO Y SEGURO ────────────────────────
+    sec_cell_style = ParagraphStyle("SecTitle", parent=styles["body"], fontName="Helvetica-Bold", fontSize=8.5, leading=10, textColor=colors.HexColor("#0f766e"))
+    lbl_style = ParagraphStyle("FieldLbl", parent=styles["body"], fontName="Helvetica-Bold", fontSize=7.5, leading=9.5, textColor=colors.HexColor("#475569"))
+    val_style = ParagraphStyle("FieldVal", parent=styles["body"], fontName="Helvetica", fontSize=8.0, leading=10, textColor=colors.HexColor("#0f172a"))
+    val_bold = ParagraphStyle("FieldValBold", parent=styles["body"], fontName="Helvetica-Bold", fontSize=8.0, leading=10, textColor=colors.HexColor("#0f172a"))
+
+    p_table_data = [
+        [
+            Paragraph("<b>I. DATOS DEL AFILIADO Y PÓLIZA</b>", sec_cell_style),
+            Paragraph(f"<b>Fecha Solicitud:</b> {fecha_str}", lbl_style),
+            Paragraph(f"<b>Accidente de Tránsito:</b> <b>{traffic_acc}</b>", lbl_style),
+        ],
+        [
+            Paragraph(f"<b>Nombre del Afiliado:</b><br/>{p_info['name']}", val_bold),
+            Paragraph(f"<b>Cédula / DNI:</b><br/>{p_info['doc_id']}", val_style),
+            Paragraph(f"<b>NSS (Seguridad Social):</b><br/>{nss_val}", val_style),
+        ],
+        [
+            Paragraph(f"<b>No. Carnet / Póliza:</b><br/>{card_val}", val_style),
+            Paragraph(f"<b>Contrato No. / Plan:</b><br/>{contr_val} • {plan_val}", val_style),
+            Paragraph(f"<b>Edad / Sexo:</b><br/>{p_info['age_str'] or 'N/D'} / {p_info['gender'] or 'N/D'}", val_style),
+        ],
+        [
+            Paragraph(f"<b>Teléfonos:</b><br/>{p_info['phone']}", val_style),
+            Paragraph(f"<b>Centro donde se realizará:</b><br/>{center_val}", val_style),
+            Paragraph(f"<b>Alergias Conocidas:</b><br/><font color='#b91c1c'>{p_info['allergies']}</font>", val_style),
+        ]
+    ]
+
+    p_table = Table(p_table_data, colWidths=[usable_w * 0.40, usable_w * 0.32, usable_w * 0.28])
+    p_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), BG_LIGHT),
+        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ('SPAN', (0, 0), (0, 0)),
+    ]))
+    story.append(p_table)
+    story.append(Spacer(1, 6))
+
+    # ── BLOQUE 2: HISTORIA DE LA ENFERMEDAD ACTUAL & SÍNTOMAS ─────────────────
+    onset_date = getattr(auth_obj, "symptoms_onset_date", None) or "No especificado"
+    cur_history = getattr(auth_obj, "current_illness_history", None) or "Sin registro de cuadro clínico actual."
+
+    illness_data = [
+        [
+            Paragraph("<b>II. HISTORIA DE LA ENFERMEDAD ACTUAL</b>", sec_cell_style),
+            Paragraph(f"<b>¿Desde qué fecha iniciaron los síntomas?:</b> <b>{onset_date}</b>", lbl_style),
+        ],
+        [
+            Paragraph(cur_history.replace("\n", "<br/>"), val_style),
+            Paragraph("", val_style),
+        ]
+    ]
+    illness_table = Table(illness_data, colWidths=[usable_w * 0.60, usable_w * 0.40])
+    illness_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
+        ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.HexColor("#e2e8f0")),
+        ('SPAN', (0, 1), (1, 1)),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(illness_table)
+    story.append(Spacer(1, 6))
+
+    # ── BLOQUE 3: ANTECEDENTES Y ESTUDIOS ESPECIALES (2 COLUMNAS) ──────────────
+    pers_fam = getattr(auth_obj, "personal_family_history", None) or "Sin antecedentes relevantes reportados."
+    labs_studies = getattr(auth_obj, "diagnostic_tests", None) or "Ver resultados anexos al expediente."
+
+    ant_data = [
+        [
+            Paragraph("<b>III. ANTECEDENTES PERSONALES Y FAMILIARES</b>", sec_cell_style),
+            Paragraph("<b>IV. LABORATORIOS Y ESTUDIOS REALIZADOS</b>", sec_cell_style),
+        ],
+        [
+            Paragraph(pers_fam.replace("\n", "<br/>"), val_style),
+            Paragraph(labs_studies.replace("\n", "<br/>"), val_style),
+        ]
+    ]
+    ant_table = Table(ant_data, colWidths=[usable_w * 0.50, usable_w * 0.50])
+    ant_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(ant_table)
+    story.append(Spacer(1, 6))
+
+    # ── BLOQUE 4: DIAGNÓSTICOS (PRESUNTIVO Y DEFINITIVO CIE-10) ───────────────
+    dx_pres = getattr(auth_obj, "presumptive_diagnosis", None) or "En estudio"
+    dx_def = getattr(auth_obj, "definitive_diagnosis", None) or "Sin diagnóstico definitivo registrado"
+    sec_dx = getattr(auth_obj, "secondary_diagnoses", None) or ""
+
+    dx_rows = [
+        [
+            Paragraph("<b>V. DIAGNÓSTICOS CLÍNICOS</b>", sec_cell_style),
+            Paragraph("", val_style)
+        ],
+        [
+            Paragraph("<b>Diagnóstico Presuntivo:</b>", lbl_style),
+            Paragraph(str(dx_pres), val_bold),
+        ],
+        [
+            Paragraph("<b>Diagnóstico Definitivo (CIE-10):</b>", lbl_style),
+            Paragraph(f"<font color='#0f766e'><b>{dx_def}</b></font>", val_bold),
+        ]
+    ]
+    if sec_dx and str(sec_dx).strip():
+        dx_rows.append([
+            Paragraph("<b>Otros Diagnósticos:</b>", lbl_style),
+            Paragraph(str(sec_dx).replace("\n", " • "), val_style),
+        ])
+
+    dx_table = Table(dx_rows, colWidths=[usable_w * 0.30, usable_w * 0.70])
+    dx_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), BG_LIGHT),
+        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+        ('SPAN', (0, 0), (1, 0)),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(dx_table)
+    story.append(Spacer(1, 6))
+
+    # ── BLOQUE 5: PROCEDIMIENTOS SOLICITADOS (CÓDIGOS SIMON / CUPS) ────────────
+    story.append(Paragraph("<b>VI. NOMBRE DEL (LOS) PROCEDIMIENTO(S) SOLICITADO(S)</b>", sec_cell_style))
+    story.append(Spacer(1, 2))
+
+    # Parsear procedimientos desde JSON o texto
+    raw_proc = getattr(auth_obj, "procedures_json", None) or ""
+    proc_list = []
+    if raw_proc and str(raw_proc).strip().startswith("["):
+        try:
+            parsed = json.loads(raw_proc)
+            if isinstance(parsed, list):
+                proc_list = parsed
+        except Exception:
+            pass
+
+    if not proc_list and raw_proc:
+        for idx, line in enumerate(str(raw_proc).splitlines()):
+            if line.strip():
+                proc_list.append({"code": "", "procedure": line.strip()})
+
+    proc_table_rows = [
+        [
+            Paragraph("<b>Item</b>", lbl_style),
+            Paragraph("<b>Código SIMON / CUP</b>", lbl_style),
+            Paragraph("<b>Descripción del Procedimiento / Cirugía</b>", lbl_style),
+        ]
+    ]
+
+    if proc_list:
+        for idx, item in enumerate(proc_list):
+            c_code = item.get("code", "") if isinstance(item, dict) else ""
+            c_name = item.get("procedure", "") if isinstance(item, dict) else str(item)
+            proc_table_rows.append([
+                Paragraph(f"{idx + 1}.", val_bold),
+                Paragraph(f"<font color='#0f766e'><b>{c_code or '---'}</b></font>", val_bold),
+                Paragraph(str(c_name), val_style),
+            ])
+    else:
+        proc_table_rows.append([
+            Paragraph("1.", val_bold),
+            Paragraph("---", val_style),
+            Paragraph("Procedimiento clínico conforme a indicación médica adjunta.", val_style),
+        ])
+
+    proc_table = Table(proc_table_rows, colWidths=[usable_w * 0.08, usable_w * 0.27, usable_w * 0.65])
+    proc_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(proc_table)
+    story.append(Spacer(1, 6))
+
+    # ── BLOQUE 6: TRATAMIENTO Y OBSERVACIONES ──────────────────────────────────
+    treatment_val = getattr(auth_obj, "treatment_plan", None) or ""
+    notes_val = getattr(auth_obj, "notes", None) or ""
+
+    if (treatment_val and treatment_val.strip()) or (notes_val and notes_val.strip()):
+        tx_data = [
+            [Paragraph("<b>VII. TRATAMIENTO PROPUESTO Y OBSERVACIONES</b>", sec_cell_style)],
+        ]
+        comb_tx = ""
+        if treatment_val.strip():
+            comb_tx += f"<b>Plan Terapéutico:</b> {treatment_val.strip()}<br/>"
+        if notes_val.strip():
+            comb_tx += f"<b>Observaciones:</b> {notes_val.strip()}"
+        tx_data.append([Paragraph(comb_tx, val_style)])
+
+        tx_table = Table(tx_data, colWidths=[usable_w])
+        tx_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(tx_table)
+        story.append(Spacer(1, 8))
+
+    # ── BLOQUE 7: FIRMA Y SELLO DEL MÉDICO TRATANTE ────────────────────────────
+    doc_user = getattr(auth_obj, "doctor", None)
+    doc_name = getattr(doc_user, "name", None) or getattr(setting, "doctor_name", "Dr. Carlos M. Heredia")
+    doc_spec = getattr(doc_user, "specialty", None) or getattr(setting, "specialty", "Ginecología y Obstetricia")
+    doc_code = getattr(auth_obj, "doctor_code", None) or getattr(setting, "exequatur", "24241")
+
+    sig_data = [
+        [
+            Paragraph(f"<b>Fecha de Emisión:</b> {fecha_str}<br/><b>Centro:</b> {center_val}", val_style),
+            Paragraph("____________________________________________<br/>"
+                      f"<b>{doc_name}</b><br/>"
+                      f"<font size=7.5 color='#475569'>{doc_spec}</font><br/>"
+                      f"<font size=7.5 color='#0f766e'><b>Exequátur / Cód. Médico: {doc_code}</b></font><br/>"
+                      "<font size=7 color='#64748b'>Firma y Sello del Médico Tratante</font>",
+                      ParagraphStyle("SigBlock", parent=styles["body"], alignment=1, leading=10))
+        ]
+    ]
+    sig_table = Table(sig_data, colWidths=[usable_w * 0.45, usable_w * 0.55])
+    sig_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    story.append(KeepTogether([sig_table]))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
 
 

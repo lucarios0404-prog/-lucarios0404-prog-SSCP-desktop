@@ -34,21 +34,50 @@
 
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
                     <form id="quick-rx-form" method="post" action="/prescriptions/quick" class="space-y-6">
-                        <!-- Selección de Paciente -->
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                Seleccionar Paciente <span class="text-red-500">*</span>
-                            </label>
-                            <select id="patient_id" name="patient_id" required onchange="handlePatientChange(this)"
-                                class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500">
-                                <option value="">-- Seleccione un paciente --</option>
-                                {% for p in patients %}
-                                <option value="{{ p.id }}" data-allergies="{{ p.allergies or '' }}" {% if selected_patient and selected_patient.id == p.id %}selected{% endif %}>
-                                    {{ p.first_name }} {{ p.last_name }} (DNI: {{ p.document_id or 'N/D' }}) {% if p.allergies %}⚠️ Alergias: {{ p.allergies }}{% endif %}
-                                </option>
-                                {% endfor %}
-                            </select>
-                            <div id="patient-allergies-badge" class="mt-2 text-xs text-slate-600 font-medium"></div>
+                        <!-- Selección de Paciente con Live Search -->
+                        <div class="patient-live-search-container space-y-2">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                    Seleccionar Paciente <span class="text-red-500">*</span>
+                                </label>
+                                <span class="text-[11px] text-teal-600 font-semibold flex items-center gap-1">
+                                    <i class="fas fa-bolt text-amber-500 text-[10px]"></i> Búsqueda en vivo (Escribe para buscar)
+                                </span>
+                            </div>
+
+                            <!-- Campo de Búsqueda Rápida en Vivo -->
+                            <div class="relative">
+                                <div class="relative flex items-center">
+                                    <span class="absolute left-3.5 text-slate-400 pointer-events-none">
+                                        <i class="fas fa-search text-xs"></i>
+                                    </span>
+                                    <input type="text" autocomplete="off"
+                                        placeholder="Escribe nombre, cédula (ej. 001-...) o teléfono..."
+                                        class="patient-search-input w-full pl-9 pr-10 py-2.5 text-sm border border-slate-300 rounded-xl bg-slate-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 text-slate-900 placeholder-slate-400 font-medium transition-all shadow-2xs">
+                                    <button type="button" class="patient-search-clear hidden absolute right-3 text-slate-400 hover:text-slate-600 p-1">
+                                        <i class="fas fa-times-circle text-sm"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Dropdown flotante con resultados instantáneos -->
+                                <div class="patient-search-dropdown hidden absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
+                                    <div class="patient-search-results p-1.5 space-y-1"></div>
+                                </div>
+                            </div>
+
+                            <!-- Selector tradicional sincronizado -->
+                            <div class="pt-0.5">
+                                <select id="patient_id" name="patient_id" required onchange="handlePatientChange(this)"
+                                    class="patient-target-select w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 text-slate-700 bg-white">
+                                    <option value="">-- O seleccionar manualmente de la lista --</option>
+                                    {% for p in patients %}
+                                    <option value="{{ p.id }}" data-name="{{ p.first_name }} {{ p.last_name }}" data-doc="{{ p.document_id or '' }}" data-allergies="{{ p.allergies or '' }}" {% if selected_patient and selected_patient.id == p.id %}selected{% endif %}>
+                                        {{ p.first_name }} {{ p.last_name }} (DNI: {{ p.document_id or 'N/D' }}) {% if p.allergies %}⚠️ Alergias: {{ p.allergies }}{% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div id="patient-allergies-badge" class="mt-1 text-xs text-slate-600 font-medium"></div>
                         </div>
 
                         <!-- Selector de Plantillas Clínicas -->
@@ -94,10 +123,17 @@
                         </div>
 
                         <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 flex-wrap">
+                            <!-- Botón: Calibrador de Talonario -->
+                            <button type="button" onclick="openCalibrator()"
+                                class="py-3 px-4 rounded-xl border border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5"
+                                title="Abre el calibrador interactivo de márgenes y coordenadas del talonario (Ctrl+Alt+M)">
+                                <i class="fas fa-sliders-h text-violet-600"></i>
+                                <span>Calibrar Talonario</span>
+                            </button>
                             <!-- Botón: Imprimir en Talonario Preimpreso -->
                             <button type="button" onclick="submitTalonario()"
                                 class="py-3 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-lg shadow-blue-600/25 transition-all flex items-center gap-2"
-                                title="Genera un PDF del tamaño exacto del talonario preimpreso. Solo imprime los datos sobre el papel físico.">
+                                title="Genera un PDF del tamaño exacto del talonario preimpreso (13.6 × 21.7 cm). Solo imprime los datos sobre el papel físico.">
                                 <i class="fas fa-file-medical"></i>
                                 <span>Imprimir en Talonario</span>
                             </button>
@@ -156,6 +192,16 @@ function submitTalonario() {
     document.body.appendChild(form);
     form.submit();
     document.body.removeChild(form);
+}
+
+function openCalibrator() {
+    if (window.electronAPI && window.electronAPI.openPrintConfigurator) {
+        window.electronAPI.openPrintConfigurator();
+    } else if (window.sscpElectron && window.sscpElectron.openPrintConfigurator) {
+        window.sscpElectron.openPrintConfigurator();
+    } else {
+        alert('Para abrir el Calibrador interactivo, presiona Ctrl+Alt+M o usa el menú Archivo > Configurar Márgenes de Impresión.');
+    }
 }
 
 function handlePatientChange(select) {
