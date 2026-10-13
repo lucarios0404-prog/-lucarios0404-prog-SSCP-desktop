@@ -64,7 +64,7 @@
                             </div>
                             <div>
                                 <h2 class="text-base font-bold text-slate-900">Sincronización Directa de Estaciones (P2P)</h2>
-                                <p class="text-xs text-slate-500">Replica pacientes, citas, pagos y órdenes de laboratorio entre el Doctor y la Secretaría en Red Local / Tailscale.</p>
+                                <p class="text-xs text-slate-500">Replica pacientes, citas, pagos y órdenes de laboratorio entre el Doctor y la Secretaría en Red Local / Cloud Relay.</p>
                             </div>
                         </div>
                         <div>
@@ -93,7 +93,7 @@
                             <span class="font-mono font-bold text-indigo-700 text-xs truncate block" id="peer-station-display">
                                 {{ setting.central_station_url if setting and setting.central_station_url else "No configurada (Ir a Ajustes)" }}
                             </span>
-                            <span class="text-[10px] text-slate-400 block">IP de red local o Tailscale con puerto :8080</span>
+                            <span class="text-[10px] text-slate-400 block">IP de red local con puerto :8080 o canal Cloud Relay</span>
                         </div>
                         <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
                             <span class="text-slate-500 block text-[10px] font-bold uppercase">Estado de Enlace Par</span>
@@ -160,7 +160,7 @@
                                 <i class="fas fa-tablet-screen-button text-lg"></i>
                             </div>
                             <h2 class="text-base font-bold text-slate-900">Enlace con Tablets y Celulares</h2>
-                            <p class="text-xs text-slate-500 mt-1">Conecta cualquier Tablet (iPad / Android) o teléfono en el consultorio a esta computadora física sin necesidad de Tailscale ni servidores en la nube.</p>
+                            <p class="text-xs text-slate-500 mt-1">Conecta cualquier Tablet (iPad / Android) o teléfono en el consultorio a esta computadora física de forma instantánea vía Wi-Fi o Cloud Relay.</p>
                             
                             <div class="mt-4 p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-2">
                                 <div class="flex items-center justify-between">
@@ -229,21 +229,21 @@
                     </div>
                 </div>
 
-                <!-- Arquitectura Multi-Sede & Red Privada Tailscale -->
+                <!-- Arquitectura de Red & Enlace Seguro Cloud Relay -->
                 <div class="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-2xl p-6 text-white shadow-md border border-slate-800">
                     <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                         <div class="space-y-1">
                             <div class="inline-flex items-center space-x-2 px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[11px] font-bold">
                                 <i class="fas fa-network-wired"></i>
-                                <span>Multi-Sede Mesh (Tailscale VPN)</span>
+                                <span>Enlace Clínico Seguro (Red Local &amp; Cloud Relay)</span>
                             </div>
                             <h3 class="text-base font-bold">Nodo Clínico: {{ stats.sede_name }}</h3>
                             <p class="text-xs text-slate-300">Sincronización P2P cifrada de extremo a extremo sin exponer puertos en internet.</p>
                         </div>
                         <div class="flex items-center space-x-4">
                             <div class="bg-slate-800/80 px-3.5 py-2 rounded-xl border border-slate-700 text-xs">
-                                <span class="text-slate-400 block text-[10px] uppercase font-bold">IP Tailscale Local</span>
-                                <span class="font-mono text-emerald-400 font-bold">{{ setting.tailscale_ip if setting and setting.tailscale_ip else "100.x.x.x (No asignada)" }}</span>
+                                <span class="text-slate-400 block text-[10px] uppercase font-bold">Canal Cloud Relay</span>
+                                <span class="font-mono text-emerald-400 font-bold">{{ setting.relay_channel_id if setting and setting.relay_channel_id else "dr_carlos_heredia" }}</span>
                             </div>
                             <div class="bg-slate-800/80 px-3.5 py-2 rounded-xl border border-slate-700 text-xs">
                                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Frecuencia Auto-Sync</span>

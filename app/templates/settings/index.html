@@ -541,26 +541,25 @@
                                             <span class="text-slate-400 block font-medium">IP en Red Local (Wi-Fi):</span>
                                             <code class="text-xs font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">http://{{ local_ip }}:8080</code>
                                         </div>
-                                        {% if tailscale_ip %}
-                                        <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
+                                        <!-- Enlace Cloud Relay (Recomendado 24/7) -->
+                                        <div class="p-2.5 bg-sky-50 border border-sky-200 rounded-xl space-y-1">
                                             <div class="flex items-center justify-between">
-                                                <span class="text-[10px] font-bold text-emerald-900 flex items-center">
-                                                    <i class="fas fa-shield-halved text-emerald-600 mr-1.5"></i> IP Fija Tailscale (Recomendada):
+                                                <span class="text-[10px] font-bold text-sky-900 flex items-center">
+                                                    <i class="fas fa-cloud text-sky-600 mr-1.5"></i> Enlace Cloud Relay (Recomendado):
                                                 </span>
-                                                <span class="text-[9px] bg-emerald-200/80 text-emerald-900 font-bold px-1.5 py-0.2 rounded-full">Permanente</span>
+                                                <span class="text-[9px] bg-sky-200/80 text-sky-900 font-bold px-1.5 py-0.2 rounded-full">Automático</span>
                                             </div>
                                             <div class="flex items-center space-x-1.5">
-                                                <code class="text-xs font-bold text-emerald-900 bg-white px-2 py-1 rounded-lg border border-emerald-300 font-mono flex-1 select-all">http://{{ tailscale_ip }}:8080</code>
-                                                <button type="button" onclick="navigator.clipboard.writeText('http://{{ tailscale_ip }}:8080'); alert('IP de Tailscale copiada al portapapeles: http://{{ tailscale_ip }}:8080');" 
-                                                        class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold shadow-sm transition">
+                                                <code class="text-xs font-bold text-sky-900 bg-white px-2 py-1 rounded-lg border border-sky-300 font-mono flex-1 select-all">{{ setting.relay_channel_id or 'dr_carlos_heredia' }}</code>
+                                                <button type="button" onclick="navigator.clipboard.writeText('{{ setting.relay_channel_id or 'dr_carlos_heredia' }}'); alert('Canal Cloud Relay copiado');" 
+                                                        class="px-2 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[10px] font-bold shadow-sm transition">
                                                     Copiar
                                                 </button>
                                             </div>
-                                            <p class="text-[10px] text-emerald-700 leading-tight">
-                                                Esta IP <strong>nunca cambia</strong>. Ingrese esta URL en la app del celular o tablet para que la conexión permanezca activa siempre, incluso si el router se reinicia o cambia de Wi-Fi.
+                                            <p class="text-[10px] text-sky-700 leading-tight">
+                                                Conecta la Tablet de recepción con esta PC <strong>sin configurar VPN ni abrir puertos</strong>.
                                             </p>
                                         </div>
-                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
@@ -731,7 +730,6 @@ async function sendTestWhatsApp() {
 }
 
 let currentQrType = 'apk';
-let currentHostMode = {% if tailscale_ip %}'tailscale'{% else %}'local'{% endif %};
 
 function updateQrImage() {
     const img = document.getElementById('qr-display-img');
@@ -739,17 +737,17 @@ function updateQrImage() {
     const btnApk = document.getElementById('btn-qr-apk');
     const btnWeb = document.getElementById('btn-qr-web');
     
-    const host = (currentHostMode === 'tailscale' && "{{ tailscale_ip }}") ? "http://{{ tailscale_ip }}:8080" : "http://{{ local_ip }}:8080";
+    const host = "http://{{ local_ip }}:8080";
 
     if (currentQrType === 'apk') {
         img.src = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(host + '/download/apk')}`;
-        label.textContent = "Descargar APK (" + (currentHostMode === 'tailscale' ? 'Tailscale' : 'Wi-Fi') + ")";
+        label.textContent = "Descargar APK (Red Local)";
         label.className = "block text-[10px] font-bold text-emerald-700 mt-1";
         btnApk.className = "flex-1 py-1 px-2 text-[10px] font-bold bg-white text-emerald-700 rounded shadow-sm transition";
         btnWeb.className = "flex-1 py-1 px-2 text-[10px] font-bold text-slate-600 rounded transition";
     } else {
         img.src = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(host + '/mobile')}`;
-        label.textContent = "Abrir Web (" + (currentHostMode === 'tailscale' ? 'Tailscale' : 'Wi-Fi') + ")";
+        label.textContent = "Abrir Web (Red Local)";
         label.className = "block text-[10px] font-bold text-indigo-700 mt-1";
         btnWeb.className = "flex-1 py-1 px-2 text-[10px] font-bold bg-white text-indigo-700 rounded shadow-sm transition";
         btnApk.className = "flex-1 py-1 px-2 text-[10px] font-bold text-slate-600 rounded transition";
