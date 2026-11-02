@@ -1,5 +1,7 @@
 import io
 import os
+import sys
+from pathlib import Path
 import json
 import re
 from datetime import datetime, date
@@ -304,7 +306,7 @@ def _resolve_doctor_logo(setting=None):
         if custom_p and os.path.isfile(custom_p):
             return custom_p
 
-    base_proj = Path(__file__).resolve().parent.parent.parent
+    base_proj = Path(sys._MEIPASS).resolve() if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent.parent.parent
     default_logo = base_proj / "static" / "images" / "logo_dr_heredia_bw.png"
     if default_logo.exists():
         return str(default_logo)
