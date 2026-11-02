@@ -263,6 +263,9 @@
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                 <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider">
                                     <i class="fas fa-pills text-teal-600 mr-1"></i> Indicaciones Farmacológicas / Receta Médica
+                                    <button type="button" onclick="correctMedicalText('prescription_textarea')" class="ml-2 text-xs py-0.5 px-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-bold inline-flex items-center gap-1 transition-colors" title="Corregir ortografía y medicamentos en la receta">
+                                        <i class="fas fa-magic"></i> Corregir Receta
+                                    </button>
                                 </label>
                                 {% if prescription_templates %}
                                 <div class="flex items-center gap-2">

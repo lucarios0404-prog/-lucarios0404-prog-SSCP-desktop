@@ -159,7 +159,7 @@ LAB_PANELS = [
             "Tiempo de Coagulación",
             "Retracción de Coágulo",
             "Reconteo de Plaquetas",
-            "Investigación de Células Falciformes",
+            "Investigación de Células Falciformes (Falcemia)",
             "Electroforesis de Hb",
             "Fibrinógeno",
             "Dímero D",

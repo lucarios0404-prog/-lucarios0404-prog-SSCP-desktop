@@ -1963,6 +1963,9 @@ TALONARIO_LAB_COORDS = {
     "Retracción de Coágulo": (10.6, 129.1),
     "Reconteo de Plaquetas": (10.6, 125.8),
     "Investigación de Células Falciformes": (10.6, 122.7),
+    "Investigación de Células Falciformes (Falcemia)": (10.6, 122.7),
+    "Falcemia": (10.6, 122.7),
+    "Células Falciformes": (10.6, 122.7),
     "Electroforesis de Hb": (10.6, 119.4),
     "Fibrinógeno": (10.6, 116.3),
     "Dímero D": (10.6, 113.3),
@@ -2164,50 +2167,30 @@ def generate_lab_order_talonario_pdf(order, setting=None) -> io.BytesIO:
     Genera un PDF de posicionamiento exacto para imprimir la Solicitud de Laboratorios
     sobre el talonario preimpreso VERTICAL del Dr. Carlos M. Heredia (13.6 × 21.7 cm, Media Carta Vertical).
 
-    El papel físico es VERTICAL (13.6 cm ancho × 21.7 cm alto) y contiene:
-      1. Membrete superior del Dr. Carlos M. Heredia y Centro Médico María Dolores (hasta y=162mm).
-      2. Zona central para los estudios (y=160mm hasta y=30mm).
-      3. Líneas inferiores preimpresas:
-         NOMBRE: ____________________________________________________________________ (y=22.0 mm)
-         FECHA: ___________    EDAD: ___________    SEXO: ___________                   (y=14.8 mm)
-                                            Firma                                       (y=6.6 mm)
-
-    Conforme a las especificaciones del médico:
-      - NO imprime casillas [ ], ni [X], ni paréntesis ( ), ni palomitas.
-      - Imprime una lista organizada y nítida con cada uno de los estudios solicitados,
-        uno debajo de otro, numerados de forma clara y elegante (1., 2., 3.).
-      - Hasta 16 estudios en 1 sola columna vertical con interlineado óptimo.
-      - Más de 16 estudios en 2 columnas balanceadas.
-      - Al pie imprime los datos del paciente alineados exactamente sobre las líneas preimpresas.
+    Utiliza las coordenadas y márgenes calibrados de print_config_service:
+      - Membrete y símbolo Rp superior respetados (inicia en y <= 140 mm).
+      - Si hay 6 o más estudios, los divide automáticamente en 2 columnas balanceadas
+        para aprovechar el ancho del papel y no invadir el pie ni el membrete.
+      - Al pie imprime los datos del paciente alineados exactamente sobre las líneas físicas preimpresas
+        (PACIENTE, EDAD, CED., FECHA) mediante _draw_talonario_patient_footer.
     """
-    # Dimensiones exactas del talonario vertical (13.6 cm ancho × 21.7 cm alto)
-    PAGE_W_pt = 136.0 * mm
-    PAGE_H_pt = 217.0 * mm
+    page_w_mm, page_h_mm, fields, to_rl_y = _get_calibrated_talonario_params()
+
+    PAGE_W_pt = page_w_mm * mm
+    PAGE_H_pt = page_h_mm * mm
 
     buffer = io.BytesIO()
     c = rl_canvas.Canvas(buffer, pagesize=(PAGE_W_pt, PAGE_H_pt))
 
-    # ── Datos del paciente ─────────────────────────────────────────────────────
+    # ── Datos del paciente en el pie preimpreso ───────────────────────────────
     p = getattr(order, "patient", None)
-    p_info = _extract_patient_display_data(p)
-    patient_name = p_info["name"]
-    age_str = p_info["age_str"]
-    gender_raw = p_info["gender"] or ""
-
-    # Formateo de sexo (Femenino / Masculino)
-    if str(gender_raw).upper() in ("F", "FEMENINO", "FEMALE"):
-        gender_str = "Femenino"
-    elif str(gender_raw).upper() in ("M", "MASCULINO", "MALE"):
-        gender_str = "Masculino"
-    else:
-        gender_str = str(gender_raw or "")
-
-    # Fecha de la orden
     ord_date = getattr(order, "order_date", None)
     if isinstance(ord_date, (datetime, date)):
         fecha_str = ord_date.strftime("%d/%m/%Y")
     else:
         fecha_str = datetime.now().strftime("%d/%m/%Y")
+
+    _draw_talonario_patient_footer(c, p, fields, to_rl_y, custom_date_str=fecha_str)
 
     # Parsear lista de análisis solicitados
     tests_list = []
@@ -2219,86 +2202,66 @@ def generate_lab_order_talonario_pdf(order, setting=None) -> io.BytesIO:
 
     # Filtrar vacíos
     tests_list = [str(t).strip() for t in tests_list if str(t).strip()]
+    total_tests = len(tests_list)
 
-    # ── TÍTULO E INDICACIÓN CLÍNICA (ZONA CENTRAL DEL PAPEL VERTICAL) ─────────
+    # ── TÍTULO E INDICACIÓN CLÍNICA (CALIBRADO CON EL CUERPO DEL TALONARIO) ────
+    f_body = fields.get("medications", {}) if isinstance(fields, dict) else {}
+    body_x = float(f_body.get("x", 16.0))
+    body_y_top = float(f_body.get("y", 72.0))
+
+    # Título dinámico según la coordenada Y configurada (evita colisión con Rp y membrete)
+    y_title = to_rl_y(body_y_top + 2.0, 8.5)
+    col1_x = body_x * mm
+    col2_x = (body_x + 58.0) * mm
+
     c.setFont("Helvetica-Bold", 8.5)
     c.setFillColor(colors.HexColor("#0f766e"))
-    c.drawString(14.0 * mm, 158.0 * mm, "INDICACIÓN DE ESTUDIOS DE LABORATORIO:")
+    c.drawString(col1_x, y_title, "INDICACIÓN DE ESTUDIOS DE LABORATORIO:")
 
     # Indicación clínica / Diagnóstico presuntivo si existe
     indication = getattr(order, "clinical_indication", None)
     if indication and str(indication).strip():
         c.setFont("Helvetica-Bold", 7.5)
         c.setFillColor(colors.HexColor("#334155"))
-        c.drawString(14.0 * mm, 153.0 * mm, "Dx / Indicación:")
+        c.drawString(col1_x, y_title - 5.0 * mm, "Dx / Indicación:")
         c.setFont("Helvetica", 7.5)
-        c.drawString(38.0 * mm, 153.0 * mm, str(indication).strip()[:60])
-        y_tests_start = 147.0 * mm
+        c.drawString(col1_x + 23.0 * mm, y_title - 5.0 * mm, str(indication).strip()[:55])
+        y_tests_start = y_title - 11.0 * mm
     else:
-        y_tests_start = 151.0 * mm
+        y_tests_start = y_title - 7.0 * mm
 
-    # ── LISTA DE ESTUDIOS: UNO DEBAJO DE OTRO, BIEN ORGANIZADO Y BONITO ───────
-    # Sin palomitas ni cuadritos: Lista numerada limpia y profesional
-    total_tests = len(tests_list)
+    # Límite inferior dinámico basado en la posición del pie del paciente
+    pat_y_top = float(fields.get("patient_name", {}).get("y", 178.5)) if isinstance(fields, dict) and "patient_name" in fields else 178.5
+    stop_y_bottom = to_rl_y(pat_y_top - 6.0, 8.0)
+
+    # ── LISTA DE ESTUDIOS: LLENADO DINÁMICO (MÍNIMO 10 EN COLUMNA IZQUIERDA ANTES DE INICIAR DERECHA) ───
     if total_tests > 0:
-        if total_tests <= 16:
-            # 1 sola columna vertical espaciosa (uno debajo de otro)
-            avail_h = y_tests_start / mm - 33.0
-            line_h = min(6.0, max(4.6, avail_h / max(1, total_tests))) * mm
-            y_cursor = y_tests_start
-            for idx, test in enumerate(tests_list):
-                if y_cursor < 32.0 * mm:
-                    break
-                # Número en negrita teal
-                c.setFont("Helvetica-Bold", 8.5)
-                c.setFillColor(colors.HexColor("#0f766e"))
-                c.drawString(14.0 * mm, y_cursor, f"{idx + 1}.")
-                # Nombre del estudio en color slate oscuro
-                c.setFont("Helvetica", 8.5)
-                c.setFillColor(colors.HexColor("#0f172a"))
-                c.drawString(20.0 * mm, y_cursor, str(test)[:56])
-                y_cursor -= line_h
+        THRESHOLD_COL1 = 10
+        if total_tests <= THRESHOLD_COL1:
+            per_col1 = total_tests
         else:
-            # 2 columnas balanceadas organizadas una debajo de otra
-            per_col = (total_tests + 1) // 2
-            avail_h = y_tests_start / mm - 33.0
-            line_h = min(4.8, max(3.8, avail_h / per_col)) * mm
-            col1_x = 12.0 * mm
-            col2_x = 74.0 * mm
+            per_col1 = max(THRESHOLD_COL1, (total_tests + 1) // 2)
 
-            for idx, test in enumerate(tests_list):
-                if idx < per_col:
-                    col_x = col1_x
-                    row_idx = idx
-                else:
-                    col_x = col2_x
-                    row_idx = idx - per_col
+        line_h = 5.2 * mm
 
-                y_pos = y_tests_start - (row_idx * line_h)
-                if y_pos < 32.0 * mm:
-                    continue
+        for idx, test in enumerate(tests_list):
+            if idx < per_col1:
+                col_x = col1_x
+                row_idx = idx
+            else:
+                col_x = col2_x
+                row_idx = idx - per_col1
 
-                c.setFont("Helvetica-Bold", 7.5)
-                c.setFillColor(colors.HexColor("#0f766e"))
-                c.drawString(col_x, y_pos, f"{idx + 1}.")
-                c.setFont("Helvetica", 7.5)
-                c.setFillColor(colors.HexColor("#0f172a"))
-                c.drawString(col_x + 5.0 * mm, y_pos, str(test)[:32])
+            y_pos = y_tests_start - (row_idx * line_h)
+            if y_pos < stop_y_bottom:
+                continue
 
-
-    # ── PIE DEL TALONARIO: DATOS DEL PACIENTE ─────────────────────────────────
-    # 1. NOMBRE: _______________________________________________________________
-    # Línea preimpresa a y = 22.0 mm. Se imprime el nombre después de 'NOMBRE:'
-    c.setFont("Helvetica-Bold", 8.5)
-    c.setFillColor(colors.HexColor("#0f172a"))
-    c.drawString(22.0 * mm, 22.0 * mm, str(patient_name or ""))
-
-    # 2. FECHA: _______________ EDAD: _______________ SEXO: _______________
-    # Línea preimpresa a y = 14.8 mm del fondo
-    c.setFont("Helvetica", 8.0)
-    c.drawString(20.0 * mm, 14.8 * mm, str(fecha_str or ""))
-    c.drawString(68.0 * mm, 14.8 * mm, str(age_str or ""))
-    c.drawString(108.0 * mm, 14.8 * mm, str(gender_str or ""))
+            c.setFont("Helvetica-Bold", 8.0)
+            c.setFillColor(colors.HexColor("#0f766e"))
+            c.drawString(col_x, y_pos, f"{idx + 1}.")
+            c.setFont("Helvetica", 8.0)
+            c.setFillColor(colors.HexColor("#0f172a"))
+            c.drawString(col_x + 6.0 * mm, y_pos, str(test)[:34])
 
     c.save()
     buffer.seek(0)

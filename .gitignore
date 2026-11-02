@@ -78,3 +78,9 @@ data/.*
 # Scratch and test files
 scratch/
 scratch_*.py
+ 
+*.bak
+data/*.bak*
+*.png
+sscp.db
+data/sscp.db.*

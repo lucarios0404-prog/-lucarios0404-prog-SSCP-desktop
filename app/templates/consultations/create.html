@@ -285,6 +285,12 @@
                                 <div class="px-5 py-2.5 bg-slate-50/80 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
                                     <div class="flex items-center space-x-3">
                                         <span id="ch_word_count" class="font-medium text-slate-400">0 palabras &bull; 0 caracteres</span>
+                                        <button type="button" onclick="toggleMedicalAutocorrect()" class="sscp-corrector-badge-toggle text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg cursor-pointer hover:bg-emerald-100 transition-colors shadow-2xs flex items-center" title="Haga clic para pausar o activar el corrector médico">
+                                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block mr-1"></span> Corrector Activo
+                                        </button>
+                                        <button type="button" onclick="correctMedicalText('clinical_history')" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-colors shadow-2xs flex items-center gap-1.5" title="Revisar y corregir términos médicos y ortografía de todo el cuadro">
+                                            <i class="fas fa-magic"></i> Corregir Texto
+                                        </button>
                                     </div>
                                     <div class="flex items-center space-x-1.5">
                                         <span class="text-[11px] text-slate-400 font-semibold mr-1">Insertar sección rápida:</span>
@@ -316,6 +322,9 @@
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                 <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider">
                                     <i class="fas fa-pills text-teal-600 mr-1"></i> Indicaciones Farmacológicas / Receta Médica
+                                    <button type="button" onclick="correctMedicalText('prescription_textarea')" class="ml-2 text-xs py-0.5 px-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-bold inline-flex items-center gap-1 transition-colors" title="Corregir ortografía y medicamentos en la receta">
+                                        <i class="fas fa-magic"></i> Corregir Receta
+                                    </button>
                                 </label>
                                 {% if prescription_templates %}
                                 <div class="flex items-center gap-2">

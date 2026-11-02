@@ -199,32 +199,60 @@
                             </div>
                         </div>
 
-                        <!-- PERFILES RÁPIDOS (PRESETS MÉDICOS DE 1-CLIC) -->
-                        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] text-slate-600 no-scrollbar">
-                            <span class="font-bold text-slate-400 uppercase tracking-wider text-[10px] shrink-0 mr-1">
-                                <i class="fas fa-bolt text-amber-500 mr-0.5"></i> Perfiles Rápidos:
-                            </span>
-                            <button type="button" onclick="applyPreset('rutina')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
-                                🩺 Rutina General
-                            </button>
-                            <button type="button" onclick="applyPreset('diabetico')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
-                                🍬 Control Diabético
-                            </button>
-                            <button type="button" onclick="applyPreset('lipidico')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
-                                🩸 Perfil Lipídico
-                            </button>
-                            <button type="button" onclick="applyPreset('tiroideo')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
-                                🦋 Perfil Tiroideo
-                            </button>
-                            <button type="button" onclick="applyPreset('prequirurgico')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
-                                🩹 Pre-Quirúrgico
-                            </button>
-                            <button type="button" onclick="applyPreset('prenatal')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
-                                🤰 Prenatal
-                            </button>
-                            <button type="button" onclick="applyPreset('hepato_renal')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
-                                🧪 Hepático / Renal
-                            </button>
+                                                <!-- PERFILES RÁPIDOS Y PLANILLAS MÉDICAS -->
+                        <div class="space-y-1.5 pb-1 text-[11px] text-slate-600">
+                            <!-- Fila 1: Perfiles Predefinidos Clínicos y Obstétricos -->
+                            <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+                                <span class="font-bold text-slate-400 uppercase tracking-wider text-[10px] shrink-0 mr-1">
+                                    <i class="fas fa-bolt text-amber-500 mr-0.5"></i> Perfiles de Fábrica:
+                                </span>
+                                <button type="button" onclick="applyPreset('rutina')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                    🩺 Rutina General
+                                </button>
+                                <button type="button" onclick="applyPreset('primer_trimestre')" class="px-2.5 py-1 rounded-md bg-pink-100 hover:bg-pink-200 text-pink-900 border border-pink-300 transition-all font-bold whitespace-nowrap shadow-2xs" title="1er Trimestre de Embarazo: Hemograma, Tipificación, Orina, Urea, Creatinina, Ácido Úrico, Glicemia, HbA1c, Falcemia, TORCH, Perfil Hepático, Lipídico, VDRL, HIV, Hepatitis B/C, Progesterona, T4L, TSH, Cultivo Vaginal">
+                                    🤰 1er Trimestre
+                                </button>
+                                <button type="button" onclick="applyPreset('segundo_trimestre')" class="px-2.5 py-1 rounded-md bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition-all font-bold whitespace-nowrap shadow-2xs" title="2do Trimestre de Embarazo: Hemograma, Glicemia, Orina, T3, T4, T4 Libre, TSH, Cultivo Vaginal, VDRL, PT, TPT">
+                                    🤰 2do Trimestre
+                                </button>
+                                <button type="button" onclick="applyPreset('prenatal')" class="px-2 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 transition-all font-bold whitespace-nowrap shadow-2xs" title="Perfil Prenatal Básico + Falcemia: Hemograma, Tipificación, Orina, VDRL, HIV, Glicemia, Toxoplasmosis y Falcemia">
+                                    🤰 Prenatal + Falcemia
+                                </button>
+                                <button type="button" onclick="applyPreset('diabetico')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                    🍬 Control Diabético
+                                </button>
+                                <button type="button" onclick="applyPreset('lipidico')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                    🩸 Perfil Lipídico
+                                </button>
+                                <button type="button" onclick="applyPreset('tiroideo')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                    🦋 Perfil Tiroideo
+                                </button>
+                                <button type="button" onclick="applyPreset('prequirurgico')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                    🩹 Pre-Quirúrgico
+                                </button>
+                                <button type="button" onclick="applyPreset('hepato_renal')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                    🧪 Hepático / Renal
+                                </button>
+                                <button type="button" onclick="applyPreset('reumatico')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                    🦴 Reumatológico
+                                </button>
+                                <button type="button" onclick="applyPreset('infeccioso')" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200 border border-slate-200/80 transition-all font-medium whitespace-nowrap">
+                                    🦠 Infeccioso / Febril
+                                </button>
+                            </div>
+
+                            <!-- Fila 2: Mis Planillas Personalizadas (Guardadas por el Doctor) -->
+                            <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar bg-indigo-50/40 p-1.5 rounded-lg border border-indigo-100/70">
+                                <span class="font-bold text-indigo-700 uppercase tracking-wider text-[10px] shrink-0 mr-1 flex items-center gap-1">
+                                    <i class="fas fa-folder-open text-indigo-600"></i> Mis Planillas:
+                                </span>
+                                <div id="custom-presets-list" class="flex items-center gap-1.5 flex-wrap">
+                                    <!-- Renderizado dinámico de planillas del médico -->
+                                </div>
+                                <button type="button" onclick="saveCurrentSelectionAsPreset()" class="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all whitespace-nowrap flex items-center gap-1 shadow-2xs text-[10.5px]" title="Guarda los análisis actualmente seleccionados como una nueva planilla rápida con el nombre que usted elija">
+                                    <i class="fas fa-plus-circle text-xs"></i> Guardar Selección como Planilla
+                                </button>
+                            </div>
                         </div>
 
                         <!-- GRID COMPACTO DE PANELES DE LABORATORIO (DISTRIBUCIÓN INTELIGENTE) -->
@@ -287,7 +315,15 @@
                         </div>
 
                         <!-- Botones de Impresión y Guardado -->
-                        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+                            <!-- Botón Calibrar Espacios del Talonario -->
+                            <button type="button" onclick="openPrintCalibrator()"
+                                class="px-3 py-2 border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5"
+                                title="Abre el calibrador visual interactivo para ajustar los espacios y coordenadas del talonario físico (Ctrl+Alt+M).">
+                                <i class="fas fa-sliders-h text-amber-600"></i>
+                                <span>Calibrar Espacios</span>
+                            </button>
+
                             <!-- Botón Opcional: Formato Carta -->
                             <button type="submit" name="print_format" value="letter"
                                 class="px-3 py-2 border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5"
@@ -325,13 +361,131 @@
 // Diccionario de Perfiles Clínicos Rápidos
 const PRESETS = {
     rutina: ["Hemograma Completo", "Exámen de orina", "Glicemia en ayuna", "Creatinina", "Colesterol Total", "Trigliceridos"],
+    primer_trimestre: [
+        "Hemograma Completo", "Tipificación Sanguínea", "Exámen de orina", "Bun", "Creatinina", 
+        "Acido Urico", "Glicemia en ayuna", "Hemoglobina Glicosilada", 
+        "Investigación de Células Falciformes (Falcemia)", "Investigación de Células Falciformes", "Falcemia",
+        "TORCH IgG - IgM", "Toxoplasmosis IgG - IgM", 
+        "SGOT", "SGPT", "Bilirrubina", "Fosfatasa Alcalina", "Proteinas totales", "Albumina",
+        "Colesterol Total", "Trigliceridos", "HDL", "LDL", 
+        "V.D.R.L.", "HIV", "Hepatitis B", "Hepatitis C", 
+        "Progesterona", "T4 libre", "TSH", "Cultivo Secreción Vaginal"
+    ],
+    segundo_trimestre: [
+        "Hemograma Completo", "Glicemia en ayuna", "Exámen de orina", 
+        "T3", "T4", "T4 libre", "TSH", 
+        "Cultivo Secreción Vaginal", "V.D.R.L.", "PT", "TPT"
+    ],
+    prenatal: [
+        "Hemograma Completo", "Tipificación Sanguínea", "Exámen de orina", "V.D.R.L.", "HIV", 
+        "Glicemia en ayuna", "Toxoplasmosis IgG - IgM", 
+        "Investigación de Células Falciformes (Falcemia)", "Investigación de Células Falciformes", "Falcemia"
+    ],
     diabetico: ["Glicemia en ayuna", "Glicemia Post Pandrial", "Hemoglobina Glicosilada", "Exámen de orina", "Creatinina", "Microalbuminuria"],
     lipidico: ["Colesterol Total", "HDL", "LDL", "VLDL", "Trigliceridos"],
     tiroideo: ["TSH", "T3 libre", "T4 libre", "T3", "T4"],
     prequirurgico: ["Hemograma Completo", "PT", "TPT", "Tipificación Sanguínea", "Glicemia en ayuna", "Exámen de orina", "Creatinina"],
-    prenatal: ["Hemograma Completo", "Tipificación Sanguínea", "Exámen de orina", "V.D.R.L.", "HIV", "Glicemia en ayuna", "Toxoplasmosis IgG - IgM"],
-    hepato_renal: ["SGOT", "SGPT", "Bilirrubina", "Fosfatasa Alcalina", "Proteinas totales", "Albumina", "Bun", "Creatinina", "Acido Urico"]
+    hepato_renal: ["SGOT", "SGPT", "Bilirrubina", "Fosfatasa Alcalina", "Proteinas totales", "Albumina", "Bun", "Creatinina", "Acido Urico"],
+    reumatico: ["Proteina C Reactiva (P.C.R.)", "PCR", "Eritrosedimentación", "Factor Reumatoideo", "Acido Urico", "Antiestreptolisina O (ASO)", "ASTO"],
+    infeccioso: ["Hemograma Completo", "Exámen de orina", "Coprológico", "Dengue IgG - IgM", "Tipificación Sanguínea"]
 };
+
+// ── GESTIÓN DE PLANILLAS PERSONALIZADAS DEL DOCTOR (LOCALSTORAGE) ──
+const CUSTOM_PRESETS_KEY = 'sscp_custom_lab_presets';
+
+function getCustomPresets() {
+    try {
+        const stored = localStorage.getItem(CUSTOM_PRESETS_KEY);
+        return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function renderCustomPresets() {
+    const container = document.getElementById('custom-presets-list');
+    if (!container) return;
+    const presets = getCustomPresets();
+    container.innerHTML = '';
+    
+    if (presets.length === 0) {
+        container.innerHTML = `<span class="text-[10px] text-slate-400 italic">No hay planillas guardadas aún (marque análisis y haga clic en Guardar).</span>`;
+        return;
+    }
+
+    presets.forEach(p => {
+        const btn = document.createElement('div');
+        btn.className = 'inline-flex items-center rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 text-[11px] font-medium transition-all shadow-2xs overflow-hidden';
+        btn.innerHTML = `
+            <button type="button" onclick="applyCustomPreset('${p.id}')" class="px-2 py-0.5 flex items-center gap-1 hover:text-indigo-950 font-medium" title="Cargar ${p.tests.length} análisis de la planilla '${p.name}'">
+                <i class="fas fa-file-medical text-indigo-600 text-[10px]"></i> ${p.name}
+                <span class="text-[9px] bg-indigo-200/60 px-1 py-0.1 rounded font-bold">${p.tests.length}</span>
+            </button>
+            <button type="button" onclick="deleteCustomPreset('${p.id}')" class="px-1.5 py-0.5 text-slate-400 hover:text-red-600 hover:bg-red-50 border-l border-indigo-200/80 transition-colors" title="Eliminar planilla">
+                <i class="fas fa-times text-[10px]"></i>
+            </button>
+        `;
+        container.appendChild(btn);
+    });
+}
+
+function saveCurrentSelectionAsPreset() {
+    const selectedCheckboxes = Array.from(document.querySelectorAll('.test-checkbox:checked'));
+    if (selectedCheckboxes.length === 0) {
+        alert("Por favor seleccione primero en el checklist los análisis que desea incluir en su nueva planilla.");
+        return;
+    }
+
+    const testNames = selectedCheckboxes.map(cb => cb.value.trim());
+    const name = prompt(`Ingrese un nombre para su planilla con los ${testNames.length} análisis seleccionados:\n(Ej.: Control Dra. Gómez, Chequeo Anual, etc.)`);
+    if (!name || !name.trim()) return;
+
+    const trimmedName = name.trim();
+    const presets = getCustomPresets();
+    const newPreset = {
+        id: 'preset_' + Date.now(),
+        name: trimmedName,
+        tests: testNames
+    };
+    presets.push(newPreset);
+    try {
+        localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(presets));
+        renderCustomPresets();
+        // Toast
+        const toast = document.createElement('div');
+        toast.className = 'fixed bottom-5 right-5 bg-emerald-600 text-white px-4 py-2 rounded-xl shadow-2xl text-xs z-50 flex items-center gap-2';
+        toast.innerHTML = `<i class="fas fa-check-circle"></i> Planilla "<strong>${trimmedName}</strong>" guardada con éxito (${testNames.length} análisis).`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3500);
+    } catch (e) {
+        alert("Error al guardar planilla personalizada.");
+    }
+}
+
+function applyCustomPreset(presetId) {
+    const presets = getCustomPresets();
+    const found = presets.find(p => p.id === presetId);
+    if (!found) return;
+
+    const normalize = str => str.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+    const normalizedTests = found.tests.map(normalize);
+
+    document.querySelectorAll('.test-checkbox').forEach(cb => {
+        const val = normalize(cb.value);
+        if (normalizedTests.some(t => val.includes(t) || t.includes(val))) {
+            cb.checked = true;
+        }
+    });
+    updateSelectedCount();
+}
+
+function deleteCustomPreset(presetId) {
+    if (!confirm("¿Seguro que desea eliminar esta planilla personalizada?")) return;
+    let presets = getCustomPresets();
+    presets = presets.filter(p => p.id !== presetId);
+    localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(presets));
+    renderCustomPresets();
+}
 
 function selectAllTests(check) {
     document.querySelectorAll('.test-checkbox').forEach(cb => {
@@ -367,6 +521,17 @@ function applyPreset(key) {
             cb.checked = true;
         }
     });
+
+    // REGLA EXPLÍCITA: Si es prenatal o 1er trimestre, asegurar 100% que Falcemia quede marcada
+    if (key === 'prenatal' || key === 'primer_trimestre') {
+        document.querySelectorAll('.test-checkbox').forEach(cb => {
+            const val = normalize(cb.value);
+            if (val.includes('falcemia') || val.includes('falciforme') || val.includes('celulas falciformes')) {
+                cb.checked = true;
+            }
+        });
+    }
+
     updateSelectedCount();
 }
 
@@ -477,9 +642,37 @@ function handlePatientSelection(selectEl) {
     card.classList.remove('hidden');
 }
 
+function openPrintCalibrator() {
+    if (window.electronAPI && window.electronAPI.openPrintConfigurator) {
+        window.electronAPI.openPrintConfigurator();
+    } else if (window.sscpElectron && window.sscpElectron.openPrintConfigurator) {
+        window.sscpElectron.openPrintConfigurator();
+    } else {
+        alert("Para calibrar espacios, presione Ctrl + Alt + M o seleccione Archivo > Configurar Márgenes de Impresión en el menú superior.");
+    }
+}
+
 function submitTalonarioDirect() {
     const patientSelect = document.getElementById('patient_id');
-    const patientId = patientSelect ? patientSelect.value : '';
+    const searchInput = document.querySelector('.patient-search-input');
+    let patientId = patientSelect ? patientSelect.value : '';
+
+    // Si no hay id pero el médico escribió el nombre en el buscador
+    if (!patientId && searchInput && searchInput.value.trim().length > 0) {
+        const typedName = searchInput.value.trim();
+        for (let i = 1; i < patientSelect.options.length; i++) {
+            if (patientSelect.options[i].text.toLowerCase().includes(typedName.toLowerCase())) {
+                patientSelect.selectedIndex = i;
+                patientId = patientSelect.options[i].value;
+                handlePatientSelection(patientSelect);
+                break;
+            }
+        }
+        // Si no encontró coincidencia exacta, usar la opción seleccionada activa
+        if (!patientId && patientSelect.selectedIndex > 0) {
+            patientId = patientSelect.options[patientSelect.selectedIndex].value;
+        }
+    }
 
     if (!patientId) {
         alert('Por favor seleccione un paciente antes de emitir e imprimir el talonario.');
@@ -524,6 +717,7 @@ function submitTalonarioDirect() {
 
 // Inicializar al cargar
 document.addEventListener('DOMContentLoaded', () => {
+    renderCustomPresets();
     updateSelectedCount();
     const pSelect = document.getElementById('patient_id');
     if (pSelect && pSelect.tagName === 'SELECT' && pSelect.value) {

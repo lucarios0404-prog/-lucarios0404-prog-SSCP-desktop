@@ -218,6 +218,25 @@ function initPatientLiveSearch(config) {
         const val = this.value.trim();
         if (clearBtn) clearBtn.classList.toggle('hidden', !val);
 
+        // Filtrar también las opciones del select en tiempo real
+        if (select && select.options) {
+            const queryLower = val.toLowerCase();
+            let hasFirstMatch = false;
+            for (let i = 1; i < select.options.length; i++) {
+                const optText = select.options[i].text.toLowerCase();
+                const matches = !val || optText.includes(queryLower);
+                select.options[i].hidden = !matches;
+                if (matches && !hasFirstMatch && val.length >= 2) {
+                    hasFirstMatch = true;
+                    // Pre-asignar silenciosamente al primer resultado si coincide
+                    select.selectedIndex = i;
+                }
+            }
+            if (!val) {
+                select.selectedIndex = 0;
+            }
+        }
+
         clearTimeout(timer);
         if (val.length >= 1) {
             timer = setTimeout(() => doSearch(val), 180);
@@ -249,8 +268,9 @@ function initPatientLiveSearch(config) {
             highlightItem(items);
         } else if (e.key === 'Enter') {
             e.preventDefault();
-            if (selectedIndex >= 0 && selectedIndex < currentPatients.length) {
-                selectPatient(currentPatients[selectedIndex]);
+            const pickIdx = selectedIndex >= 0 ? selectedIndex : 0;
+            if (currentPatients.length > 0 && pickIdx < currentPatients.length) {
+                selectPatient(currentPatients[pickIdx]);
             }
         } else if (e.key === 'Escape') {
             dropdown.classList.add('hidden');

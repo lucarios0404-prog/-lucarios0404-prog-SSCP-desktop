@@ -143,6 +143,121 @@ function createSplashWindow() {
   });
 }
 
+// Función universal de Menú Contextual (Clic Derecho) para todas las ventanas y vistas
+function setupGlobalContextMenu(targetWebContents) {
+  if (!targetWebContents || targetWebContents._hasContextMenuAttached) return;
+  targetWebContents._hasContextMenuAttached = true;
+
+  targetWebContents.on('context-menu', (event, params) => {
+    const { Menu, MenuItem } = require('electron');
+    const menu = new Menu();
+
+    // 1. Sugerencias ortográficas del motor Chromium si la palabra tiene error
+    if (params.misspelledWord) {
+      if (params.dictionarySuggestions && params.dictionarySuggestions.length > 0) {
+        for (const suggestion of params.dictionarySuggestions) {
+          menu.append(new MenuItem({
+            label: suggestion,
+            click: () => targetWebContents.replaceMisspelling(suggestion)
+          }));
+        }
+      } else {
+        menu.append(new MenuItem({
+          label: 'Sin sugerencias de ortografía',
+          enabled: false
+        }));
+      }
+
+      menu.append(new MenuItem({ type: 'separator' }));
+      menu.append(new MenuItem({
+        label: 'Añadir "' + params.misspelledWord + '" al diccionario',
+        click: () => {
+          try {
+            targetWebContents.session.addWordToSpellCheckerDictionary(params.misspelledWord);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      }));
+      menu.append(new MenuItem({ type: 'separator' }));
+    }
+
+    // 2. Opciones de edición si está en un campo editable (cualquier input o textarea)
+    if (params.isEditable) {
+      menu.append(new MenuItem({
+        role: 'undo',
+        label: 'Deshacer',
+        accelerator: 'CmdOrCtrl+Z'
+      }));
+      menu.append(new MenuItem({
+        role: 'redo',
+        label: 'Rehacer',
+        accelerator: 'CmdOrCtrl+Y'
+      }));
+      menu.append(new MenuItem({ type: 'separator' }));
+      menu.append(new MenuItem({
+        role: 'cut',
+        label: 'Cortar',
+        accelerator: 'CmdOrCtrl+X',
+        enabled: params.editFlags ? params.editFlags.canCut : true
+      }));
+      menu.append(new MenuItem({
+        role: 'copy',
+        label: 'Copiar',
+        accelerator: 'CmdOrCtrl+C',
+        enabled: params.editFlags ? params.editFlags.canCopy : true
+      }));
+      menu.append(new MenuItem({
+        role: 'paste',
+        label: 'Pegar',
+        accelerator: 'CmdOrCtrl+V',
+        enabled: params.editFlags ? params.editFlags.canPaste : true
+      }));
+      menu.append(new MenuItem({
+        role: 'pasteAndMatchStyle',
+        label: 'Pegar texto sin formato',
+        accelerator: 'CmdOrCtrl+Shift+V',
+        enabled: params.editFlags ? params.editFlags.canPaste : true
+      }));
+      menu.append(new MenuItem({ type: 'separator' }));
+      menu.append(new MenuItem({
+        role: 'selectAll',
+        label: 'Seleccionar todo',
+        accelerator: 'CmdOrCtrl+A',
+        enabled: params.editFlags ? params.editFlags.canSelectAll : true
+      }));
+      menu.popup();
+    } else if (params.selectionText && params.selectionText.trim().length > 0) {
+      // 3. Texto seleccionado en cualquier elemento de solo lectura (tablas, reportes, fichas)
+      menu.append(new MenuItem({
+        role: 'copy',
+        label: 'Copiar',
+        accelerator: 'CmdOrCtrl+C'
+      }));
+      menu.append(new MenuItem({
+        role: 'selectAll',
+        label: 'Seleccionar todo',
+        accelerator: 'CmdOrCtrl+A'
+      }));
+      menu.popup();
+    } else {
+      // 4. Clic derecho en espacio general (fondo, panel, tarjetas, dashboard)
+      menu.append(new MenuItem({
+        role: 'selectAll',
+        label: 'Seleccionar todo',
+        accelerator: 'CmdOrCtrl+A'
+      }));
+      menu.append(new MenuItem({ type: 'separator' }));
+      menu.append(new MenuItem({
+        role: 'reload',
+        label: 'Recargar',
+        accelerator: 'F5'
+      }));
+      menu.popup();
+    }
+  });
+}
+
 function createMainWindow() {
   const winConfig = config.window || {};
   mainWindow = new BrowserWindow({
@@ -152,7 +267,7 @@ function createMainWindow() {
     minHeight: winConfig.minHeight || 700,
     show: false,
     icon: getAppIcon(),
-    title: (config.appName || "SSCP Desktop") + " v1.3.4",
+    title: (config.appName || "SSCP Desktop") + " v" + (require('../../package.json').version || "1.8.3"),
     webPreferences: {
       preload: path.resolve(__dirname, '../preload/preload.js'),
       nodeIntegration: false,
@@ -164,6 +279,16 @@ function createMainWindow() {
 
   // Configurar menú nativo
   buildAppMenu(mainWindow, baseUrl, getAppIcon);
+
+  // Configuración de idiomas para el corrector ortográfico (Español)
+  try {
+    mainWindow.webContents.session.setSpellCheckerLanguages(['es-419', 'es-ES', 'es']);
+  } catch (err) {
+    console.warn('[SpellCheck] No se pudieron configurar idiomas de ortografia:', err);
+  }
+
+    // Menú Contextual Universal
+  setupGlobalContextMenu(mainWindow.webContents);
 
   // Manejar apertura de enlaces externos en el navegador por defecto con validación de protocolos seguros
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -402,6 +527,11 @@ function setupIpc() {
 }
 
 // Inicialización de la aplicación
+
+// Garantizar Menú Contextual en TODAS las ventanas y vistas creadas
+app.on('web-contents-created', (event, contents) => {
+  setupGlobalContextMenu(contents);
+});
 app.whenReady().then(async () => {
   setupIpc();
   createSplashWindow();

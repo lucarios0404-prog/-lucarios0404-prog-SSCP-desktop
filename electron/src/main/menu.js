@@ -48,6 +48,21 @@ function buildAppMenu(mainWindow, baseUrl, getAppIcon) {
       ]
     },
     {
+      label: 'Edición',
+      submenu: [
+        { role: 'undo', label: 'Deshacer', accelerator: 'CmdOrCtrl+Z' },
+        { role: 'redo', label: 'Rehacer', accelerator: 'CmdOrCtrl+Y' },
+        { type: 'separator' },
+        { role: 'cut', label: 'Cortar', accelerator: 'CmdOrCtrl+X' },
+        { role: 'copy', label: 'Copiar', accelerator: 'CmdOrCtrl+C' },
+        { role: 'paste', label: 'Pegar', accelerator: 'CmdOrCtrl+V' },
+        { role: 'pasteAndMatchStyle', label: 'Pegar sin formato', accelerator: 'CmdOrCtrl+Shift+V' },
+        { role: 'delete', label: 'Eliminar' },
+        { type: 'separator' },
+        { role: 'selectAll', label: 'Seleccionar todo', accelerator: 'CmdOrCtrl+A' }
+      ]
+    },
+    {
       label: 'Módulos Clínicos',
       submenu: [
         {

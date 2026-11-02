@@ -1,7 +1,7 @@
 {
   "name": "sscp-desktop",
   "productName": "SSCP Desktop",
-  "version": "1.8.1",
+  "version": "1.8.3",
   "description": "Sistema de Seguimiento para Consultas de Pacientes - Versión Desktop",
   "main": "src/main/main.js",
   "scripts": {
