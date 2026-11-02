@@ -185,12 +185,11 @@ def api_patient_last_consultation(
     ).order_by(Consultation.created_at.desc(), Consultation.id.desc()).first()
 
     if not c:
-        return {"found": False}
+        return {"found": False, "has_history": False, "consultation": None}
 
     doc_name = c.doctor.name if c.doctor else "Doctor"
-    date_str = c.created_at.strftime("%d/%m/%Y") if c.created_at else "—"
-    return {
-        "found": True,
+    date_str = c.created_at.strftime("%d/%m/%Y %I:%M %p") if c.created_at else "—"
+    c_data = {
         "id": c.id,
         "date": date_str,
         "doctor": doc_name,
@@ -199,6 +198,12 @@ def api_patient_last_consultation(
         "clinical_history": c.display_clinical_history or "",
         "treatment": c.treatment or "",
         "prescription": c.prescription or ""
+    }
+    return {
+        "found": True,
+        "has_history": True,
+        "consultation": c_data,
+        **c_data
     }
 
 

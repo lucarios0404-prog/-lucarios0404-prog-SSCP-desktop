@@ -994,8 +994,9 @@ async function loadPatientLastConsultation(patientId) {
         if (!res.ok) return;
         const data = await res.json();
 
-        if (data.has_history && data.consultation) {
-            const c = data.consultation;
+        const c = data.consultation || (data.found || data.has_history ? data : null);
+        if (c && (data.has_history || data.found)) {
+            // c ya resuelto arriba
             const dateEl = document.getElementById('lc_date');
             const reasonEl = document.getElementById('lc_reason');
             const diagEl = document.getElementById('lc_diagnosis');

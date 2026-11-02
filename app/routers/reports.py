@@ -1,3 +1,6 @@
+import calendar
+import json
+import re
 import csv
 import io
 from datetime import datetime, date
@@ -625,4 +628,222 @@ def export_financial_csv(
         content=csv_data.encode("utf-8-sig"),
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+# -----------------------------------------------------------------------------
+# INFORME MENSUAL DE ACTIVIDAD MÉDICA & ANÁLISIS SEMANAL (DÍA FUERTE / FLOJO)
+# -----------------------------------------------------------------------------
+MONTH_NAMES_ES = [
+    "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+]
+
+PALETTE = [
+    "#3b82f6", # Blue
+    "#10b981", # Emerald
+    "#8b5cf6", # Violet
+    "#f59e0b", # Amber
+    "#ec4899", # Pink
+    "#06b6d4", # Cyan
+    "#6366f1", # Indigo
+    "#14b8a6", # Teal
+    "#f97316", # Orange
+    "#64748b", # Slate
+]
+
+@router.get("/monthly")
+def reports_monthly(
+    request: Request,
+    month: str = Query(None),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('reports'))
+):
+    """
+    Informe Mensual de Actividad Médica & Análisis Semanal:
+    - Tipos de citas y consultas con cantidad y porcentaje (%).
+    - Gráfica interactiva de distribución por tipo de cita.
+    - Análisis semanal: qué día fue más fuerte y cuál fue más flojo.
+    - Gráfica de afluencia por día de la semana.
+    """
+    # 1. Determinar meses disponibles en la base de datos
+    appt_dates = db.query(Appointment.date).filter(Appointment.date != None).distinct().all()
+    months_set = set()
+    for (d,) in appt_dates:
+        if d:
+            months_set.add(d.strftime('%Y-%m'))
+
+    cons_dates = db.query(Consultation.created_at).filter(Consultation.created_at != None).distinct().all()
+    for (dt,) in cons_dates:
+        if dt:
+            months_set.add(dt.strftime('%Y-%m'))
+
+    available_months = sorted(list(months_set), reverse=True)
+    today = date.today()
+    current_month_str = today.strftime("%Y-%m")
+    if current_month_str not in available_months:
+        available_months.insert(0, current_month_str)
+
+    # 2. Mes seleccionado
+    selected_month_str = (month or "").strip()
+    if not selected_month_str or not re.match(r"^\d{4}-\d{2}$", selected_month_str):
+        # Si no se pasó mes, elegir el mes actual o el último con actividad si el actual está vacío
+        selected_month_str = current_month_str
+
+    try:
+        y_int, m_int = [int(p) for p in selected_month_str.split("-")]
+        if not (1 <= m_int <= 12):
+            y_int, m_int = today.year, today.month
+            selected_month_str = f"{y_int:04d}-{m_int:02d}"
+    except Exception:
+        y_int, m_int = today.year, today.month
+        selected_month_str = f"{y_int:04d}-{m_int:02d}"
+
+    month_name_es = f"{MONTH_NAMES_ES[m_int]} {y_int}"
+
+    # Calcular mes previo y siguiente para flechas de navegación
+    if m_int == 1:
+        prev_month_str = f"{y_int - 1:04d}-12"
+    else:
+        prev_month_str = f"{y_int:04d}-{m_int - 1:02d}"
+
+    if m_int == 12:
+        next_month_str = f"{y_int + 1:04d}-01"
+    else:
+        next_month_str = f"{y_int:04d}-{m_int + 1:02d}"
+
+    _, last_day = calendar.monthrange(y_int, m_int)
+    start_dt = datetime(y_int, m_int, 1, 0, 0, 0)
+    end_dt = datetime(y_int, m_int, last_day, 23, 59, 59)
+    start_d = date(y_int, m_int, 1)
+    end_d = date(y_int, m_int, last_day)
+
+    # 3. Citas del mes
+    appts = db.query(Appointment).filter(
+        ((Appointment.date >= start_d) & (Appointment.date <= end_d)) |
+        ((Appointment.date == None) & (Appointment.created_at >= start_dt) & (Appointment.created_at <= end_dt))
+    ).all()
+    total_appointments = len(appts)
+
+    # 4. Consultas del mes
+    conss = db.query(Consultation).filter(
+        Consultation.created_at >= start_dt,
+        Consultation.created_at <= end_dt
+    ).all()
+    total_consultations = len(conss)
+
+    # 5. Pacientes únicos atendidos
+    p_ids = {a.patient_id for a in appts if a.patient_id} | {c.patient_id for c in conss if c.patient_id}
+    unique_patients_count = len(p_ids)
+
+    # 6. Recaudación del mes
+    payments = db.query(Payment).filter(
+        Payment.created_at >= start_dt,
+        Payment.created_at <= end_dt
+    ).all()
+    total_revenue = sum(p.total for p in payments if p.status == 'paid')
+
+    # 7. Desglose de TIPOS DE CITAS CON %
+    type_counter = Counter()
+    for a in appts:
+        t = (a.reason or (a.service.name if a.service else "Consulta General")).strip()
+        type_counter[t] += 1
+
+    # También consultas registradas directamente
+    for c in conss:
+        if not c.appointment_id:
+            t = (c.reason or "Consulta Médica General").strip()
+            type_counter[t] += 1
+
+    total_activity = sum(type_counter.values())
+    types_breakdown = []
+    for idx, (t_name, count) in enumerate(type_counter.most_common()):
+        pct = round((count / max(total_activity, 1)) * 100, 1)
+        color = PALETTE[idx % len(PALETTE)]
+        types_breakdown.append({
+            "name": t_name,
+            "count": count,
+            "percentage": pct,
+            "color": color
+        })
+
+    # Datos serializados para Chart.js de Tipos de Citas
+    types_chart_labels = [item["name"] for item in types_breakdown]
+    types_chart_data = [item["count"] for item in types_breakdown]
+    types_chart_colors = [item["color"] for item in types_breakdown]
+
+    # 8. ANÁLISIS DE LA SEMANA (Día más fuerte y Día más flojo)
+    day_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    weekday_counts = [0] * 7
+
+    for a in appts:
+        d = a.date or (a.created_at.date() if a.created_at else None)
+        if d:
+            weekday_counts[d.weekday()] += 1
+
+    for c in conss:
+        if not c.appointment_id and c.created_at:
+            d = c.created_at.date()
+            weekday_counts[d.weekday()] += 1
+
+    total_week_events = sum(weekday_counts)
+
+    strongest_day = None
+    weakest_day = None
+    if total_week_events > 0:
+        max_c = max(weekday_counts)
+        max_idx = weekday_counts.index(max_c)
+        strongest_day = {
+            "name": day_names[max_idx],
+            "count": max_c,
+            "percentage": round((max_c / total_week_events) * 100, 1)
+        }
+
+        min_c = min(weekday_counts)
+        min_idx = weekday_counts.index(min_c)
+        weakest_day = {
+            "name": day_names[min_idx],
+            "count": min_c,
+            "percentage": round((min_c / total_week_events) * 100, 1)
+        }
+
+    # Desglose de cada día de la semana para la vista
+    weekly_breakdown = []
+    for i in range(7):
+        c_count = weekday_counts[i]
+        weekly_breakdown.append({
+            "name": day_names[i],
+            "count": c_count,
+            "percentage": round((c_count / max(total_week_events, 1)) * 100, 1),
+            "is_strongest": bool(strongest_day and day_names[i] == strongest_day["name"] and c_count > 0),
+            "is_weakest": bool(weakest_day and day_names[i] == weakest_day["name"])
+        })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="reports/monthly.html",
+        context={
+            "user": current_user,
+            "selected_month": selected_month_str,
+            "month_name_es": month_name_es,
+            "prev_month": prev_month_str,
+            "next_month": next_month_str,
+            "available_months": available_months,
+            "total_appointments": total_appointments,
+            "total_consultations": total_consultations,
+            "total_activity": total_activity,
+            "unique_patients_count": unique_patients_count,
+            "total_revenue": total_revenue,
+            "types_breakdown": types_breakdown,
+            "strongest_day": strongest_day,
+            "weakest_day": weakest_day,
+            "weekly_breakdown": weekly_breakdown,
+            "types_chart_labels": json.dumps(types_chart_labels),
+            "types_chart_data": json.dumps(types_chart_data),
+            "types_chart_colors": json.dumps(types_chart_colors),
+            "weekly_chart_labels": json.dumps(day_names),
+            "weekly_chart_data": json.dumps(weekday_counts),
+            "active_menu": "reports",
+            "active_tab": "monthly"
+        }
     )
