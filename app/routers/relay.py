@@ -15,22 +15,87 @@ router = APIRouter(prefix="/api/relay", tags=["relay"])
 def global_relay_status(db: Session = Depends(get_db)):
     """Estado global del buzón relay local."""
     clinic_id = RelayService.get_clinic_id(db)
+    setting = db.query(Setting).first()
     messages = RelayService.pull_messages(db, clinic_id=clinic_id, limit=5)
     return {
         "status": "online",
         "service": "SSCP Local-First Relay Mailbox",
         "clinic_id": clinic_id,
+        "pairing_code": clinic_id.upper().replace("_", "-"),
+        "doctor_name": setting.doctor_name if setting and setting.doctor_name else "Médico Especialista",
+        "specialty": setting.specialty if setting and setting.specialty else "Consulta General",
+        "clinic_name": setting.clinic_name if setting and setting.clinic_name else "Centro Médico SSCP",
+        "sede_name": setting.sede_name if setting and setting.sede_name else "Sede Central",
         "recent_messages_count": len(messages),
         "timestamp": datetime.utcnow().isoformat()
+    }
+
+@router.get("/link-info")
+def get_link_info(db: Session = Depends(get_db)):
+    """Información completa para vincular una tablet o estación secundaria."""
+    clinic_id = RelayService.get_clinic_id(db)
+    setting = db.query(Setting).first()
+    # Auto-sincronizar el perfil de estación y la IP local al buzón cloud en segundo plano
+    import threading
+    from app.database import SessionLocal
+    def _bg_sync():
+        try:
+            bg_db = SessionLocal()
+            try:
+                RelayService.sync_station_profile_to_cloud(bg_db, clinic_id)
+            finally:
+                bg_db.close()
+        except Exception:
+            pass
+    threading.Thread(target=_bg_sync, daemon=True).start()
+
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+    except Exception:
+        local_ip = "127.0.0.1"
+    finally:
+        s.close()
+
+    return {
+        "status": "online",
+        "clinic_id": clinic_id,
+        "pairing_code": clinic_id.upper().replace("_", "-"),
+        "doctor_name": setting.doctor_name if setting and setting.doctor_name else "Médico Especialista",
+        "specialty": setting.specialty if setting and setting.specialty else "Consulta General",
+        "clinic_name": setting.clinic_name if setting and setting.clinic_name else "Centro Médico SSCP",
+        "sede_name": setting.sede_name if setting and setting.sede_name else "Sede Central",
+        "local_ip": local_ip,
+        "local_url": f"http://{local_ip}:8080",
+        "server": "https://sscp.laxarusdevs.com"
     }
 
 @router.get("/{clinic_id}/status")
 def clinic_relay_status(clinic_id: str, db: Session = Depends(get_db)):
     """Estado del buzón para una clínica específica."""
+    setting = db.query(Setting).first()
     messages = RelayService.pull_messages(db, clinic_id=clinic_id, limit=100)
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+    except Exception:
+        local_ip = "127.0.0.1"
+    finally:
+        s.close()
+
     return {
         "status": "online",
         "clinic_id": clinic_id,
+        "pairing_code": clinic_id.upper().replace("_", "-"),
+        "doctor_name": setting.doctor_name if setting and setting.doctor_name else "Médico Especialista",
+        "specialty": setting.specialty if setting and setting.specialty else "Consulta General",
+        "clinic_name": setting.clinic_name if setting and setting.clinic_name else "Centro Médico SSCP",
+        "local_ip": local_ip,
+        "local_url": f"http://{local_ip}:8080",
         "pending_deltas_count": len(messages),
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -135,9 +200,13 @@ def sync_local_from_relay(
         total_appts += res.get("processed_appointments", 0)
         total_payments += res.get("processed_payments", 0)
 
+    # 3. Publicar snapshot actualizado al buzón en la nube para sincronización con terminales externas
+    RelayService.push_snapshot_to_cloud(db=db, clinic_id=clinic_id)
+
     return {
         "success": True,
         "cloud_messages": cloud_stats.get("pulled_messages", 0),
+        "new_cloud_messages": cloud_stats.get("new_messages", 0),
         "processed_messages": len(messages) + cloud_stats.get("pulled_messages", 0),
         "total_patients_merged": total_patients,
         "total_appointments_merged": total_appts,
@@ -149,13 +218,38 @@ def sync_local_from_relay(
 @router.get("/qr-link")
 def get_relay_qr_image(request: Request, db: Session = Depends(get_db)):
     """Genera la imagen PNG del Código QR para conectar la tablet en 2 segundos."""
-    from app.routers.sync import get_local_ip
-    import os
-
+    import urllib.parse
+    import socket
     clinic_id = RelayService.get_clinic_id(db)
-    # Genera enlace que funciona por Internet en cualquier red (Wi-Fi, 4G o cable)
-    connection_data = f"https://sscp.laxarusdevs.com/reception/agenda?clinic_id={clinic_id}&server=https://sscp.laxarusdevs.com"
+    setting = db.query(Setting).first()
+    doc_name = setting.doctor_name if setting and setting.doctor_name else ""
+    spec = setting.specialty if setting and setting.specialty else ""
+    clinic_name = setting.clinic_name if setting and setting.clinic_name else ""
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+    except Exception:
+        local_ip = "127.0.0.1"
+    finally:
+        s.close()
+
+    local_url = f"http://{local_ip}:8080"
+
+    params = urllib.parse.urlencode({
+        "clinic_id": clinic_id,
+        "local_url": local_url,
+        "server": local_url,
+        "cloud_server": "https://sscp.laxarusdevs.com",
+        "doctor": doc_name,
+        "specialty": spec,
+        "clinic": clinic_name
+    })
+    # Genera enlace universal compatible tanto con red local Wi-Fi como por Cloud Relay 4G
+    connection_data = f"https://sscp.laxarusdevs.com/mobile/?{params}"
 
     qr_bytes = generate_qr_code_image_bytes(connection_data)
     return Response(content=qr_bytes, media_type="image/png")
+
 

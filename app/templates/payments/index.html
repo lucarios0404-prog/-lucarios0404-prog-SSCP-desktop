@@ -20,60 +20,140 @@
                         <p class="text-xs text-slate-500 mt-0.5">Control de ingresos, cobro de consultas y cuentas por cobrar.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <a href="/reports/export/secretary-daily-pdf" target="_blank" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-md shadow-teal-500/20 transition-all" title="Descargar Reporte Diario de Recepción & Arqueo de Caja en PDF">
-                            <i class="fas fa-file-pdf mr-2"></i> Cuadre de Caja (PDF)
-                        </a>
+                        <button type="button" onclick="openCuadreModal()" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-md shadow-teal-500/20 transition-all" title="Vista previa del Cuadre de Caja con opciones de Imprimir o Descargar en PDF">
+                            <i class="fas fa-cash-register mr-2"></i> Cuadre de Caja
+                        </button>
                         <a href="/payments/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-md shadow-emerald-500/20 transition-all">
                             <i class="fas fa-plus-circle mr-2"></i> Registrar Nuevo Pago / Cobro
                         </a>
                     </div>
                 </div>
 
-                <!-- KPI Totals -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Cobrado (Ingresos)</p>
-                            <h3 class="text-2xl font-bold text-emerald-600 mt-1">RD$ {{ "%.2f"|format(total_cobrado) }}</h3>
+                <!-- KPI Totals (4 Tarjetas con Cobrado Hoy Destacado) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Tarjeta 1: Cobrado Hoy (Ingresos del Día) -->
+                    <div class="bg-gradient-to-br from-emerald-500/10 via-emerald-50/50 to-white rounded-2xl p-5 border-2 border-emerald-300 shadow-sm flex flex-col justify-between relative overflow-hidden">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[11px] font-extrabold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Cobrado Hoy
+                            </span>
+                            <div class="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm font-bold shadow-sm">
+                                <i class="fas fa-calendar-day"></i>
+                            </div>
                         </div>
-                        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
-                            <i class="fas fa-hand-holding-usd"></i>
+                        <div>
+                            <h3 class="text-2xl font-black text-emerald-700 tracking-tight">RD$ {{ "%.2f"|format(total_cobrado_hoy) }}</h3>
+                            <p class="text-[11px] text-emerald-800 font-semibold mt-1">
+                                {{ total_cobrado_hoy_count }} cobro{{ 's' if total_cobrado_hoy_count != 1 else '' }} hoy
+                            </p>
+                            <div class="mt-2 pt-2 border-t border-emerald-200/60 flex flex-wrap gap-1 text-[10px] text-slate-600">
+                                {% if breakdown_hoy.cash > 0 %}<span class="bg-white px-1.5 py-0.5 rounded border border-emerald-200 font-medium">Ef: RD${{ "%.0f"|format(breakdown_hoy.cash) }}</span>{% endif %}
+                                {% if breakdown_hoy.card > 0 %}<span class="bg-white px-1.5 py-0.5 rounded border border-emerald-200 font-medium">Tarj: RD${{ "%.0f"|format(breakdown_hoy.card) }}</span>{% endif %}
+                                {% if breakdown_hoy.transfer > 0 %}<span class="bg-white px-1.5 py-0.5 rounded border border-emerald-200 font-medium">Transf: RD${{ "%.0f"|format(breakdown_hoy.transfer) }}</span>{% endif %}
+                                {% if breakdown_hoy.insurance > 0 %}<span class="bg-white px-1.5 py-0.5 rounded border border-emerald-200 font-medium">Seg: RD${{ "%.0f"|format(breakdown_hoy.insurance) }}</span>{% endif %}
+                            </div>
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                    <!-- Tarjeta 2: Cobrado en Período Activo -->
+                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                {% if date_filter == 'today' %}Cobrado Hoy
+                                {% elif date_filter == 'yesterday' %}Cobrado Ayer
+                                {% elif date_filter == 'this_week' %}Cobrado Esta Semana
+                                {% elif date_filter == 'all' %}Total Cobrado (Histórico)
+                                {% else %}Cobrado ({{ date_filter }}){% endif %}
+                            </span>
+                            <div class="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center text-sm font-bold">
+                                <i class="fas fa-hand-holding-usd"></i>
+                            </div>
+                        </div>
                         <div>
-                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cuentas por Cobrar</p>
+                            <h3 class="text-2xl font-bold text-slate-900 mt-1">RD$ {{ "%.2f"|format(total_cobrado) }}</h3>
+                            <p class="text-[11px] text-slate-400 mt-1">Monto acumulado en filtro</p>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 3: Cuentas por Cobrar -->
+                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Cuentas por Cobrar</span>
+                            <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-bold">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                            </div>
+                        </div>
+                        <div>
                             <h3 class="text-2xl font-bold text-amber-600 mt-1">RD$ {{ "%.2f"|format(total_pendiente) }}</h3>
-                        </div>
-                        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
-                            <i class="fas fa-file-invoice-dollar"></i>
+                            <p class="text-[11px] text-amber-700 font-medium mt-1">Facturas con saldo pendiente</p>
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                    <!-- Tarjeta 4: Pacientes con Deuda -->
+                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pacientes con Deuda</span>
+                            <div class="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-sm font-bold">
+                                <i class="fas fa-users-slash"></i>
+                            </div>
+                        </div>
                         <div>
-                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pacientes con Deuda</p>
                             <h3 class="text-2xl font-bold text-red-600 mt-1">{{ debtors|length }}</h3>
+                            <p class="text-[11px] text-red-700 font-medium mt-1">Pacientes pendientes de cobro</p>
                         </div>
-                        <div class="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-xl font-bold">
-                            <i class="fas fa-users-slash"></i>
-                        </div>
+                    </div>
+                </div>
+
+                <!-- Barra de Filtros por Día y Fecha -->
+                <div class="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div class="flex items-center flex-wrap gap-2 text-xs">
+                        <span class="text-slate-400 font-bold uppercase tracking-wider text-[11px] mr-1 flex items-center gap-1">
+                            <i class="fas fa-filter text-slate-500"></i> Filtrar por Día:
+                        </span>
+                        <a href="/payments?status={{ status_filter }}&date_filter=today"
+                            class="px-3 py-1.5 rounded-xl font-bold transition-all {% if date_filter == 'today' %}bg-emerald-600 text-white shadow-sm shadow-emerald-600/30{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700{% endif %}">
+                            <i class="fas fa-calendar-day mr-1"></i> Hoy
+                        </a>
+                        <a href="/payments?status={{ status_filter }}&date_filter=yesterday"
+                            class="px-3 py-1.5 rounded-xl font-bold transition-all {% if date_filter == 'yesterday' %}bg-emerald-600 text-white shadow-sm shadow-emerald-600/30{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700{% endif %}">
+                            Ayer
+                        </a>
+                        <a href="/payments?status={{ status_filter }}&date_filter=this_week"
+                            class="px-3 py-1.5 rounded-xl font-bold transition-all {% if date_filter == 'this_week' %}bg-emerald-600 text-white shadow-sm shadow-emerald-600/30{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700{% endif %}">
+                            Esta Semana
+                        </a>
+                        <a href="/payments?status={{ status_filter }}&date_filter=all"
+                            class="px-3 py-1.5 rounded-xl font-bold transition-all {% if date_filter == 'all' or not date_filter %}bg-slate-800 text-white shadow-sm{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700{% endif %}">
+                            Todo el Historial
+                        </a>
+                    </div>
+
+                    <!-- Selector de Fecha Específica -->
+                    <div class="flex items-center gap-2 text-xs">
+                        <label for="custom_date_input" class="text-slate-500 font-semibold whitespace-nowrap">Fecha específica:</label>
+                        <input type="date" id="custom_date_input" value="{{ custom_date }}"
+                            onchange="window.location.href='/payments?status={{ status_filter }}&date_filter=' + this.value"
+                            class="px-3 py-1.5 border border-slate-300 rounded-xl text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500 bg-slate-50/50 hover:bg-white text-xs">
+                        {% if date_filter and date_filter != 'all' %}
+                        <a href="/payments?status={{ status_filter }}&date_filter=all" class="text-xs text-red-500 hover:text-red-700 font-semibold px-1" title="Limpiar filtro de fecha">
+                            <i class="fas fa-times-circle"></i> Limpiar
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
 
                 <!-- Tabs Navigation -->
                 <div class="border-b border-slate-200 flex space-x-6">
-                    <a href="/payments?status=all" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'all' %}border-blue-600 text-blue-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+                    <a href="/payments?status=all&date_filter={{ date_filter }}" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'all' %}border-blue-600 text-blue-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
                         <i class="fas fa-list mr-1.5"></i> Todos los Pagos
                     </a>
-                    <a href="/payments?status=paid" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'paid' %}border-emerald-600 text-emerald-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+                    <a href="/payments?status=paid&date_filter={{ date_filter }}" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'paid' %}border-emerald-600 text-emerald-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
                         <i class="fas fa-check-circle mr-1.5"></i> Cobrados
                     </a>
-                    <a href="/payments?status=pending" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'pending' %}border-amber-600 text-amber-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+                    <a href="/payments?status=pending&date_filter={{ date_filter }}" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'pending' %}border-amber-600 text-amber-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
                         <i class="fas fa-clock mr-1.5"></i> Pendientes de Pago
                     </a>
-                    <a href="/payments?status=receivables" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'receivables' %}border-red-600 text-red-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+                    <a href="/payments?status=receivables&date_filter={{ date_filter }}" class="pb-3 text-sm font-semibold border-b-2 transition-colors {% if status_filter == 'receivables' %}border-red-600 text-red-600{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
                         <i class="fas fa-exclamation-triangle mr-1.5"></i> Cuentas por Cobrar
                     </a>
                 </div>
@@ -155,30 +235,69 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
-                                {% for p in payments %}
-                                <tr class="hover:bg-slate-50/80 transition-colors">
-                                    <td class="py-4 px-5 whitespace-nowrap">
-                                        <span class="font-mono text-xs font-bold text-slate-900">{{ p.receipt_number or ('REC-' ~ p.id) }}</span>
-                                        <span class="block text-[11px] text-slate-400">{{ p.created_at.strftime("%d/%m/%Y %H:%M") if p.created_at else "—" }}</span>
+                                {% if not payments_by_day %}
+                                <tr>
+                                    <td colspan="7" class="py-12 text-center text-slate-400">
+                                        <i class="fas fa-receipt text-3xl mb-3 block text-slate-300"></i>
+                                        No hay registros de facturación para la fecha o filtro seleccionado.
                                     </td>
-                                    <td class="py-4 px-5 font-semibold text-slate-900">
+                                </tr>
+                                {% endif %}
+
+                                {% for date_key, group in payments_by_day.items() %}
+                                <!-- Encabezado Divisor por Día -->
+                                <tr class="bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100/60 border-y border-slate-200">
+                                    <td colspan="7" class="py-2.5 px-5">
+                                        <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                            <div class="flex items-center gap-2">
+                                                <span class="w-6 h-6 rounded-lg bg-teal-600 text-white flex items-center justify-center text-[10px] font-bold">
+                                                    <i class="far fa-calendar-alt"></i>
+                                                </span>
+                                                <span class="font-extrabold text-slate-900 text-xs tracking-tight">
+                                                    {{ group.label }}
+                                                </span>
+                                                <span class="text-[11px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs">
+                                                    {{ group.count }} cobro{{ 's' if group.count != 1 else '' }}
+                                                </span>
+                                            </div>
+                                            <div class="flex items-center gap-3 font-mono text-xs">
+                                                <span class="font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                                                    Cobrado: RD$ {{ "%.2f"|format(group.day_paid) }}
+                                                </span>
+                                                {% if group.day_pending > 0 %}
+                                                <span class="font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 text-[11px]">
+                                                    Pendiente: RD$ {{ "%.2f"|format(group.day_pending) }}
+                                                </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                {% for p in group.records %}
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-3.5 px-5 whitespace-nowrap">
+                                        <span class="font-mono text-xs font-bold text-slate-900">{{ p.receipt_number or ('REC-' ~ p.id) }}</span>
+                                        <span class="block text-[11px] text-slate-400">{{ p.created_at.strftime("%H:%M") if p.created_at else "—" }}</span>
+                                    </td>
+                                    <td class="py-3.5 px-5 font-semibold text-slate-900">
                                         {% if p.patient %}
                                         <a href="/patients/{{ p.patient.id }}" class="hover:text-blue-600">
                                             {{ p.patient.first_name }} {{ p.patient.last_name }}
                                         </a>
-                                        <div class="mt-1">
+                                        <div class="mt-0.5">
                                             {{ (p.insurance_name or p.patient.insurance_name)|ars_badge(p.patient.insurance_number)|safe }}
                                         </div>
                                         {% else %}
                                         <span class="text-slate-400 italic">Paciente N/D</span>
                                         {% if p.insurance_name %}
-                                        <div class="mt-1">
+                                        <div class="mt-0.5">
                                             {{ p.insurance_name|ars_badge|safe }}
                                         </div>
                                         {% endif %}
                                         {% endif %}
                                     </td>
-                                    <td class="py-4 px-5 text-xs text-slate-700">
+                                    <td class="py-3.5 px-5 text-xs text-slate-700">
                                         <div class="flex items-center gap-1.5">
                                             {% if p.service and p.service.color %}
                                             <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {{ p.service.color }};"></span>
@@ -188,7 +307,7 @@
                                             <span class="font-medium text-slate-800">{{ p.service_name }}</span>
                                         </div>
                                     </td>
-                                    <td class="py-4 px-5 whitespace-nowrap">
+                                    <td class="py-3.5 px-5 whitespace-nowrap">
                                         <span class="inline-flex items-center text-xs text-slate-600 font-medium">
                                             {% if p.payment_method == 'cash' %}💵 Efectivo
                                             {% elif p.payment_method == 'card' %}💳 Tarjeta
@@ -197,13 +316,13 @@
                                             {% else %}{{ p.payment_method }}{% endif %}
                                         </span>
                                     </td>
-                                    <td class="py-4 px-5 whitespace-nowrap font-bold text-slate-900">
+                                    <td class="py-3.5 px-5 whitespace-nowrap font-bold text-slate-900">
                                         RD$ {{ "%.2f"|format(p.total) }}
                                         {% if p.discount and p.discount > 0 %}
                                         <span class="block text-[10px] text-emerald-600 font-normal">Desc: -RD$ {{ "%.2f"|format(p.discount) }}</span>
                                         {% endif %}
                                     </td>
-                                    <td class="py-4 px-5 whitespace-nowrap">
+                                    <td class="py-3.5 px-5 whitespace-nowrap">
                                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold
                                             {% if p.status == 'paid' %}bg-emerald-100 text-emerald-800 border border-emerald-200
                                             {% elif p.status == 'pending' %}bg-amber-100 text-amber-800 border border-amber-200
@@ -213,7 +332,7 @@
                                             {% else %}{{ p.status }}{% endif %}
                                         </span>
                                     </td>
-                                    <td class="py-4 px-5 text-right whitespace-nowrap">
+                                    <td class="py-3.5 px-5 text-right whitespace-nowrap">
                                         {% if p.status == 'pending' %}
                                         <form method="post" action="/payments/{{ p.id }}/pay" class="inline">
                                             <button type="submit" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all">
@@ -225,13 +344,7 @@
                                         {% endif %}
                                     </td>
                                 </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="7" class="py-12 text-center text-slate-400">
-                                        <i class="fas fa-receipt text-3xl mb-3 block text-slate-300"></i>
-                                        No hay registros de facturación para este filtro.
-                                    </td>
-                                </tr>
+                                {% endfor %}
                                 {% endfor %}
                             </tbody>
                         </table>

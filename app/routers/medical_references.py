@@ -91,11 +91,12 @@ def submit_reference(
 
     if print_format == "talonario":
         return RedirectResponse(url=f"/references/{ref_obj.id}/talonario/pdf", status_code=303)
-    return RedirectResponse(url=f"/references/{ref_obj.id}/pdf", status_code=303)
+    return RedirectResponse(url=f"/references/{ref_obj.id}/pdf?download=1", status_code=303)
 
 @router.get("/{reference_id}/pdf")
 def download_reference_pdf(
     reference_id: int,
+    download: bool = Query(False),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
@@ -107,10 +108,11 @@ def download_reference_pdf(
     pdf_buffer = generate_medical_reference_pdf(ref_obj, setting)
 
     filename = f"Referencia_Medica_{ref_obj.patient_id}_{ref_obj.id}.pdf"
+    disposition = "attachment" if download else "inline"
     return StreamingResponse(
         pdf_buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename={filename}"}
+        headers={"Content-Disposition": f"{disposition}; filename={filename}"}
     )
 
 @router.get("/{reference_id}/talonario/pdf")

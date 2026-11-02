@@ -12,7 +12,7 @@
         {% include "partials/header.html" %}
 
         <main class="flex-1 overflow-y-auto p-6 md:p-8">
-            <div class="max-w-4xl mx-auto space-y-6">
+            <div class="max-w-7xl mx-auto space-y-6">
                 <div class="flex items-center justify-between">
                     <div>
                         <h1 class="text-2xl font-bold text-slate-900">Registrar Consulta Médica</h1>
@@ -23,8 +23,11 @@
                     </a>
                 </div>
 
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
-                    {% if request.query_params.get('walk_in') %}
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <!-- Columna Principal: Formulario de Registro (8 columnas) -->
+                    <div class="lg:col-span-8">
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+                            {% if request.query_params.get('walk_in') %}
                     <div class="mb-6 p-4 bg-emerald-50 border-2 border-emerald-300 rounded-xl flex items-center justify-between text-emerald-900 shadow-sm">
                         <div class="flex items-center space-x-3">
                             <span class="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
@@ -348,6 +351,115 @@
                 </div>
             </div>
 
+            <!-- Columna Lateral: Panel de Última Consulta Previa ("en un ladito") (4 columnas sticky) -->
+            <div class="lg:col-span-4 lg:sticky lg:top-4 space-y-4">
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <!-- Cabecera del Panel Lateral -->
+                    <div class="bg-gradient-to-r from-slate-900 to-blue-900 text-white px-4 py-3.5 flex items-center justify-between">
+                        <div class="flex items-center space-x-2.5">
+                            <span class="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold border border-blue-500/30">
+                                <i class="fas fa-history"></i>
+                            </span>
+                            <div>
+                                <h2 class="text-xs font-extrabold uppercase tracking-wider text-blue-300">Última Consulta Previa</h2>
+                                <p class="text-[10px] text-slate-300">Historial clínico reciente del paciente</p>
+                            </div>
+                        </div>
+                        <span id="lc_badge" class="{% if not last_consultation %}hidden{% endif %} text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                            Reciente
+                        </span>
+                    </div>
+
+                    <!-- Estado Vacío (Sin paciente o primera visita) -->
+                    <div id="no_last_consultation" class="{% if last_consultation %}hidden{% endif %} p-6 text-center text-slate-500 space-y-2">
+                        <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-lg">
+                            <i class="fas fa-folder-open"></i>
+                        </div>
+                        <p class="text-xs font-bold text-slate-700" id="no_lc_title">
+                            {% if selected_patient %}Sin consultas previas{% else %}Sin paciente seleccionado{% endif %}
+                        </p>
+                        <p class="text-[11px] text-slate-500" id="no_lc_desc">
+                            {% if selected_patient %}
+                                Este paciente no tiene consultas registradas anteriormente (Apertura de expediente / Primera visita).
+                            {% else %}
+                                Seleccione un paciente en el formulario para visualizar automáticamente su consulta médica más reciente aquí al lado.
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <!-- Ficha Detallada de la Última Consulta -->
+                    <div id="last_consultation_card" class="{% if not last_consultation %}hidden{% endif %} p-4 space-y-3.5 divide-y divide-slate-100 text-xs">
+                        <!-- Fecha y Acceso al Expediente -->
+                        <div class="pt-0 flex items-center justify-between text-slate-600">
+                            <div class="flex items-center space-x-1.5 font-bold text-slate-800">
+                                <i class="fas fa-calendar-alt text-blue-500 text-xs"></i>
+                                <span id="lc_date">
+                                    {% if last_consultation %}{{ last_consultation.created_at.strftime('%d/%m/%Y %I:%M %p') }}{% endif %}
+                                </span>
+                            </div>
+                            <a id="lc_patient_link" href="{% if selected_patient %}/patients/{{ selected_patient.id }}{% else %}#{% endif %}" target="_blank" class="text-[11px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1">
+                                Expediente <i class="fas fa-external-link-alt text-[9px]"></i>
+                            </a>
+                        </div>
+
+                        <!-- Motivo de Consulta -->
+                        <div class="pt-3 space-y-1">
+                            <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Motivo de Consulta</span>
+                            <p id="lc_reason" class="font-semibold text-slate-800 leading-snug">
+                                {% if last_consultation %}{{ last_consultation.reason }}{% endif %}
+                            </p>
+                        </div>
+
+                        <!-- Diagnóstico -->
+                        <div class="pt-3 space-y-1">
+                            <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Diagnóstico Registrado</span>
+                            <p id="lc_diagnosis" class="font-medium text-purple-900 bg-purple-50 p-2 rounded-lg border border-purple-100 text-xs">
+                                {% if last_consultation %}{{ last_consultation.diagnosis or 'Sin diagnóstico registrado' }}{% endif %}
+                            </p>
+                        </div>
+
+                        <!-- Historia Clínica / Hallazgos -->
+                        <div class="pt-3 space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Historia Clínica Previa</span>
+                                <button type="button" onclick="copyLastHistoryToCurrent()" class="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1">
+                                    <i class="fas fa-copy text-[10px]"></i> Anexar
+                                </button>
+                            </div>
+                            <div id="lc_history" class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-[11px] leading-relaxed max-h-40 overflow-y-auto whitespace-pre-line font-mono">
+                                {% if last_consultation %}{{ last_consultation.clinical_history or 'Sin texto' }}{% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Receta / Prescripción -->
+                        <div class="pt-3 space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Prescripción / Receta</span>
+                                <button type="button" onclick="copyLastPrescriptionToCurrent()" class="text-[10px] text-teal-600 hover:text-teal-800 font-bold flex items-center gap-1">
+                                    <i class="fas fa-pills text-[10px]"></i> Usar Receta
+                                </button>
+                            </div>
+                            <div id="lc_prescription" class="p-2 rounded-lg bg-teal-50/70 border border-teal-200 text-teal-900 text-[11px] leading-snug max-h-28 overflow-y-auto whitespace-pre-line">
+                                {% if last_consultation %}{{ last_consultation.prescription or 'Sin prescripción' }}{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tarjeta Informativa de Ayuda al Médico -->
+                <div class="bg-blue-50/70 rounded-2xl border border-blue-200 p-4 text-xs text-blue-900 space-y-2">
+                    <div class="flex items-center space-x-2 font-bold text-blue-950">
+                        <i class="fas fa-lightbulb text-amber-500"></i>
+                        <span>Continuidad Clínica Inmediata</span>
+                    </div>
+                    <p class="text-[11px] text-blue-800 leading-relaxed">
+                        Este panel lateral ("en un ladito") permanece fijo mientras redactas la consulta para comparar la evolución de los síntomas y replicar recetas con un solo clic.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
             <!-- Modal: Agregar Diagnóstico / Código Personalizado -->
             <div id="customCie10Modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
                 <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
@@ -418,6 +530,8 @@
 // --- ACTUALIZACIÓN DINÁMICA DE FICHA DE PACIENTE ---
 function updatePatientIdentity(selectEl) {
     const opt = selectEl.options[selectEl.selectedIndex];
+    const patientId = opt ? opt.value : '';
+    loadPatientLastConsultation(patientId);
     const card = document.getElementById('patient_identity_card');
     if (!opt || !opt.value) {
         if (card) card.classList.add('hidden');
@@ -629,6 +743,7 @@ function selectPatientFromLiveSearch(p) {
     if (patientSearchInput) {
         patientSearchInput.value = `${p.name} (DNI: ${p.document_id || 'Sin DNI'})`;
     }
+    loadPatientLastConsultation(p.id);
     if (clearPatientBtn) clearPatientBtn.classList.remove('hidden');
     if (patientSearchDropdown) patientSearchDropdown.classList.add('hidden');
 }
@@ -843,6 +958,95 @@ function applyPrescriptionTemplate(selectEl) {
             rxEl.value = content;
         }
         rxEl.focus();
+    }
+}
+
+// --- CARGA Y SINCRONIZACIÓN DE LA ÚLTIMA CONSULTA PREVIA (PANEL LATERAL) ---
+async function loadPatientLastConsultation(patientId) {
+    const card = document.getElementById('last_consultation_card');
+    const empty = document.getElementById('no_last_consultation');
+    const badge = document.getElementById('lc_badge');
+    const emptyTitle = document.getElementById('no_lc_title');
+    const emptyDesc = document.getElementById('no_lc_desc');
+
+    if (!patientId) {
+        if (card) card.classList.add('hidden');
+        if (badge) badge.classList.add('hidden');
+        if (empty) {
+            empty.classList.remove('hidden');
+            if (emptyTitle) emptyTitle.textContent = "Sin paciente seleccionado";
+            if (emptyDesc) emptyDesc.textContent = "Seleccione un paciente en el formulario para visualizar automáticamente su consulta médica más reciente aquí al lado.";
+        }
+        return;
+    }
+
+    try {
+        const res = await fetch(`/consultations/api/patient-last-consultation/${patientId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.has_history && data.consultation) {
+            const c = data.consultation;
+            const dateEl = document.getElementById('lc_date');
+            const reasonEl = document.getElementById('lc_reason');
+            const diagEl = document.getElementById('lc_diagnosis');
+            const histEl = document.getElementById('lc_history');
+            const rxEl = document.getElementById('lc_prescription');
+            const linkEl = document.getElementById('lc_patient_link');
+
+            if (dateEl) dateEl.textContent = c.date || '-';
+            if (reasonEl) reasonEl.textContent = c.reason || '-';
+            if (diagEl) diagEl.textContent = c.diagnosis || 'Sin diagnóstico registrado';
+            if (histEl) histEl.textContent = c.clinical_history || 'Sin texto registrado';
+            if (rxEl) rxEl.textContent = c.prescription || 'Sin prescripción';
+            if (linkEl) linkEl.href = `/patients/${patientId}`;
+
+            if (empty) empty.classList.add('hidden');
+            if (card) card.classList.remove('hidden');
+            if (badge) badge.classList.remove('hidden');
+        } else {
+            if (card) card.classList.add('hidden');
+            if (badge) badge.classList.add('hidden');
+            if (empty) {
+                empty.classList.remove('hidden');
+                if (emptyTitle) emptyTitle.textContent = "Sin consultas previas";
+                if (emptyDesc) emptyDesc.textContent = "Este paciente no tiene consultas registradas anteriormente (Apertura de expediente / Primera visita).";
+            }
+        }
+    } catch (e) {
+        console.error("Error cargando última consulta del paciente:", e);
+    }
+}
+
+function copyLastPrescriptionToCurrent() {
+    const rxText = document.getElementById('lc_prescription')?.textContent?.trim();
+    if (!rxText || rxText === 'Sin prescripción') {
+        alert('No hay prescripción previa disponible para copiar.');
+        return;
+    }
+    const target = document.getElementById('prescription_textarea');
+    if (target) {
+        if (target.value.trim() && !confirm('¿Desea reemplazar la receta actual con la prescripción previa? (Cancelar para anexar al final)')) {
+            target.value += '\n' + rxText;
+        } else {
+            target.value = rxText;
+        }
+        target.focus();
+    }
+}
+
+function copyLastHistoryToCurrent() {
+    const histText = document.getElementById('lc_history')?.textContent?.trim();
+    if (!histText || histText === 'Sin texto') {
+        alert('No hay historia previa disponible para copiar.');
+        return;
+    }
+    const target = document.getElementById('clinical_history');
+    if (target) {
+        const note = `\n\n--- ANTECEDENTE DE CONSULTA PREVIA ---\n${histText}\n---------------------------------------\n`;
+        target.value += note;
+        target.focus();
+        updateWordCount();
     }
 }
 </script>

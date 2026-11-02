@@ -23,25 +23,46 @@
                 <img id="relayQrImage" src="/api/relay/qr-link" alt="Código QR de Vinculación" class="w-56 h-56 object-contain rounded-xl">
             </div>
 
+            <!-- Tarjeta de Código de Enlace Manual (Alternativa al QR) -->
+            <div class="bg-indigo-50 dark:bg-indigo-950/40 p-3 rounded-xl border border-indigo-200 dark:border-indigo-800 text-left">
+                <span class="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider block mb-1">
+                    Código de Enlace de este Consultorio
+                </span>
+                <div class="flex items-center justify-between gap-2">
+                    <span id="relayPairingCode" class="font-mono text-base font-black text-indigo-950 dark:text-indigo-200 tracking-wider">...</span>
+                    <button type="button" onclick="copyPairingCode()" class="px-2.5 py-1 text-xs font-bold bg-white dark:bg-slate-700 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-200 border border-indigo-300 dark:border-indigo-600 rounded-lg transition shadow-xs active:scale-95">
+                        <i class="fas fa-copy mr-1"></i> Copiar
+                    </button>
+                </div>
+                <div class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+                    <i class="fas fa-user-md text-indigo-500"></i>
+                    <span>Médico: <strong id="relayDoctorBadge" class="text-slate-700 dark:text-slate-200">Consultorio Médico</strong></span>
+                </div>
+            </div>
+
             <div class="bg-sky-50 dark:bg-slate-700/50 rounded-xl p-3 border border-sky-100 dark:border-slate-600 text-left space-y-2">
                 <div class="flex items-start gap-2.5">
                     <span class="w-5 h-5 rounded-full bg-sky-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
-                    <p class="text-xs text-slate-700 dark:text-slate-200"><span class="font-semibold">Abre la app en la Tablet</span> o apunta la cámara del dispositivo móvil.</p>
+                    <p class="text-xs text-slate-700 dark:text-slate-200"><span class="font-semibold">Abre la app en la Tablet</span> o PC secundaria de secretaría.</p>
                 </div>
                 <div class="flex items-start gap-2.5">
                     <span class="w-5 h-5 rounded-full bg-sky-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
-                    <p class="text-xs text-slate-700 dark:text-slate-200"><span class="font-semibold">Escanea este código QR</span> para enlazar este consultorio en 2 segundos.</p>
+                    <p class="text-xs text-slate-700 dark:text-slate-200"><span class="font-semibold">Escanea este código QR</span> o escribe el Código de Enlace para vincular al instante.</p>
                 </div>
                 <div class="flex items-start gap-2.5">
                     <span class="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">✓</span>
-                    <p class="text-xs text-emerald-800 dark:text-emerald-300 font-medium">Funciona en redes Wi-Fi diferentes, chips 4G o sin compartir red local.</p>
+                    <p class="text-xs text-emerald-800 dark:text-emerald-300 font-medium">Funciona tanto en la red Wi-Fi local del consultorio como por Internet (4G / Nube).</p>
+                </div>
+                <div class="pt-2 border-t border-sky-200/60 dark:border-slate-600/60 text-[11px] text-slate-600 dark:text-slate-300 flex items-center justify-between">
+                    <span>Acceso Wi-Fi Local directo:</span>
+                    <strong id="relayLocalUrlBadge" class="font-mono text-indigo-700 dark:text-indigo-300 font-bold select-all">Detectando IP...</strong>
                 </div>
             </div>
         </div>
 
         <!-- Footer -->
         <div class="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-            <span class="text-[11px] text-slate-400">Canal: <strong id="relayChannelBadge" class="text-slate-600 dark:text-slate-300">dr_carlos_heredia</strong></span>
+            <span class="text-[11px] text-slate-400">Canal: <strong id="relayChannelBadge" class="text-slate-600 dark:text-slate-300">...</strong></span>
             <button type="button" onclick="closeRelayQrModal()" class="px-4 py-1.5 text-xs font-semibold bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors">
                 Entendido
             </button>
@@ -50,10 +71,20 @@
 </div>
 
 <script>
+    let currentRelayCode = '';
+
+    function copyPairingCode() {
+        if (!currentRelayCode) return;
+        navigator.clipboard.writeText(currentRelayCode).then(() => {
+            alert('Código de enlace copiado: ' + currentRelayCode);
+        }).catch(() => {
+            prompt('Copia este código de enlace:', currentRelayCode);
+        });
+    }
+
     function openRelayQrModal() {
         const modal = document.getElementById('relayQrModal');
         if (modal) {
-            // Refrescar imagen con timestamp para asegurar carga limpia
             const img = document.getElementById('relayQrImage');
             if (img) {
                 img.src = '/api/relay/qr-link?t=' + new Date().getTime();
@@ -61,9 +92,19 @@
             fetch('/api/relay/status')
                 .then(res => res.json())
                 .then(data => {
-                    if (data && data.clinic_id) {
+                    if (data) {
                         const tag = document.getElementById('relayChannelBadge');
-                        if (tag) tag.textContent = data.clinic_id;
+                        if (tag && data.clinic_id) tag.textContent = data.clinic_id;
+                        const code = document.getElementById('relayPairingCode');
+                        const pCode = data.pairing_code || (data.clinic_id ? data.clinic_id.toUpperCase().replace(/_/g, '-') : 'CONSULTORIO');
+                        currentRelayCode = pCode;
+                        if (code) code.textContent = pCode;
+                        const doc = document.getElementById('relayDoctorBadge');
+                        if (doc && data.doctor_name) doc.textContent = data.doctor_name;
+                        const localBadge = document.getElementById('relayLocalUrlBadge');
+                        if (localBadge && data.local_url) {
+                            localBadge.textContent = data.local_url + '/mobile';
+                        }
                     }
                 })
                 .catch(() => {});

@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, func
 
 from fastapi import FastAPI, Request, Depends
 from fastapi.staticfiles import StaticFiles
@@ -67,21 +68,41 @@ async def run_peer_continuous_sync():
             pass
 
 
+def _execute_relay_sync_cycle():
+    """Ejecuta un ciclo de sincronización en hilo de fondo para no bloquear el bucle de eventos asyncio."""
+    from app.services.relay_service import RelayService
+    with SessionLocal() as db:
+        clinic_id = RelayService.get_clinic_id(db)
+        # 1. Absorber deltas pendientes desde el Cloud Relay público (Internet sin importar la red)
+        try:
+            RelayService.pull_from_cloud(db, clinic_id=clinic_id)
+        except Exception:
+            pass
+        # 2. Absorber desde el buzón local
+        try:
+            messages = RelayService.pull_messages(db, clinic_id=clinic_id, exclude_device_id="pc_doctor", limit=50)
+            for m in messages:
+                payload = m.get("payload", {})
+                RelayService.reconcile_incoming_delta(db, payload)
+        except Exception:
+            pass
+        # 3. Publicar snapshot actualizado de citas y pacientes al Cloud Relay
+        try:
+            RelayService.push_snapshot_to_cloud(db, clinic_id=clinic_id)
+        except Exception:
+            pass
+        # 4. Publicar perfil de estación con IP local para auto-descubrimiento
+        try:
+            RelayService.sync_station_profile_to_cloud(db, clinic_id=clinic_id)
+        except Exception:
+            pass
+
 async def run_relay_continuous_sync():
-    """Tarea en segundo plano: vacía automáticamente los deltas del Buzón Relay (Cloud y Local) hacia SQLite cada 15s."""
+    """Tarea en segundo plano: mantiene sincronizado bidireccionalmente el Buzón Relay (Cloud y Local) cada 15s sin bloquear."""
     while True:
         try:
             await asyncio.sleep(15)
-            from app.services.relay_service import RelayService
-            with SessionLocal() as db:
-                clinic_id = RelayService.get_clinic_id(db)
-                # 1. Absorber desde el Cloud Relay público (Internet sin importar la red)
-                RelayService.pull_from_cloud(db, clinic_id=clinic_id)
-                # 2. Absorber desde el buzón local
-                messages = RelayService.pull_messages(db, clinic_id=clinic_id, exclude_device_id="pc_doctor", limit=50)
-                for m in messages:
-                    payload = m.get("payload", {})
-                    RelayService.reconcile_incoming_delta(db, payload)
+            await asyncio.to_thread(_execute_relay_sync_cycle)
         except asyncio.CancelledError:
             break
         except Exception:
@@ -109,6 +130,13 @@ def ensure_schema_migrations(engine):
                 conn.execute(text("ALTER TABLE patients ADD COLUMN insurance_name TEXT DEFAULT 'Privado'"))
             if "insurance_number" not in col_names:
                 conn.execute(text("ALTER TABLE patients ADD COLUMN insurance_number TEXT"))
+            if "doctor_id" not in col_names:
+                conn.execute(text("ALTER TABLE patients ADD COLUMN doctor_id INTEGER"))
+
+            res_u = conn.execute(text("PRAGMA table_info(users)")).fetchall()
+            u_cols = [r[1] for r in res_u]
+            if "assigned_doctor_id" not in u_cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN assigned_doctor_id INTEGER"))
 
             # 2. Migraciones en settings (WhatsApp)
             res_s = conn.execute(text("PRAGMA table_info(settings)")).fetchall()
@@ -129,17 +157,25 @@ def ensure_schema_migrations(engine):
                 conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_gateway_status TEXT DEFAULT 'disconnected'"))
             if "whatsapp_connected_phone" not in s_cols:
                 conn.execute(text("ALTER TABLE settings ADD COLUMN whatsapp_connected_phone TEXT"))
+            if "doctor_logo_path" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN doctor_logo_path TEXT"))
+            if "doctor_exequatur" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN doctor_exequatur TEXT DEFAULT '165-10'"))
+            if "doctor_cedula" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN doctor_cedula TEXT DEFAULT '001-1418378-3'"))
             if "station_role" not in s_cols:
                 conn.execute(text("ALTER TABLE settings ADD COLUMN station_role TEXT DEFAULT 'doctor_principal'"))
             if "central_station_url" not in s_cols:
                 conn.execute(text("ALTER TABLE settings ADD COLUMN central_station_url TEXT"))
             if "relay_channel_id" not in s_cols:
-                conn.execute(text("ALTER TABLE settings ADD COLUMN relay_channel_id TEXT DEFAULT 'dr_carlos_heredia'"))
+                conn.execute(text("ALTER TABLE settings ADD COLUMN relay_channel_id TEXT"))
 
 
-            # 3. Migraciones en appointments (Turnos, Servicios, WhatsApp)
+            # 3. Migraciones en appointments (Turnos, Servicios, WhatsApp, Doctor)
             res_a = conn.execute(text("PRAGMA table_info(appointments)")).fetchall()
             a_cols = [r[1] for r in res_a]
+            if "doctor_id" not in a_cols:
+                conn.execute(text("ALTER TABLE appointments ADD COLUMN doctor_id INTEGER"))
             if "queue_number" not in a_cols:
                 conn.execute(text("ALTER TABLE appointments ADD COLUMN queue_number INTEGER"))
             if "service_id" not in a_cols:
@@ -283,11 +319,18 @@ from app.routers import mobile_api
 # Evita que sitios web de terceros en el navegador puedan sondear la API local del consultorio
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+|100\.\d+\.\d+\.\d+)(:\d+)?|app://.*|capacitor://.*|file://.*)$",
+    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+|100\.\d+\.\d+\.\d+|.*\.laxarusdevs\.com)(:\d+)?|https?://appassets\.androidplatform\.net|app://.*|capacitor://.*|file://.*|null)$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    allow_private_network=True,
 )
+
+@app.middleware("http")
+async def add_private_network_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 
 # Soporte para PyInstaller (empaquetado .exe) y desarrollo local
 BASE_DIR = Path(sys._MEIPASS).resolve() if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
@@ -389,9 +432,14 @@ async def license_gate_middleware(request: Request, call_next):
 
     lic = check_license()
     if lic.status != LicenseStatus.ACTIVE:
+        if request.url.path.startswith("/api/"):
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Licencia no activa", "status": lic.status.value}
+            )
         accept = request.headers.get("accept", "")
         # Si la peticion es de API pura (solicita json explicitamente sin html/*/*)
-        if "application/json" in accept and "text/html" not in accept and "*/*" not in accept:
+        if "application/json" in accept and "text/html" not in accept:
             return JSONResponse(
                 status_code=403,
                 content={"detail": "Licencia no activa", "status": lic.status.value}
@@ -450,22 +498,92 @@ async def dashboard(request: Request, db: Session = Depends(get_db), current_use
     if not current_user:
         return RedirectResponse(url="/")
         
-    total_patients = db.query(Patient).count()
-    total_appointments = db.query(Appointment).count()
-    total_consultations = db.query(Consultation).count()
+    from app.routers.patients import resolve_current_doctor_id
+    doc_id = resolve_current_doctor_id(db, current_user)
+    today = date.today()
+
+    # Auto-reconciliación: Si un paciente ya tuvo consulta médica posterior al registro de su cita, marcar la cita como Completada
+    try:
+        pending_candidates = db.query(Appointment).filter(
+            Appointment.status.in_(["Pendiente", "Confirmada"])
+        ).all()
+        reconciled = False
+        for cand in pending_candidates:
+            has_consultation = db.query(Consultation).filter(
+                Consultation.patient_id == cand.patient_id,
+                Consultation.created_at >= cand.created_at
+            ).first()
+            if has_consultation:
+                cand.status = "Completada"
+                reconciled = True
+        if reconciled:
+            db.commit()
+    except Exception:
+        pass
+
+    pat_q = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None))
+    appt_q = db.query(Appointment).filter(
+        Appointment.status.in_(["Pendiente", "Confirmada", "En Espera", "En espera", "en espera"]),
+        Appointment.date >= today
+    )
+    cons_q = db.query(Consultation)
+
+    if doc_id:
+        pat_q = pat_q.filter(or_(Patient.doctor_id == doc_id, Patient.doctor_id == None))
+        appt_q = appt_q.filter(or_(Appointment.doctor_id == doc_id, Appointment.doctor_id == None))
+        cons_q = cons_q.filter(or_(Consultation.doctor_id == doc_id, Consultation.doctor_id == None))
+
+    total_patients = pat_q.count()
+    total_appointments = appt_q.count()
+    total_consultations = cons_q.count()
     
     pending_payments = db.query(Payment).filter(Payment.status == "pending").all()
     total_pending_debt = sum(p.total for p in pending_payments)
 
-    recent_appointments = db.query(Appointment).order_by(Appointment.date.desc()).limit(5).all()
-    recent_consultations = db.query(Consultation).order_by(Consultation.created_at.desc()).limit(5).all()
+    # Próximas Citas: solo citas pendientes/confirmadas desde hoy en adelante
+    recent_appts_q = db.query(Appointment).filter(
+        Appointment.status.in_(["Pendiente", "Confirmada", "En Espera", "En espera", "en espera"]),
+        Appointment.date >= today
+    )
+    if doc_id:
+        recent_appts_q = recent_appts_q.filter(or_(Appointment.doctor_id == doc_id, Appointment.doctor_id == None))
+    recent_appointments = recent_appts_q.order_by(Appointment.date.asc(), Appointment.start_time.asc()).limit(5).all()
+
+    recent_cons_q = db.query(Consultation)
+    if doc_id:
+        recent_cons_q = recent_cons_q.filter(or_(Consultation.doctor_id == doc_id, Consultation.doctor_id == None))
+    recent_consultations = recent_cons_q.order_by(Consultation.created_at.desc()).limit(5).all()
 
     # Pacientes en sala de espera hoy (notificados por secretaría para atención inmediata)
-    today = date.today()
-    waiting_patients = db.query(Appointment).filter(
+    waiting_patients_q = db.query(Appointment).filter(
         Appointment.date == today,
-        Appointment.status == "En Espera"
-    ).order_by(Appointment.start_time.asc()).all()
+        Appointment.status.in_(["En Espera", "En espera", "en espera"])
+    )
+    if doc_id:
+        waiting_patients_q = waiting_patients_q.filter(or_(Appointment.doctor_id == doc_id, Appointment.doctor_id == None))
+    waiting_patients = waiting_patients_q.order_by(Appointment.start_time.asc(), Appointment.id.asc()).all()
+
+    from app.routers.appointments import assign_next_queue_number
+    from sqlalchemy.sql import func
+    needs_commit = False
+    # Asegurar turnos secuenciales limpios sin números duplicados
+    seen_queues = set()
+    for idx, wp in enumerate(waiting_patients, start=1):
+        if not wp.queue_number or wp.queue_number in seen_queues:
+            wp.queue_number = idx
+            needs_commit = True
+        seen_queues.add(wp.queue_number)
+        if not wp.is_paid:
+            pay = db.query(Payment).filter(
+                Payment.patient_id == wp.patient_id,
+                Payment.status == "paid",
+                func.date(Payment.created_at) == today
+            ).first()
+            if pay:
+                pay.appointment_id = wp.id
+                needs_commit = True
+    if needs_commit:
+        db.commit()
 
     return templates.TemplateResponse(
         request=request, name="dashboard.html", context={

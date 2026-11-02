@@ -173,6 +173,35 @@ def list_consultations(
         }
     )
 
+@router.get("/api/patient-last-consultation/{patient_id}")
+def api_patient_last_consultation(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('consultations'))
+):
+    """Retorna la última consulta registrada de un paciente para el panel lateral de historia clínica."""
+    c = db.query(Consultation).filter(
+        Consultation.patient_id == patient_id
+    ).order_by(Consultation.created_at.desc(), Consultation.id.desc()).first()
+
+    if not c:
+        return {"found": False}
+
+    doc_name = c.doctor.name if c.doctor else "Doctor"
+    date_str = c.created_at.strftime("%d/%m/%Y") if c.created_at else "—"
+    return {
+        "found": True,
+        "id": c.id,
+        "date": date_str,
+        "doctor": doc_name,
+        "reason": c.reason or "",
+        "diagnosis": c.diagnosis or "",
+        "clinical_history": c.display_clinical_history or "",
+        "treatment": c.treatment or "",
+        "prescription": c.prescription or ""
+    }
+
+
 @router.get("/create")
 def create_consultation_form(
     request: Request,
@@ -183,6 +212,11 @@ def create_consultation_form(
 ):
     patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.last_name).all()
     selected_patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
+    last_consultation = None
+    if selected_patient:
+        last_consultation = db.query(Consultation).filter(
+            Consultation.patient_id == selected_patient.id
+        ).order_by(Consultation.created_at.desc(), Consultation.id.desc()).first()
     consultation_templates = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "consultation").order_by(ClinicalTemplate.title).all()
     prescription_templates = db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "prescription").order_by(ClinicalTemplate.title).all()
     
@@ -201,6 +235,7 @@ def create_consultation_form(
             "user": current_user,
             "patients": patients,
             "selected_patient": selected_patient,
+            "last_consultation": last_consultation,
             "selected_appointment_id": appointment_id,
             "cie10_common": dynamic_cie10,
             "consultation_templates": consultation_templates,
@@ -269,9 +304,29 @@ def create_consultation(
         appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
         if appt:
             appt.status = "Completada"
+            appt.updated_at = datetime.utcnow()
+    else:
+        # Si no viene ligada explícitamente pero el paciente tiene cita pendiente para hoy o anterior, completarla automáticamente
+        target_date = creation_dt.date() if isinstance(creation_dt, datetime) else date.today()
+        pending_appt = db.query(Appointment).filter(
+            Appointment.patient_id == patient_id,
+            Appointment.date <= target_date,
+            Appointment.status.in_(["Pendiente", "Confirmada", "En Espera", "En Consulta", "en_consulta", "En espera", "en espera"])
+        ).order_by(Appointment.date.desc()).first()
+        if pending_appt:
+            pending_appt.status = "Completada"
+            pending_appt.updated_at = datetime.utcnow()
+            new_consultation.appointment_id = pending_appt.id
             
     db.commit()
     db.refresh(new_consultation)
+
+    # Notificar inmediatamente al Cloud Relay para que la cita pase a Completada en Móvil y Tablet
+    try:
+        from app.services.relay_service import RelayService
+        RelayService.push_snapshot_to_cloud(db)
+    except Exception:
+        pass
 
     # Registrar en auditoría médica (F13)
     AuditService.log_change(

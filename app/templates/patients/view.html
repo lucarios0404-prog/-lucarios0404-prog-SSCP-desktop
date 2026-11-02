@@ -125,22 +125,22 @@
                             {% endif %}
                         </div>
                     </div>
-                    {% if user.role == 'admin' %}
+                    {% if user.role in ['admin', 'doctor'] %}
                     <div class="flex items-center gap-2 self-end md:self-center shrink-0">
-                        <!-- Restaurar Paciente (Admin) -->
+                        <!-- Restaurar Paciente (Admin / Doctor) -->
                         <form method="post" action="/patients/{{ patient.id }}/restore" onsubmit="return confirm('¿Desea restaurar este paciente al estado activo?')">
                             <button type="submit" class="inline-flex items-center px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all">
                                 <i class="fas fa-rotate-left mr-1.5"></i> Restaurar Paciente
                             </button>
                         </form>
-                        <!-- Eliminar Definitivamente (Admin) -->
+                        <!-- Eliminar Definitivamente (Admin / Doctor) -->
                         <button type="button" onclick="document.getElementById('modal-delete-patient').classList.remove('hidden')" class="inline-flex items-center px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-all">
                             <i class="fas fa-trash mr-1.5"></i> Eliminar Definitivamente
                         </button>
                     </div>
                     {% else %}
                     <div class="text-xs font-semibold text-amber-800 bg-amber-100/80 px-3 py-2 rounded-xl">
-                        <i class="fas fa-lock mr-1"></i> Solo el Administrador puede restaurar o eliminar este expediente.
+                        <i class="fas fa-lock mr-1"></i> Solo el Administrador o Doctor puede restaurar o eliminar este expediente.
                     </div>
                     {% endif %}
                 </div>
@@ -267,6 +267,13 @@
                             <button type="button" onclick="document.getElementById('modal-archive-patient').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 rounded-xl bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-800 text-xs font-semibold border border-slate-200 transition-all" title="Ocultar o archivar expediente clínico">
                                 <i class="fas fa-box-archive mr-1.5 text-amber-600"></i> Archivar
                             </button>
+                            {% endif %}
+                            {% if user.role in ['admin', 'doctor'] %}
+                            <form method="post" action="/patients/{{ patient.id }}/delete" class="inline" onsubmit="return confirm('¿Está seguro de ELIMINAR definitivamente el expediente de {{ patient.first_name }} {{ patient.last_name }} y todos sus datos? Esta acción no se puede deshacer.')">
+                                <button type="submit" class="inline-flex items-center px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold border border-rose-200 transition-all" title="Eliminar paciente erróneo">
+                                    <i class="fas fa-trash mr-1.5 text-rose-600"></i> Eliminar
+                                </button>
+                            </form>
                             {% endif %}
                         </div>
                     </div>

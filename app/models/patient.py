@@ -1,11 +1,13 @@
-from sqlalchemy import Column, Integer, String, Date, Text, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Date, Text, DateTime, Boolean, ForeignKey
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 class Patient(Base):
     __tablename__ = "patients"
 
     id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     first_name = Column(String, index=True)
     last_name = Column(String, index=True)
     document_id = Column(String, unique=True, index=True, nullable=True) # Cédula/DNI
@@ -36,3 +38,5 @@ class Patient(Base):
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    doctor = relationship("User", foreign_keys=[doctor_id], backref="patients")

@@ -43,13 +43,17 @@ def get_reason_color(reason: Optional[str]) -> str:
         return "#10b981" # Verde (Consulta general)
 
 @router.get("/")
-def reception_index():
-    return RedirectResponse(url="/reception/agenda", status_code=302)
+def reception_index(token: Optional[str] = Query(None)):
+    url = "/reception/agenda"
+    if token:
+        url += f"?token={token}"
+    return RedirectResponse(url=url, status_code=302)
 
 @router.get("/agenda")
 def reception_agenda(
     request: Request,
     date_str: Optional[str] = Query(None),
+    token: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
@@ -70,14 +74,21 @@ def reception_agenda(
     next_date = (target_date + timedelta(days=1)).strftime("%Y-%m-%d")
     today_str = date.today().strftime("%Y-%m-%d")
 
-    # Cargar citas de la fecha
-    appointments = db.query(Appointment).filter(
-        Appointment.date == target_date
-    ).order_by(Appointment.start_time.asc()).all()
+    # Cargar citas de la fecha (aislado estrictamente por médico)
+    from app.routers.patients import resolve_current_doctor_id
+    doc_id = resolve_current_doctor_id(db, current_user)
+
+    appts_q = db.query(Appointment).filter(Appointment.date == target_date)
+    if doc_id:
+        appts_q = appts_q.filter(Appointment.doctor_id == doc_id)
+    appointments = appts_q.order_by(Appointment.start_time.asc()).all()
 
     # Si no hay citas para hoy, pero hay citas en la BD, buscamos la fecha con más citas cercanas
     # para que la demo se aprecie al 100% si el usuario no tiene citas creadas exactamente hoy
-    all_appts_count = db.query(Appointment).count()
+    all_appts_q = db.query(Appointment)
+    if doc_id:
+        all_appts_q = all_appts_q.filter(Appointment.doctor_id == doc_id)
+    all_appts_count = all_appts_q.count()
 
     # Mapear citas con atributos visuales
     agenda_items = []
@@ -100,11 +111,14 @@ def reception_agenda(
             "queue_number": appt.queue_number,
         })
 
-    # Cargar lista de pacientes activos para agendar rápido
-    patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.first_name.asc()).all()
+    # Cargar lista de pacientes activos para agendar rápido (aislado estrictamente por médico)
+    pat_q = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None))
+    if doc_id:
+        pat_q = pat_q.filter(Patient.doctor_id == doc_id)
+    patients = pat_q.order_by(Patient.first_name.asc()).all()
     services = db.query(Service).filter(Service.is_active == True).order_by(Service.name.asc()).all()
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
         name="reception/agenda.html",
         context={
@@ -120,14 +134,27 @@ def reception_agenda(
             "all_appts_count": all_appts_count,
             "patients": patients,
             "services": services,
+            "from_mobile": request.query_params.get("from_mobile") == "1",
         }
     )
+    raw_token = token or request.query_params.get("token")
+    if raw_token:
+        clean_token = raw_token.replace("Bearer ", "").strip()
+        response.set_cookie(
+            key="access_token",
+            value=f"Bearer {clean_token}",
+            httponly=True,
+            samesite="lax",
+            max_age=60 * 60 * 24 * 30
+        )
+    return response
 
 @router.get("/billing")
 def reception_billing(
     request: Request,
     year: Optional[int] = Query(None),
     month: Optional[int] = Query(None),
+    token: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
@@ -192,7 +219,7 @@ def reception_billing(
     patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.first_name.asc()).all()
     services = db.query(Service).filter(Service.is_active == True).order_by(Service.name.asc()).all()
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
         name="reception/billing.html",
         context={
@@ -210,8 +237,20 @@ def reception_billing(
             "unpaid_items": unpaid_items,
             "patients": patients,
             "services": services,
+            "from_mobile": request.query_params.get("from_mobile") == "1",
         }
     )
+    raw_token = token or request.query_params.get("token")
+    if raw_token:
+        clean_token = raw_token.replace("Bearer ", "").strip()
+        response.set_cookie(
+            key="access_token",
+            value=f"Bearer {clean_token}",
+            httponly=True,
+            samesite="lax",
+            max_age=60 * 60 * 24 * 30
+        )
+    return response
 
 @router.post("/payments/{payment_id}/toggle")
 def toggle_payment_status(

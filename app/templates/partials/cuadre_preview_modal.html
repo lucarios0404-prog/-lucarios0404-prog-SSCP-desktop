@@ -1,0 +1,123 @@
+<!-- MODAL GLOBAL: VISTA PREVIA DEL CUADRE DE CAJA Y ARQUEO DIARIO -->
+<div id="cuadrePreviewModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
+    <div class="bg-white rounded-3xl max-w-5xl w-full flex flex-col shadow-2xl border border-slate-200 animate-fade-in overflow-hidden max-h-[95vh]">
+        <!-- Barra Superior / Header con Acciones en la Esquina -->
+        <div class="px-5 py-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+            <!-- Izquierda: Título y Selector de Fecha -->
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-xl shadow-sm shrink-0">
+                    <i class="fas fa-cash-register"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900 leading-tight">Vista Previa: Cuadre de Caja & Arqueo</h3>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-xs text-slate-500 font-medium">Fecha consultada:</span>
+                        <input type="date" id="cuadreDateInput" onchange="onCuadreDateChange(this.value)"
+                            class="px-2.5 py-0.5 text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-2xs">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Derecha / Esquina: Botones de Acción (Imprimir, Descargar en PDF y Cerrar) -->
+            <div class="flex items-center flex-wrap gap-2 sm:self-center">
+                <button type="button" onclick="printCuadreFromModal()" class="inline-flex items-center px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95" title="Imprimir reporte en la impresora conectada">
+                    <i class="fas fa-print mr-1.5 text-amber-300"></i> Imprimir
+                </button>
+                <button type="button" onclick="downloadCuadreFromModal()" class="inline-flex items-center px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-md shadow-teal-600/20 transition-all active:scale-95" title="Descargar archivo PDF firmado para constancia contable">
+                    <i class="fas fa-file-download mr-1.5"></i> Descargar en PDF
+                </button>
+                <button type="button" onclick="closeCuadreModal()" class="w-9 h-9 rounded-xl bg-slate-200/80 hover:bg-slate-300 text-slate-600 hover:text-slate-900 flex items-center justify-center font-bold text-lg transition-colors ml-1" title="Cerrar ventana">
+                    &times;
+                </button>
+            </div>
+        </div>
+
+        <!-- Contenedor del Visor Embebido con Spinner -->
+        <div class="relative flex-1 p-3 sm:p-5 bg-slate-100 overflow-hidden flex flex-col">
+            <div id="cuadreLoadingSpinner" class="absolute inset-0 z-10 bg-slate-100/90 flex flex-col items-center justify-center gap-3">
+                <i class="fas fa-circle-notch fa-spin text-teal-600 text-3xl"></i>
+                <span class="text-xs font-bold text-slate-600">Generando vista previa del cuadre de caja...</span>
+            </div>
+            <iframe id="cuadreIframe" src="" class="w-full flex-1 rounded-2xl border border-slate-200 bg-white shadow-inner min-h-[60vh] sm:min-h-[72vh]"
+                onload="document.getElementById('cuadreLoadingSpinner').classList.add('hidden')"></iframe>
+        </div>
+    </div>
+</div>
+
+<script>
+window.openCuadreModal = function(specificDate) {
+    const modal = document.getElementById('cuadrePreviewModal');
+    const iframe = document.getElementById('cuadreIframe');
+    const spinner = document.getElementById('cuadreLoadingSpinner');
+    const dateInput = document.getElementById('cuadreDateInput');
+
+    if (!modal || !iframe) return;
+
+    let targetDate = specificDate;
+    if (!targetDate) {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        targetDate = `${yyyy}-${mm}-${dd}`;
+    }
+
+    if (dateInput) {
+        dateInput.value = targetDate;
+    }
+
+    if (spinner) spinner.classList.remove('hidden');
+    iframe.src = `/reports/export/secretary-daily-pdf?report_date=${targetDate}&download=0&t=` + new Date().getTime();
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+};
+
+window.closeCuadreModal = function() {
+    const modal = document.getElementById('cuadrePreviewModal');
+    const iframe = document.getElementById('cuadreIframe');
+    if (modal) modal.classList.add('hidden');
+    if (iframe) iframe.src = '';
+    document.body.style.overflow = '';
+};
+
+window.onCuadreDateChange = function(newDate) {
+    const iframe = document.getElementById('cuadreIframe');
+    const spinner = document.getElementById('cuadreLoadingSpinner');
+    if (iframe && newDate) {
+        if (spinner) spinner.classList.remove('hidden');
+        iframe.src = `/reports/export/secretary-daily-pdf?report_date=${newDate}&download=0&t=` + new Date().getTime();
+    }
+};
+
+window.printCuadreFromModal = function() {
+    const iframe = document.getElementById('cuadreIframe');
+    if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+    } else {
+        const dateVal = document.getElementById('cuadreDateInput')?.value || '';
+        window.open(`/reports/export/secretary-daily-pdf?report_date=${dateVal}&download=0`, '_blank');
+    }
+};
+
+window.downloadCuadreFromModal = function() {
+    const dateVal = document.getElementById('cuadreDateInput')?.value || '';
+    window.location.href = `/reports/export/secretary-daily-pdf?report_date=${dateVal}&download=1`;
+};
+
+// Cerrar con Escape o clic fuera
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('cuadrePreviewModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            window.closeCuadreModal();
+        }
+    }
+});
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('cuadrePreviewModal');
+    if (e.target === modal) {
+        window.closeCuadreModal();
+    }
+});
+</script>

@@ -50,6 +50,26 @@ async def check_duplicate_patient(
     )
     return {"has_duplicates": len(matches) > 0, "matches": matches}
 
+def resolve_current_doctor_id(db: Session, user) -> Optional[int]:
+    """Resuelve el ID del doctor activo o asignado para aislar pacientes estrictamente."""
+    if not user:
+        return None
+    if getattr(user, "role", "") == "doctor":
+        return user.id
+    if getattr(user, "role", "") == "secretaria":
+        assigned = getattr(user, "assigned_doctor_id", None)
+        if assigned:
+            return assigned
+        from app.models.setting import Setting
+        s = db.query(Setting).first()
+        station_doc = None
+        if s and s.doctor_name:
+            station_doc = db.query(User).filter(User.name.ilike(f"%{s.doctor_name.strip()}%"), User.role == "doctor").first()
+        if not station_doc:
+            station_doc = db.query(User).filter(User.role == "doctor", User.is_active == True).first()
+        return station_doc.id if station_doc else None
+    return None
+
 @router.get("/autocomplete")
 def autocomplete_patients(
     q: str = Query("", min_length=0),
@@ -59,15 +79,21 @@ def autocomplete_patients(
 ):
     """
     Búsqueda en tiempo real de pacientes para autocompletado rápido (Fase 2 v1.2.0).
-    Filtra por nombre, apellidos, cédula o teléfono. Excluye archivados.
+    Filtra por nombre, apellidos, cédula o teléfono. Aislado estrictamente por médico.
     """
     search_term = (q or "").strip()
     if not search_term:
         return []
 
     pattern = f"%{search_term}%"
-    patients = db.query(Patient).filter(
-        Patient.is_active == True,
+    doc_id = resolve_current_doctor_id(db, current_user)
+    query = db.query(Patient).filter(Patient.is_active == True)
+    if doc_id:
+        has_doc_patients = db.query(Patient.id).filter(Patient.is_active == True, Patient.doctor_id == doc_id).first() is not None
+        if has_doc_patients:
+            query = query.filter(Patient.doctor_id == doc_id)
+
+    patients = query.filter(
         or_(
             Patient.first_name.ilike(pattern),
             Patient.last_name.ilike(pattern),
@@ -116,12 +142,30 @@ def list_patients(
 ):
     is_admin = getattr(current_user, "role", "") == "admin"
     view_archived = (status == "archived") and is_admin
+    doc_id = resolve_current_doctor_id(db, current_user)
     
-    # Contadores para las pestañas de navegación
-    active_count = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).count()
-    archived_count = db.query(Patient).filter(Patient.is_active == False).count() if is_admin else 0
+    # Contadores para las pestañas de navegación (aislados por médico con fallback seguro)
+    has_doc_patients = False
+    if doc_id:
+        has_doc_patients = db.query(Patient.id).filter(
+            or_(Patient.is_active == True, Patient.is_active == None),
+            Patient.doctor_id == doc_id
+        ).first() is not None
+
+    cnt_q = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None))
+    if doc_id and has_doc_patients:
+        cnt_q = cnt_q.filter(Patient.doctor_id == doc_id)
+    active_count = cnt_q.count()
+
+    arch_q = db.query(Patient).filter(Patient.is_active == False)
+    if doc_id and has_doc_patients:
+        arch_q = arch_q.filter(Patient.doctor_id == doc_id)
+    archived_count = arch_q.count() if is_admin else 0
 
     query = db.query(Patient)
+    if doc_id and has_doc_patients:
+        query = query.filter(Patient.doctor_id == doc_id)
+
     if view_archived:
         query = query.filter(Patient.is_active == False)
     else:
@@ -237,7 +281,10 @@ def create_patient(
         except ValueError:
             dob = None
 
+    pat_doc_id = resolve_current_doctor_id(db, current_user) or 1
+
     new_patient = Patient(
+        doctor_id=pat_doc_id,
         first_name=first_name,
         last_name=last_name,
         document_id=document_id,
@@ -646,20 +693,59 @@ def restore_patient(
     return RedirectResponse(url=f"/patients/{patient.id}?restored=1", status_code=303)
 
 
+@router.post("/{patient_id}/delete")
+def delete_patient(
+    request: Request,
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    """
+    Elimina un paciente y sus registros asociados.
+    Disponible para Administrador y Doctor para limpiar pacientes erróneos.
+    """
+    if getattr(current_user, "role", "") not in ["admin", "doctor"]:
+        raise HTTPException(status_code=403, detail="Acceso restringido: Solo el Administrador o Doctor puede eliminar expedientes.")
+
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+    from app.models.medical_license import MedicalLicense
+    from app.models.medical_reference import MedicalReference
+    from app.models.audit_log import ClinicalAuditLog
+
+    # Eliminación en cascada segura de tablas dependientes
+    db.query(Appointment).filter(Appointment.patient_id == patient_id).delete(synchronize_session=False)
+    db.query(Consultation).filter(Consultation.patient_id == patient_id).delete(synchronize_session=False)
+    db.query(Payment).filter(Payment.patient_id == patient_id).delete(synchronize_session=False)
+    db.query(VitalSign).filter(VitalSign.patient_id == patient_id).delete(synchronize_session=False)
+    db.query(MedicalLicense).filter(MedicalLicense.patient_id == patient_id).delete(synchronize_session=False)
+    db.query(MedicalReference).filter(MedicalReference.patient_id == patient_id).delete(synchronize_session=False)
+    db.query(ClinicalAuditLog).filter(ClinicalAuditLog.patient_id == patient_id).delete(synchronize_session=False)
+
+    db.delete(patient)
+    db.commit()
+
+    referer = request.headers.get("referer", "/patients")
+    if "/patients/" in referer and not referer.endswith("/patients"):
+        return RedirectResponse(url="/patients?deleted=1", status_code=303)
+    return RedirectResponse(url=referer + ("&" if "?" in referer else "?") + "deleted=1", status_code=303)
+
 @router.post("/{patient_id}/permanent-delete")
 def permanent_delete_patient(
     request: Request,
     patient_id: int,
-    confirm_text: str = Form(...),
+    confirm_text: str = Form("ELIMINAR"),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
     """
     Elimina físicamente un paciente y sus registros dependientes en cascada.
-    Exclusivo para el Administrador con confirmación explícita.
+    Disponible para Administrador y Doctor.
     """
-    if getattr(current_user, "role", "") != "admin":
-        raise HTTPException(status_code=403, detail="Acceso restringido: Solo un Administrador puede eliminar permanentemente expedientes.")
+    if getattr(current_user, "role", "") not in ["admin", "doctor"]:
+        raise HTTPException(status_code=403, detail="Acceso restringido: Solo un Administrador o Doctor puede eliminar expedientes.")
 
     if confirm_text.strip().upper() != "ELIMINAR":
         raise HTTPException(status_code=400, detail="Debe escribir exactamente 'ELIMINAR' para confirmar la eliminación permanente.")
@@ -684,4 +770,4 @@ def permanent_delete_patient(
     db.delete(patient)
     db.commit()
 
-    return RedirectResponse(url="/patients?status=archived&deleted=1", status_code=303)
+    return RedirectResponse(url="/patients?deleted=1", status_code=303)

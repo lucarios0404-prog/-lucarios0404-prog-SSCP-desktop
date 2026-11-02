@@ -49,23 +49,29 @@
                             <i class="fab fa-whatsapp text-emerald-600 mr-2 text-base"></i> Vincular Celular / WS
                         </button>
 
-                        <a href="/appointments/secretary-daily-pdf" target="_blank" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-md shadow-teal-500/20 transition-all" title="Descargar Reporte Diario de Entradas y Recepción en PDF">
-                            <i class="fas fa-file-pdf mr-2"></i> Reporte del Día (PDF)
-                        </a>
+                        <button type="button" onclick="openCuadreModal()" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-md shadow-teal-500/20 transition-all" title="Vista previa del Cuadre de Caja con opciones de Imprimir o Descargar en PDF">
+                            <i class="fas fa-cash-register mr-2"></i> Cuadre del Día
+                        </button>
                         <button onclick="document.getElementById('walkinModal').classList.remove('hidden')" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold shadow-md shadow-amber-500/20 transition-all">
                             <i class="fas fa-user-clock mr-2"></i> Llegada sin Cita (Poner en Espera)
                         </button>
                         <a href="/appointments/create" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md shadow-blue-500/20 transition-all">
                             <i class="fas fa-calendar-plus mr-2"></i> Agendar Nueva Cita
                         </a>
+                        <button type="button" onclick="confirmCloseDayDesktop()" class="inline-flex items-center justify-center px-3.5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-sm font-semibold shadow-xs transition-all active:scale-95" title="Archivar pacientes atendidos y cerrar la jornada de hoy">
+                            <i class="fas fa-calendar-check mr-2 text-rose-500"></i> Cerrar Jornada
+                        </button>
                     </div>
                 </div>
 
                 <!-- Filters Bar -->
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
                     <div class="flex flex-wrap items-center gap-2">
-                        <a href="/appointments" class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if status_filter == 'all' and not filter_date %}bg-slate-900 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
-                            Todas
+                        <a href="/appointments" class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if (not status_filter or status_filter == 'pendientes') and not filter_date %}bg-slate-900 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+                            <i class="fas fa-clock mr-1"></i> Citas Pendientes
+                        </a>
+                        <a href="/appointments?status=all" class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if status_filter == 'all' %}bg-slate-900 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+                            Historial Completo
                         </a>
                         <a href="/appointments?status=En Espera" class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if status_filter == 'En Espera' %}bg-amber-600 text-white{% else %}bg-amber-50 text-amber-800 hover:bg-amber-100{% endif %}">
                             <i class="fas fa-couch mr-1"></i> En Espera {% if waiting_count > 0 %}<span class="ml-1 px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 text-[10px] font-bold">{{ waiting_count }}</span>{% endif %}
@@ -138,8 +144,13 @@
                                                 </a>
                                                 <span class="block text-[11px] text-slate-400 mb-1">{{ a.patient.phone or 'Sin teléfono' }}</span>
                                                 <!-- Badge Oficial de la ARS con Logo -->
-                                                <div class="mt-0.5">
+                                                <div class="mt-0.5 flex flex-wrap items-center gap-1">
                                                     {{ a.patient.insurance_name|ars_badge(a.patient.insurance_number)|safe }}
+                                                    <button type="button" onclick="openPatientHistoryModal({{ a.patient.id }}, '{{ a.patient.first_name }} {{ a.patient.last_name }}')"
+                                                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-900 text-[10px] font-bold border border-blue-200 transition-all shadow-2xs"
+                                                        title="Ver historial de últimas consultas médicas de este paciente">
+                                                        <i class="fas fa-notes-medical text-blue-600"></i> Últimas Consultas
+                                                    </button>
                                                 </div>
                                                 {% else %}
                                                 <span class="text-slate-400 italic text-xs">Paciente eliminado</span>
@@ -222,6 +233,12 @@
                                                 <i class="fas fa-ticket-alt mr-1"></i> Turno #{{ a.queue_number or '1' }}
                                             </span>
                                             {% endif %}
+                                            <form method="post" action="/appointments/{{ a.id }}/status" class="inline">
+                                                <input type="hidden" name="new_status" value="Completada">
+                                                <button type="submit" class="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-semibold border border-emerald-200" title="Marcar cita como Completada">
+                                                    <i class="fas fa-check mr-1 text-emerald-600"></i> Completar
+                                                </button>
+                                            </form>
                                         {% elif a.status != 'Completada' and a.status != 'Cancelada' %}
                                             <form method="post" action="/appointments/{{ a.id }}/check-in" class="inline">
                                                 <button type="submit" class="px-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-lg text-xs font-bold shadow-xs inline-flex items-center transition-transform active:scale-95" title="Marcar llegada del paciente y asignar Turno automático del día">
@@ -232,6 +249,12 @@
                                                 <input type="hidden" name="new_status" value="Confirmada">
                                                 <button type="submit" class="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-medium" title="Confirmar">
                                                     Confirmar
+                                                </button>
+                                            </form>
+                                            <form method="post" action="/appointments/{{ a.id }}/status" class="inline">
+                                                <input type="hidden" name="new_status" value="Completada">
+                                                <button type="submit" class="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-semibold border border-emerald-200" title="Marcar cita como Completada">
+                                                    <i class="fas fa-check mr-1 text-emerald-600"></i> Completar
                                                 </button>
                                             </form>
                                             {% if user.has_permission('consultations') %}
@@ -247,9 +270,15 @@
                                             </a>
                                             {% endif %}
                                         {% endif %}
+                                        {% if a.is_paid %}
+                                        <span class="inline-flex items-center px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold border border-emerald-300" title="Cita pagada">
+                                            <i class="fas fa-check-circle mr-1 text-emerald-600"></i> Pagado
+                                        </span>
+                                        {% else %}
                                         <a href="/payments/create?patient_id={{ a.patient_id }}&appointment_id={{ a.id }}{% if a.service_id %}&service_id={{ a.service_id }}{% endif %}" class="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-medium" title="Cobrar Cita">
                                             Cobrar
                                         </a>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% else %}
@@ -622,7 +651,135 @@
                 if (new URLSearchParams(window.location.search).get('action') === 'walkin') {
                     document.getElementById('walkinModal')?.classList.remove('hidden');
                 }
+
+                async function confirmCloseDayDesktop() {
+                    if (!confirm('¿Deseas cerrar la jornada de hoy?\n\nTodos los turnos de hoy y días anteriores pasarán a estado "Completada" para dejar la sala de espera lista para la siguiente jornada. Esta acción se sincronizará inmediatamente con el móvil y la recepción.')) {
+                        return;
+                    }
+                    try {
+                        const resp = await fetch('/appointments/close-day', {
+                            method: 'POST',
+                            headers: { 'Accept': 'application/json' }
+                        });
+                        const res = await resp.json();
+                        if (res.success) {
+                            alert('Jornada cerrada exitosamente: ' + res.message);
+                            window.location.reload();
+                        } else {
+                            alert('No se pudo cerrar la jornada: ' + (res.message || 'Error desconocido'));
+                        }
+                    } catch (err) {
+                        alert('Error al comunicarse con el servidor: ' + err.message);
+                    }
+                }
             </script>
+        
+        <!-- MODAL: HISTORIAL DE ÚLTIMAS CONSULTAS DEL PACIENTE -->
+        <div id="patientHistoryModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
+            <div class="bg-white rounded-3xl max-w-2xl w-full flex flex-col shadow-2xl border border-slate-200 animate-fade-in overflow-hidden max-h-[90vh]">
+                <!-- Header del Modal -->
+                <div class="px-6 py-4 bg-gradient-to-r from-blue-50 via-slate-50 to-indigo-50/60 border-b border-slate-200 flex items-center justify-between shrink-0">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-lg font-bold shadow-sm shrink-0">
+                            <i class="fas fa-notes-medical"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-extrabold text-slate-900 leading-tight">Historial de Consultas Médicas</h3>
+                            <p class="text-xs text-blue-700 font-semibold mt-0.5" id="historyPatientName">Cargando...</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closePatientHistoryModal()" class="w-8 h-8 rounded-xl bg-slate-200/80 hover:bg-slate-300 text-slate-600 hover:text-slate-900 flex items-center justify-center font-bold text-lg transition-colors">
+                        &times;
+                    </button>
+                </div>
+
+                <!-- Contenido con Scroll -->
+                <div class="p-6 overflow-y-auto space-y-4 text-slate-800">
+                    <div id="historyLoadingSpinner" class="py-12 flex flex-col items-center justify-center text-slate-400 gap-2">
+                        <i class="fas fa-circle-notch fa-spin text-blue-600 text-2xl"></i>
+                        <span class="text-xs font-semibold">Buscando expediente clínico...</span>
+                    </div>
+
+                    <div id="historyEmptyState" class="hidden py-10 text-center text-slate-400">
+                        <i class="fas fa-folder-open text-3xl mb-2 text-slate-300 block"></i>
+                        <p class="font-bold text-slate-600 text-sm">Sin consultas previas registradas</p>
+                        <p class="text-xs text-slate-400 mt-0.5">Este paciente no registra historial de consultas anteriores en el sistema.</p>
+                    </div>
+
+                    <div id="historyConsultationsList" class="hidden space-y-3.5"></div>
+                </div>
+
+                <!-- Footer -->
+                <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end shrink-0">
+                    <button type="button" onclick="closePatientHistoryModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        window.openPatientHistoryModal = async function(patientId, patientName) {
+            const modal = document.getElementById('patientHistoryModal');
+            const nameEl = document.getElementById('historyPatientName');
+            const spinner = document.getElementById('historyLoadingSpinner');
+            const emptyEl = document.getElementById('historyEmptyState');
+            const listEl = document.getElementById('historyConsultationsList');
+
+            if (!modal) return;
+            nameEl.textContent = patientName || 'Paciente';
+            spinner.classList.remove('hidden');
+            emptyEl.classList.add('hidden');
+            listEl.classList.add('hidden');
+            listEl.innerHTML = '';
+            modal.classList.remove('hidden');
+
+            try {
+                const resp = await fetch(`/appointments/patient-consultations/${patientId}`);
+                if (!resp.ok) throw new Error('Error al consultar historial');
+                const data = await resp.json();
+
+                spinner.classList.add('hidden');
+                if (!data.consultations || data.consultations.length === 0) {
+                    emptyEl.classList.remove('hidden');
+                } else {
+                    listEl.classList.remove('hidden');
+                    data.consultations.forEach((c, idx) => {
+                        const card = document.createElement('div');
+                        card.className = 'p-4 rounded-2xl border border-slate-200 bg-white shadow-2xs hover:border-blue-300 transition-colors space-y-2';
+                        card.innerHTML = `
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                                <span class="font-extrabold text-blue-900 text-xs flex items-center gap-1.5">
+                                    <i class="far fa-calendar-check text-blue-600"></i> ${c.date}
+                                    <span class="text-[10px] font-normal text-slate-400">(${c.doctor})</span>
+                                </span>
+                                <a href="/consultations/${c.id}" target="_blank" class="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                    Ver Ficha <i class="fas fa-external-link-alt text-[9px]"></i>
+                                </a>
+                            </div>
+                            <div class="text-xs space-y-1">
+                                <p><strong class="text-slate-700">Motivo:</strong> <span class="text-slate-900 font-medium">${c.reason}</span></p>
+                                ${c.diagnosis ? `<p><strong class="text-slate-700">Diagnóstico:</strong> <span class="font-bold text-violet-700">${c.diagnosis}</span></p>` : ''}
+                                ${c.clinical_history ? `<p class="text-slate-600 text-[11px] bg-slate-50 p-2 rounded-lg border border-slate-100 mt-1">${c.clinical_history}</p>` : ''}
+                                ${c.prescription ? `<p class="text-[11px] text-emerald-800 bg-emerald-50/70 p-2 rounded-lg border border-emerald-100 mt-1"><strong class="text-emerald-900"><i class="fas fa-prescription mr-1"></i>Tratamiento:</strong> ${c.prescription}</p>` : ''}
+                            </div>
+                        `;
+                        listEl.appendChild(card);
+                    });
+                }
+            } catch (err) {
+                spinner.classList.add('hidden');
+                emptyEl.classList.remove('hidden');
+                emptyEl.innerHTML = `<p class="text-red-600 font-bold text-xs"><i class="fas fa-exclamation-circle mr-1"></i> No se pudo cargar el historial: ${err.message}</p>`;
+            }
+        };
+
+        window.closePatientHistoryModal = function() {
+            const modal = document.getElementById('patientHistoryModal');
+            if (modal) modal.classList.add('hidden');
+        };
+        </script>
+
         </main>
     </div>
 </div>

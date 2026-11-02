@@ -181,7 +181,7 @@ def run_tests():
     res_settings_html = client.get("/settings/")
     assert res_settings_html.status_code == 200
     assert "Integración de WhatsApp" in res_settings_html.text
-    assert "Vincular / Ver Código QR" in res_settings_html.text
+    assert "Vincular / Cambiar Teléfono" in res_settings_html.text
     print("  ✓ Renderizado HTML de /settings/ con módulo WhatsApp OK")
 
     res_appts_html = client.get("/appointments/")

@@ -159,12 +159,12 @@
                                         </span>
                                         {% endif %}
                                     </td>
-                                    <td class="py-4 px-5 text-right space-x-2">
+                                    <td class="py-4 px-5 text-right space-x-1.5">
                                         <a href="/patients/{{ p.id }}" class="inline-flex items-center px-2.5 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-lg text-xs font-medium transition-colors" title="Ver Ficha">
                                             <i class="fas fa-id-card-alt mr-1"></i> Ficha
                                         </a>
                                         {% if p.is_active == False %}
-                                            {% if is_admin %}
+                                            {% if is_admin or user.role == 'doctor' %}
                                             <form method="post" action="/patients/{{ p.id }}/restore" class="inline" onsubmit="return confirm('¿Desea restaurar este paciente al estado activo?')">
                                                 <button type="submit" class="inline-flex items-center px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition-colors" title="Restaurar a Activos">
                                                     <i class="fas fa-rotate-left mr-1"></i> Restaurar
@@ -180,6 +180,13 @@
                                                 <i class="fas fa-notes-medical mr-1"></i> Consulta
                                             </a>
                                             {% endif %}
+                                        {% endif %}
+                                        {% if user.role in ['admin', 'doctor'] %}
+                                        <form method="post" action="/patients/{{ p.id }}/delete" class="inline" onsubmit="return confirm('¿Está seguro de eliminar definitivamente al paciente {{ p.first_name }} {{ p.last_name }} y todos sus registros asociados? Esta acción no se puede deshacer.')">
+                                            <button type="submit" class="inline-flex items-center px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-semibold transition-colors" title="Eliminar Paciente Erróneo">
+                                                <i class="fas fa-trash text-xs"></i>
+                                            </button>
+                                        </form>
                                         {% endif %}
                                     </td>
                                 </tr>

@@ -29,7 +29,7 @@ with engine.connect() as conn:
     res_s = conn.execute(text("PRAGMA table_info(settings)")).fetchall()
     s_cols = [r[1] for r in res_s]
     if "relay_channel_id" not in s_cols:
-        conn.execute(text("ALTER TABLE settings ADD COLUMN relay_channel_id TEXT DEFAULT 'dr_carlos_heredia'"))
+        conn.execute(text("ALTER TABLE settings ADD COLUMN relay_channel_id TEXT"))
         conn.commit()
 
 client = TestClient(app)
@@ -41,7 +41,7 @@ print("\n[TEST 1] Verificando detección de canal según configuración del méd
 with SessionLocal() as db:
     setting = db.query(Setting).first()
     if not setting:
-        setting = Setting(doctor_name="Dr. Carlos Heredia", relay_channel_id="dr_carlos_heredia")
+        setting = Setting(doctor_name="Dra. Especialista", relay_channel_id="dra_especialista")
         db.add(setting)
         db.commit()
         db.refresh(setting)
@@ -76,7 +76,7 @@ with SessionLocal() as db:
 # PRUEBA 2: Aislamiento estricto de buzones en la Nube (sscp.laxarusdevs.com)
 # ----------------------------------------------------------------------
 print("\n[TEST 2] Verificando aislamiento multi-doctor en la Nube (Buzón A vs Buzón B)...")
-DOC_A = "dr_carlos_heredia"
+DOC_A = "dra_especialista"
 DOC_B = "dr_manuel_ramirez"
 TS = int(datetime.utcnow().timestamp())
 

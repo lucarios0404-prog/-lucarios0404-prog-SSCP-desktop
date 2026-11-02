@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}SSCP Recepción — Modo Secretaría{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/static/js/tailwind.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body {
@@ -61,19 +61,47 @@
                 </a>
             </nav>
 
-            <!-- Acciones secundarias -->
-            <div class="flex items-center gap-2">
-                <button type="button" onclick="openRelayQrModal()" title="Enlazar Tablet vía Código QR (Buzón Relay)" class="px-2.5 py-1 text-xs bg-white/20 hover:bg-white/30 text-white rounded-md border border-white/30 flex items-center gap-1.5 transition-colors font-semibold">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
-                    <span>Enlazar QR</span>
+            <!-- Acciones de retorno, modo y cierre de sesión -->
+            <div class="flex items-center gap-1.5 sm:gap-2">
+                <button type="button" onclick="returnToOriginalDashboard()" title="Volver a la App Móvil" class="px-3 py-1.5 text-xs bg-white text-indigo-700 hover:bg-indigo-50 rounded-lg border border-white/90 flex items-center gap-1.5 transition-all font-black shadow-sm active:scale-95">
+                    <svg class="w-3.5 h-3.5 text-indigo-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    <span id="txt-return-header">Volver al Dashboard</span>
                 </button>
-                <a href="/" title="Regresar a Modo Médico Completo" class="px-2.5 py-1 text-xs bg-sky-900/40 hover:bg-sky-900/60 text-sky-100 rounded-md border border-sky-400/30 flex items-center gap-1 transition-colors">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                    <span class="hidden md:inline">Modo Doctor</span>
-                </a>
+                <button type="button" onclick="logoutFromReception()" title="Cerrar Sesión / Cambiar de Usuario" class="px-2.5 py-1.5 text-xs bg-rose-600 hover:bg-rose-700 text-white rounded-lg border border-rose-400 flex items-center gap-1 transition-all font-bold shadow-sm active:scale-95">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    <span>Salir</span>
+                </button>
+                <button type="button" onclick="openRelayQrModal()" title="Enlazar Tablet vía Código QR" class="hidden sm:flex px-2 py-1 text-xs bg-white/20 hover:bg-white/30 text-white rounded-md border border-white/30 items-center gap-1 transition-colors font-semibold">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                    <span>QR</span>
+                </button>
             </div>
         </div>
     </header>
+
+    <!-- BARRA PERMANENTE: RETORNO AL DASHBOARD ORIGINAL -->
+    <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-3 sm:px-6 py-2.5 flex items-center justify-between shadow-md border-b border-indigo-500/30">
+        <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-xs font-bold tracking-wide text-slate-200">Terminal de Recepción / Secretaría Express</span>
+        </div>
+        <button type="button" onclick="returnToOriginalDashboard()" 
+                class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition active:scale-95 cursor-pointer border border-indigo-400/40">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            <span id="txt-return-banner">← Volver al Dashboard Original</span>
+        </button>
+    </div>
+
+    <!-- BOTÓN FLOTANTE TÁCTIL FIJO: VOLVER AL DASHBOARD ORIGINAL -->
+    <button type="button" onclick="returnToOriginalDashboard()" 
+            id="btn-fab-return-dashboard"
+            class="fixed bottom-5 left-5 z-50 bg-gradient-to-r from-indigo-700 via-indigo-600 to-blue-600 hover:from-indigo-800 hover:to-blue-700 text-white font-black text-xs sm:text-sm px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 border-2 border-white/90 transition-all transform active:scale-95 cursor-pointer"
+            style="box-shadow: 0 10px 25px -3px rgba(79, 70, 229, 0.65), 0 4px 6px -2px rgba(0, 0, 0, 0.2);">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+        </svg>
+        <span id="txt-return-fab">Volver al Dashboard</span>
+    </button>
 
     <!-- Contenedor Principal Optimizado para Tablet -->
     <main class="flex-1 max-w-5xl w-full mx-auto p-2.5 sm:p-4">
@@ -109,6 +137,80 @@
                 toast.classList.remove('translate-y-0', 'opacity-100');
             }, 2500);
         }
+
+        // Persistir indicador de procedencia móvil
+        if (new URLSearchParams(window.location.search).get('from_mobile') === '1') {
+            sessionStorage.setItem('sscp_from_mobile', '1');
+            try { localStorage.setItem('sscp_from_mobile', '1'); } catch (e) {}
+        }
+
+        function isMobileClient() {
+            return (
+                window.AndroidBridge !== undefined ||
+                sessionStorage.getItem('sscp_from_mobile') === '1' ||
+                (function() { try { return localStorage.getItem('sscp_from_mobile') === '1'; } catch(e) { return false; } })() ||
+                new URLSearchParams(window.location.search).get('from_mobile') === '1' ||
+                window.innerWidth <= 800 ||
+                /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+                (document.referrer && (document.referrer.includes('/mobile') || document.referrer.includes('/app') || document.referrer.includes('appassets')))
+            );
+        }
+
+        function returnToMobileApp() {
+            // 1. Si estamos dentro de la APK Android (llamada nativa directa a MainActivity.java)
+            if (window.AndroidBridge && typeof window.AndroidBridge.returnToApp === 'function') {
+                window.AndroidBridge.returnToApp();
+                return;
+            }
+
+            // 2. Si venimos de la app anterior en el historial del navegador/WebView
+            if (window.history.length > 1) {
+                window.history.back();
+                setTimeout(() => {
+                    fallbackToMobileView();
+                }, 300);
+                return;
+            }
+
+            fallbackToMobileView();
+        }
+
+        function fallbackToMobileView() {
+            if (window.location.hostname.includes('laxarusdevs.com') || window.location.pathname.startsWith('/app')) {
+                window.location.href = "/app";
+                return;
+            }
+            window.location.href = "/mobile";
+        }
+
+        function returnToOriginalDashboard() {
+            if (isMobileClient()) {
+                returnToMobileApp();
+                return;
+            }
+            window.location.href = "/dashboard";
+        }
+
+        function logoutFromReception() {
+            if (!confirm('¿Desea cerrar la sesión actual para ingresar con otro usuario?')) return;
+            sessionStorage.clear();
+            try {
+                localStorage.removeItem('sscp_mobile_token');
+                localStorage.removeItem('sscp_mobile_user');
+            } catch (e) {}
+            window.location.href = "/logout";
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (isMobileClient()) {
+                const headerText = document.getElementById('txt-return-header');
+                const bannerText = document.getElementById('txt-return-banner');
+                const fabText = document.getElementById('txt-return-fab');
+                if (headerText) headerText.innerText = '← Volver a App Móvil';
+                if (bannerText) bannerText.innerText = '← Volver a la Aplicación Móvil (Atención Hoy)';
+                if (fabText) fabText.innerText = '← Volver a App Móvil';
+            }
+        });
     </script>
     {% include "partials/relay_qr_modal.html" %}
     {% block scripts_extra %}{% endblock %}

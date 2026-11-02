@@ -15,7 +15,7 @@
             <div class="max-w-4xl mx-auto space-y-6">
                 <div>
                     <h1 class="text-2xl font-bold text-slate-900">Configuración del Consultorio y Sistema</h1>
-                    <p class="text-xs text-slate-500 mt-0.5">Parámetros generales de la clínica, integración con WhatsApp (1-Clic y Gateway QR) y conectividad multi-sede.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Parámetros generales de la clínica, integración con WhatsApp (1-Clic) y conectividad multi-sede.</p>
                 </div>
 
                 {% if saved %}
@@ -71,6 +71,16 @@
                                     class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
                             </div>
                             <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Exequátur Legal del Médico</label>
+                                <input type="text" name="doctor_exequatur" value="{{ setting.doctor_exequatur or '165-10' }}" placeholder="Ej. 165-10"
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Cédula Oficial del Médico</label>
+                                <input type="text" name="doctor_cedula" value="{{ setting.doctor_cedula or '001-1418378-3' }}" placeholder="Ej. 001-1418378-3"
+                                    class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+                            </div>
+                            <div>
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Moneda del Sistema</label>
                                 <select name="currency" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
                                     <option value="RD$" {% if setting.currency == 'RD$' %}selected{% endif %}>RD$ (Pesos Dominicanos)</option>
@@ -98,52 +108,52 @@
                         </div>
                     </div>
 
-                    <!-- Tarjeta 2: Integración WhatsApp (Híbrida: 1-Clic + Gateway Autónomo QR) -->
+                    <!-- Tarjeta 2: Integración WhatsApp (Envío Rápido 1-Clic por Teléfono) -->
                     <div class="bg-white rounded-2xl border border-emerald-200/80 shadow-sm p-6 md:p-8 space-y-6 relative overflow-hidden">
                         <div class="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none"></div>
 
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
                             <div>
                                 <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center">
-                                    <i class="fab fa-whatsapp text-emerald-600 text-lg mr-2"></i> Integración de WhatsApp (1-Clic & Gateway QR)
+                                    <i class="fab fa-whatsapp text-emerald-600 text-lg mr-2"></i> Integración de WhatsApp (Envío Rápido 1-Clic)
                                 </h2>
                                 <p class="text-xs text-slate-500 mt-0.5">Envío de recordatorios de citas a pacientes y alertas de llegada para el doctor.</p>
                             </div>
-                            <!-- Badge de estado del Gateway -->
+                            <!-- Badge de estado -->
                             <div id="gw_status_badge">
                                 {% if gateway_status.is_connected %}
                                 <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
                                     <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
-                                    Gateway Conectado ({{ gateway_status.connected_phone or setting.whatsapp_connected_phone }})
+                                    WhatsApp Vinculado ({{ gateway_status.connected_phone or setting.whatsapp_connected_phone }})
                                 </span>
                                 {% else %}
                                 <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300">
                                     <span class="w-2 h-2 rounded-full bg-slate-400 mr-1.5"></span>
-                                    Gateway Desconectado (Modo 1-Clic Activo)
+                                    WhatsApp No Vinculado (Ingresa el número)
                                 </span>
                                 {% endif %}
                             </div>
                         </div>
 
-                        <!-- Sub-sección: Vinculación con Código QR -->
+                        <!-- Sub-sección: Vinculación Telefónica Directa -->
                         <div class="bg-gradient-to-br from-slate-50 to-emerald-50/40 p-5 rounded-xl border border-emerald-100/80">
                             <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                                 <div class="space-y-1">
-                                    <p class="text-xs font-bold text-slate-900 uppercase tracking-wider">Vinculación de WhatsApp Web del Consultorio</p>
+                                    <p class="text-xs font-bold text-slate-900 uppercase tracking-wider">Canal Oficial de WhatsApp de la Clínica</p>
                                     <p class="text-xs text-slate-600 leading-relaxed">
-                                        Escanee el código QR desde la app de WhatsApp de su teléfono en <strong>Dispositivos vinculados</strong> para habilitar el envío desatendido automático.
+                                        Vincula el número telefónico del consultorio o secretaría. No requiere escanear códigos QR: los recordatorios a pacientes se envían con 1 solo toque directamente mediante la aplicación oficial de WhatsApp.
                                     </p>
                                     <p class="text-[11px] text-slate-500">
-                                        <i class="fas fa-shield-alt text-emerald-600 mr-1"></i> Si no está vinculado, el sistema utilizará siempre los <strong>enlaces directos wa.me de 1 clic</strong>.
+                                        <i class="fas fa-check-circle text-emerald-600 mr-1"></i> Número configurado: <strong>{{ gateway_status.connected_phone or setting.whatsapp_connected_phone or 'No definido aún' }}</strong>
                                     </p>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2 shrink-0">
-                                    <button type="button" onclick="openQrModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center">
-                                        <i class="fas fa-qrcode mr-1.5 text-sm"></i> Vincular / Ver Código QR
+                                    <button type="button" onclick="openWhatsAppModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center">
+                                        <i class="fab fa-whatsapp mr-1.5 text-sm"></i> Vincular / Cambiar Teléfono
                                     </button>
                                     {% if gateway_status.is_connected %}
                                     <button type="button" onclick="disconnectGateway()" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl text-xs font-bold border border-red-200 transition-all">
-                                        <i class="fas fa-power-off mr-1"></i> Desconectar
+                                        <i class="fas fa-unlink mr-1"></i> Desvincular
                                     </button>
                                     {% endif %}
                                 </div>
@@ -283,7 +293,7 @@
                                     <i class="fas fa-cloud text-sky-600"></i>
                                     <span>Canal del Buzón Cloud Relay (Enlace Tablet por Internet)</span>
                                 </label>
-                                <input type="text" name="relay_channel_id" value="{{ setting.relay_channel_id or 'dr_carlos_heredia' }}" placeholder="Ej: dr_manuel_ramirez o dra_laura_gomez" 
+                                <input type="text" name="relay_channel_id" value="{{ setting.relay_channel_id or '' }}" placeholder="Ej: dra_laura_gomez o dr_ramirez" 
                                     class="w-full px-3.5 py-2 text-sm font-mono border border-sky-300 bg-sky-50/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
                                 <p class="mt-1 text-[11px] text-sky-700">Canal exclusivo en la nube para enlazar la Tablet de la secretaría sin importar si están en redes diferentes o si la PC no tiene Wi-Fi.</p>
                             </div>
@@ -314,19 +324,34 @@
 
                     <div class="flex flex-col sm:flex-row items-start gap-6">
                         <!-- Vista previa -->
-                        <div class="shrink-0">
-                            <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Logo Actual</p>
+                        <div class="shrink-0 space-y-2">
+                            <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Logo Actual en Membrete</p>
                             {% if setting.doctor_logo_path %}
-                            <div class="w-28 h-28 border-2 border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center">
+                            <div class="w-32 h-32 border-2 border-violet-200 rounded-2xl overflow-hidden bg-white shadow-sm flex items-center justify-center p-2">
                                 <img src="/static/uploads/{{ setting.doctor_logo_path.replace('\\', '/').split('/')[-1] }}"
-                                     alt="Logo del Consultorio" class="w-full h-full object-contain p-2">
+                                     alt="Logo Personalizado" class="w-full h-full object-contain">
                             </div>
-                            <p class="text-[10px] text-emerald-600 font-semibold mt-1 text-center"><i class="fas fa-check-circle mr-1"></i>Logo activo</p>
+                            <div>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-800 border border-violet-200">
+                                    <i class="fas fa-user-md mr-1"></i> Logo Personalizado Activo
+                                </span>
+                            </div>
+                            <form method="post" action="/settings/reset-logo" onsubmit="return confirm('¿Deseas restablecer al logo oficial por defecto del Dr. Carlos Miguel Heredia Jorge?');" class="pt-1">
+                                <button type="submit" class="w-full inline-flex items-center justify-center px-2.5 py-1.5 bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-700 rounded-lg text-[11px] font-bold border border-slate-200 hover:border-red-200 transition-all shadow-2xs">
+                                    <i class="fas fa-undo mr-1.5 text-xs"></i> Restablecer a Dr. Heredia
+                                </button>
+                            </form>
                             {% else %}
-                            <div class="w-28 h-28 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/60 flex flex-col items-center justify-center text-slate-400">
-                                <i class="fas fa-image text-2xl mb-1"></i>
-                                <span class="text-[10px] font-medium text-center leading-tight">Sin logo<br>cargado</span>
+                            <div class="w-32 h-32 border-2 border-emerald-200 rounded-2xl overflow-hidden bg-white shadow-sm flex items-center justify-center p-2">
+                                <img src="/static/images/logo_dr_heredia_bw.png"
+                                     alt="Logo Dr. Heredia (Por Defecto)" class="w-full h-full object-contain">
                             </div>
+                            <div>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    <i class="fas fa-check-circle mr-1"></i> Por Defecto (Dr. Heredia)
+                                </span>
+                            </div>
+                            <p class="text-[10px] text-slate-400 leading-tight">Activo automáticamente en Licencias y Referencias</p>
                             {% endif %}
                         </div>
 
@@ -461,171 +486,188 @@
                     </div>
                 </div>
 
-                <!-- Tarjeta: Conectividad Móvil y Descarga de APK (Doctor y Secretaria) -->
+                <!-- Tarjeta: Conectividad Móvil, Multi-sede y Códigos QR (Doctor y Secretaría) -->
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
-                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-                        <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center">
-                            <i class="fas fa-mobile-screen-button text-indigo-600 mr-2"></i> Conectividad Móvil y APK (Doctor y Secretaría)
-                        </h2>
-                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                            Android .APK &amp; Web Móvil
-                        </span>
-                    </div>
-                    <p class="text-xs text-slate-500 mb-5 leading-relaxed">
-                        Permite que el <strong>Doctor</strong> y la <strong>Secretaria</strong> operen la agenda, la recepción de pacientes y las notas clínicas desde sus teléfonos Android o tablets dentro del consultorio (vía Wi-Fi local) o de forma remota (vía Tailscale / Web).
-                    </p>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Descarga de APK para Desktop -->
-                        <div class="p-5 rounded-xl border border-emerald-200 bg-emerald-50/20 flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center space-x-2 text-slate-800 font-bold text-sm mb-1.5">
-                                    <i class="fab fa-android text-emerald-600 text-lg"></i>
-                                    <span>APK Móvil para PC Desktop (v{{ APK_VERSION }})</span>
-                                </div>
-                                <p class="text-xs text-slate-600 leading-relaxed mb-3">
-                                    Instalador Android oficial para conectar el teléfono o tablet de recepción directamente con esta computadora.
-                                </p>
-                                <div class="bg-white/90 p-3 rounded-lg border border-emerald-100 text-[11px] text-slate-600 space-y-1.5">
-                                    <div class="flex items-start space-x-1.5">
-                                        <i class="fas fa-check text-emerald-600 mt-0.5 text-[10px]"></i>
-                                        <span><strong>Modo Fuera de Línea:</strong> Registro de citas y pacientes en almacenamiento local seguro.</span>
-                                    </div>
-                                    <div class="flex items-start space-x-1.5">
-                                        <i class="fas fa-check text-emerald-600 mt-0.5 text-[10px]"></i>
-                                        <span><strong>Sincronización Automática:</strong> Transferencia bidireccional inmediata al restablecer conexión.</span>
-                                    </div>
-                                    <div class="flex items-start space-x-1.5">
-                                        <i class="fas fa-check text-emerald-600 mt-0.5 text-[10px]"></i>
-                                        <span><strong>Comunicación Segura:</strong> Canal cifrado de alta disponibilidad.</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between">
-                                <a href="/mobile" target="_blank" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline">
-                                    <i class="fas fa-external-link-alt mr-1"></i> Probar en Navegador
-                                </a>
-                                <a href="/download/apk" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-emerald-600/20 transition-all">
-                                    <i class="fas fa-download mr-1.5"></i> Descargar APK Desktop
-                                </a>
-                            </div>
-                        </div>
-
-                        <!-- Vinculación de Red y Código QR -->
-                        <div class="p-5 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center space-x-2 text-slate-800 font-bold text-sm mb-1.5">
-                                    <i class="fas fa-qrcode text-indigo-600"></i>
-                                    <span>Escanear con la Cámara del Celular</span>
-                                </div>
-                                <p class="text-xs text-slate-500 leading-relaxed mb-3">
-                                    Apunta la cámara del celular conectado al mismo Wi-Fi de la clínica. Puedes elegir qué acción deseas realizar:
-                                </p>
-                                
-                                <div class="flex items-center space-x-4">
-                                    <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm shrink-0 text-center">
-                                        <img id="qr-display-img" src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=http://{{ local_ip }}:8080/download/apk" 
-                                             alt="QR Descarga APK" class="w-24 h-24 rounded-lg object-contain mx-auto">
-                                        <span id="qr-label-txt" class="block text-[10px] font-bold text-emerald-700 mt-1">Descargar APK</span>
-                                    </div>
-                                    <div class="text-[11px] text-slate-600 space-y-2 flex-1">
-                                        <div class="flex space-x-1 bg-slate-200/70 p-1 rounded-lg">
-                                            <button type="button" onclick="switchQr('apk')" id="btn-qr-apk" class="flex-1 py-1 px-2 text-[10px] font-bold bg-white text-emerald-700 rounded shadow-sm transition">
-                                                <i class="fab fa-android mr-1"></i> Descargar APK
-                                            </button>
-                                            <button type="button" onclick="switchQr('web')" id="btn-qr-web" class="flex-1 py-1 px-2 text-[10px] font-bold text-slate-600 rounded transition">
-                                                <i class="fas fa-globe mr-1"></i> Abrir Web
-                                            </button>
-                                        </div>
-                                        <div>
-                                            <span class="text-slate-400 block font-medium">IP en Red Local (Wi-Fi):</span>
-                                            <code class="text-xs font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">http://{{ local_ip }}:8080</code>
-                                        </div>
-                                        <!-- Enlace Cloud Relay (Recomendado 24/7) -->
-                                        <div class="p-2.5 bg-sky-50 border border-sky-200 rounded-xl space-y-1">
-                                            <div class="flex items-center justify-between">
-                                                <span class="text-[10px] font-bold text-sky-900 flex items-center">
-                                                    <i class="fas fa-cloud text-sky-600 mr-1.5"></i> Enlace Cloud Relay (Recomendado):
-                                                </span>
-                                                <span class="text-[9px] bg-sky-200/80 text-sky-900 font-bold px-1.5 py-0.2 rounded-full">Automático</span>
-                                            </div>
-                                            <div class="flex items-center space-x-1.5">
-                                                <code class="text-xs font-bold text-sky-900 bg-white px-2 py-1 rounded-lg border border-sky-300 font-mono flex-1 select-all">{{ setting.relay_channel_id or 'dr_carlos_heredia' }}</code>
-                                                <button type="button" onclick="navigator.clipboard.writeText('{{ setting.relay_channel_id or 'dr_carlos_heredia' }}'); alert('Canal Cloud Relay copiado');" 
-                                                        class="px-2 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[10px] font-bold shadow-sm transition">
-                                                    Copiar
-                                                </button>
-                                            </div>
-                                            <p class="text-[10px] text-sky-700 leading-tight">
-                                                Conecta la Tablet de recepción con esta PC <strong>sin configurar VPN ni abrir puertos</strong>.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between">
-                                <span class="text-[11px] text-slate-400 font-medium">Puerto de red: 8080</span>
-                                <span class="text-[11px] font-bold text-emerald-600 flex items-center">
-                                    <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span> Servidor Móvil Activo
-                                </span>
-                            </div>
-                    </div>
-
-                    <!-- Banner Informativo: Diferencia entre APK Desktop y Edición Nube -->
-                    <div class="mt-4 p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
-                        <div class="flex items-start sm:items-center space-x-2.5">
-                            <span class="text-base text-emerald-600">📶</span>
-                            <div>
-                                <span class="font-bold text-slate-800">Conexión 100% Local en tu Consultorio</span>
-                                <p class="text-[11px] text-slate-500">
-                                    Cualquier tablet o celular conectado al mismo Wi-Fi del consultorio puede operar el sistema abriendo <code class="bg-white px-1.5 py-0.5 rounded border border-emerald-200 text-emerald-800 font-bold">/mobile</code> o usando el APK local.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- MODAL: CÓDIGO QR DE WHATSAPP GATEWAY -->
-            <div id="qrModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-                <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-fade-in">
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                        <div class="flex items-center space-x-2.5">
-                            <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg">
-                                <i class="fab fa-whatsapp"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-base font-bold text-slate-900">Vincular WhatsApp Gateway</h3>
-                                <p class="text-xs text-slate-500">Escanee con WhatsApp en su celular</p>
-                            </div>
-                        </div>
-                        <button type="button" onclick="closeQrModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
-                    </div>
-
-                    <div class="space-y-4 text-center">
-                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col items-center justify-center min-h-[220px]" id="qrContainer">
-                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-2"></div>
-                            <span class="text-xs text-slate-500">Generando código QR seguro...</span>
-                        </div>
-
-                        <div class="text-left bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3 text-xs text-slate-700 space-y-1.5">
-                            <p class="font-bold text-emerald-900 flex items-center">
-                                <i class="fas fa-mobile-screen-button mr-1.5"></i> Instrucciones desde el teléfono:
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+                        <div>
+                            <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center">
+                                <i class="fas fa-network-wired text-indigo-600 mr-2"></i> Interconexión Móvil, Multi-sede & Códigos QR
+                            </h2>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                Conecta teléfonos Android, tablets de secretaría y computadoras auxiliares mediante cualquiera de los 3 canales disponibles.
                             </p>
-                            <ol class="list-decimal list-inside space-y-0.5 text-[11px] text-slate-600">
-                                <li>Abra WhatsApp en su teléfono móvil.</li>
-                                <li>Toque <strong>Ajustes / Menú</strong> &gt; <strong>Dispositivos vinculados</strong>.</li>
-                                <li>Presione <strong>Vincular un dispositivo</strong> y apunte su cámara a este código.</li>
-                            </ol>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                {% if setting.station_role == 'secretaria' %}📋 Estación Secretaría{% else %}🩺 Doctor Principal (Central){% endif %}
+                            </span>
+                            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <i class="fas fa-check-circle mr-1"></i>Servidor Activo (8080)
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Panel de 3 Canales de Conectividad -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                        <!-- Canal 1: Cloud Relay (Nube 24/7) -->
+                        <div class="p-4 rounded-2xl border-2 border-sky-200 bg-sky-50/40 flex flex-col justify-between hover:border-sky-400 transition-all shadow-xs">
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-sky-100 text-sky-800 border border-sky-300">
+                                        <i class="fas fa-cloud mr-1 text-sky-600"></i> Nube 24/7
+                                    </span>
+                                    <span class="text-[10px] font-bold text-sky-600 bg-white px-2 py-0.5 rounded-full border border-sky-200">Recomendado</span>
+                                </div>
+                                <h3 class="text-xs font-bold text-slate-900 mb-1">Buzón Cloud Relay</h3>
+                                <p class="text-[11px] text-slate-500 leading-relaxed mb-3">
+                                    Conexión universal desde cualquier lugar (Wi-Fi, 4G, fuera de la clínica). No requiere abrir puertos ni configurar router.
+                                </p>
+                                <div class="bg-white p-2.5 rounded-xl border border-sky-200 text-xs space-y-1.5 font-mono">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[10px] text-slate-400 font-sans font-bold uppercase">Canal:</span>
+                                        <span class="font-bold text-sky-900">{{ setting.relay_channel_id or 'dr_cristian_garcia' }}</span>
+                                    </div>
+                                    <div class="text-[10px] text-slate-500 truncate font-sans">
+                                        https://sscp.laxarusdevs.com/mobile
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-sky-100 flex items-center justify-between gap-2">
+                                <button type="button" onclick="switchQr('cloud')" class="flex-1 py-1.5 px-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold shadow-sm transition text-center">
+                                    <i class="fas fa-qrcode mr-1"></i> Ver QR
+                                </button>
+                                <button type="button" onclick="navigator.clipboard.writeText('https://sscp.laxarusdevs.com/mobile/?channel={{ setting.relay_channel_id or 'dr_cristian_garcia' }}'); alert('Enlace Cloud Relay copiado');" class="py-1.5 px-3 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold border border-slate-200 transition">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
                         </div>
 
-                        <div class="flex items-center justify-between pt-2">
-                            <button type="button" onclick="refreshQr()" class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-semibold flex items-center">
-                                <i class="fas fa-redo-alt mr-1"></i> Regenerar QR
-                            </button>
-                            <button type="button" onclick="confirmPairing()" class="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow transition-all flex items-center">
-                                <i class="fas fa-check mr-1.5"></i> Confirmar Vinculación
-                            </button>
+                        <!-- Canal 2: Tailscale VPN (Multi-sede Seguro) -->
+                        <div class="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/30 flex flex-col justify-between hover:border-indigo-400 transition-all shadow-xs">
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-indigo-100 text-indigo-800 border border-indigo-300">
+                                        <i class="fas fa-shield-halved mr-1 text-indigo-600"></i> VPN Remota
+                                    </span>
+                                    <span class="text-[10px] font-bold text-indigo-600 bg-white px-2 py-0.5 rounded-full border border-indigo-200">Multi-sede</span>
+                                </div>
+                                <h3 class="text-xs font-bold text-slate-900 mb-1">Tailscale VPN Directa</h3>
+                                <p class="text-[11px] text-slate-500 leading-relaxed mb-3">
+                                    Enlace seguro directo cifrado de punto a punto entre sedes remotas y celulares con Tailscale instalado.
+                                </p>
+                                <div class="bg-white p-2.5 rounded-xl border border-indigo-200 text-xs space-y-1.5 font-mono">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[10px] text-slate-400 font-sans font-bold uppercase">IP Fija VPN:</span>
+                                        <span class="font-bold text-indigo-900">{{ tailscale_ip or '100.91.251.86' }}</span>
+                                    </div>
+                                    <div class="text-[10px] text-slate-500 truncate font-sans">
+                                        http://{{ tailscale_ip or '100.91.251.86' }}:8080/mobile
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-indigo-100 flex items-center justify-between gap-2">
+                                <button type="button" onclick="switchQr('tailscale')" class="flex-1 py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition text-center">
+                                    <i class="fas fa-qrcode mr-1"></i> Ver QR
+                                </button>
+                                <button type="button" onclick="navigator.clipboard.writeText('http://{{ tailscale_ip or '100.91.251.86' }}:8080/mobile'); alert('URL Tailscale copiada');" class="py-1.5 px-3 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold border border-slate-200 transition">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Canal 3: Red Local Wi-Fi (Consultorio) -->
+                        <div class="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/30 flex flex-col justify-between hover:border-emerald-400 transition-all shadow-xs">
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        <i class="fas fa-wifi mr-1 text-emerald-600"></i> Red Local
+                                    </span>
+                                    <span class="text-[10px] font-bold text-emerald-600 bg-white px-2 py-0.5 rounded-full border border-emerald-200">Sin Internet</span>
+                                </div>
+                                <h3 class="text-xs font-bold text-slate-900 mb-1">Wi-Fi del Consultorio</h3>
+                                <p class="text-[11px] text-slate-500 leading-relaxed mb-3">
+                                    Velocidad máxima directa por la red interna del consultorio. Funciona aun si se cae la conexión a internet.
+                                </p>
+                                <div class="bg-white p-2.5 rounded-xl border border-emerald-200 text-xs space-y-1.5 font-mono">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[10px] text-slate-400 font-sans font-bold uppercase">IP Local:</span>
+                                        <span class="font-bold text-emerald-900">{{ local_ip }}:8080</span>
+                                    </div>
+                                    <div class="text-[10px] text-slate-500 truncate font-sans">
+                                        http://{{ local_ip }}:8080/mobile
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-emerald-100 flex items-center justify-between gap-2">
+                                <button type="button" onclick="switchQr('local')" class="flex-1 py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition text-center">
+                                    <i class="fas fa-qrcode mr-1"></i> Ver QR
+                                </button>
+                                <button type="button" onclick="navigator.clipboard.writeText('http://{{ local_ip }}:8080/mobile'); alert('URL Local Wi-Fi copiada');" class="py-1.5 px-3 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold border border-slate-200 transition">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sección Interactiva: Visor de Código QR Unificado y Descarga de APK -->
+                    <div class="p-5 md:p-6 rounded-2xl border border-slate-200 bg-slate-50/70 flex flex-col md:flex-row items-center gap-6">
+                        <!-- Contenedor QR -->
+                        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm shrink-0 text-center w-48">
+                            <img id="qr-display-img" src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=https://sscp.laxarusdevs.com/mobile/?channel={{ setting.relay_channel_id or 'dr_cristian_garcia' }}" 
+                                 alt="Código QR de Conexión" class="w-36 h-36 rounded-xl object-contain mx-auto border border-slate-100 p-1">
+                            <span id="qr-label-txt" class="block text-[11px] font-black text-sky-700 mt-2">Cloud Relay (Internet 24/7)</span>
+                        </div>
+
+                        <!-- Opciones y selector de QR -->
+                        <div class="flex-1 space-y-3.5 w-full">
+                            <div>
+                                <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-1 flex items-center">
+                                    <i class="fas fa-camera text-indigo-600 mr-1.5"></i> Escanear Código QR con el Celular o Tablet
+                                </h3>
+                                <p class="text-xs text-slate-500">
+                                    Selecciona el modo deseado para actualizar el código QR en pantalla y escanearlo con la cámara del dispositivo móvil:
+                                </p>
+                            </div>
+
+                            <!-- Selector de pestañas QR -->
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-slate-200/80 p-1 rounded-xl">
+                                <button type="button" onclick="switchQr('cloud')" id="btn-qr-cloud" class="py-1.5 px-2 text-[10px] font-bold bg-white text-sky-700 shadow-xs rounded-lg transition text-center">
+                                    <i class="fas fa-cloud mr-1"></i> Nube 24/7
+                                </button>
+                                <button type="button" onclick="switchQr('tailscale')" id="btn-qr-tailscale" class="py-1.5 px-2 text-[10px] font-bold text-slate-600 hover:text-slate-900 rounded-lg transition text-center">
+                                    <i class="fas fa-shield-halved mr-1"></i> Tailscale
+                                </button>
+                                <button type="button" onclick="switchQr('local')" id="btn-qr-local" class="py-1.5 px-2 text-[10px] font-bold text-slate-600 hover:text-slate-900 rounded-lg transition text-center">
+                                    <i class="fas fa-wifi mr-1"></i> Wi-Fi Local
+                                </button>
+                                <button type="button" onclick="switchQr('apk')" id="btn-qr-apk" class="py-1.5 px-2 text-[10px] font-bold text-slate-600 hover:text-slate-900 rounded-lg transition text-center">
+                                    <i class="fab fa-android mr-1"></i> APK App
+                                </button>
+                            </div>
+
+                            <!-- Enlace actualmente activo en el QR -->
+                            <div class="p-3 bg-white rounded-xl border border-slate-200 text-xs flex items-center justify-between gap-3">
+                                <div class="min-w-0 flex-1">
+                                    <span class="text-[10px] font-bold text-slate-400 block uppercase">Enlace del código QR actual:</span>
+                                    <code id="qr-url-desc" class="text-xs font-mono font-bold text-indigo-900 truncate block">https://sscp.laxarusdevs.com/mobile/?channel={{ setting.relay_channel_id or 'dr_cristian_garcia' }}</code>
+                                </div>
+                                <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('qr-url-desc').textContent); alert('Enlace copiado al portapapeles');" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition shrink-0">
+                                    <i class="fas fa-copy mr-1"></i> Copiar
+                                </button>
+                            </div>
+
+                            <!-- Botones de Acción Rápida -->
+                            <div class="flex flex-wrap items-center gap-3 pt-1">
+                                <a href="/download/apk" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-emerald-600/20 transition-all">
+                                    <i class="fas fa-download mr-1.5"></i> Descargar APK Android (v{{ APK_VERSION }})
+                                </a>
+                                <a href="/mobile" target="_blank" class="inline-flex items-center px-3.5 py-2 bg-white hover:bg-slate-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all">
+                                    <i class="fas fa-external-link-alt mr-1.5"></i> Probar Web Móvil Local
+                                </a>
+                                <a href="https://sscp.laxarusdevs.com/mobile" target="_blank" class="inline-flex items-center px-3.5 py-2 bg-white hover:bg-slate-50 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold transition-all">
+                                    <i class="fas fa-cloud mr-1.5"></i> Abrir Web Móvil en la Nube
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -635,59 +677,8 @@
 </div>
 
 <script>
-async function openQrModal() {
-    document.getElementById('qrModal').classList.remove('hidden');
-    await refreshQr();
-}
-
-function closeQrModal() {
-    document.getElementById('qrModal').classList.add('hidden');
-}
-
-async function refreshQr() {
-    const container = document.getElementById('qrContainer');
-    container.innerHTML = `
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-2"></div>
-        <span class="text-xs text-slate-500">Generando código QR seguro...</span>
-    `;
-    try {
-        const res = await fetch('/settings/whatsapp/generate-qr', { method: 'POST' });
-        const data = await res.json();
-        if (data.qr_image_base64) {
-            container.innerHTML = `
-                <img src="${data.qr_image_base64}" alt="Código QR WhatsApp" class="w-48 h-48 rounded-lg shadow-sm border border-slate-200 bg-white p-1">
-                <p class="text-[11px] text-slate-500 mt-2"><i class="fas fa-clock mr-1"></i>Válido para escaneo inmediato</p>
-            `;
-        } else {
-            container.innerHTML = `<p class="text-xs text-red-500">Error al generar código QR</p>`;
-        }
-    } catch(e) {
-        container.innerHTML = `<p class="text-xs text-red-500">No se pudo conectar con el servidor.</p>`;
-    }
-}
-
-async function confirmPairing() {
-    const phoneInput = document.querySelector('input[name="whatsapp_doctor_phone"]');
-    const phone = phoneInput ? phoneInput.value : "+1 (809) 555-0199";
-    
-    const formData = new FormData();
-    formData.append('phone', phone || "+1 (809) 555-0199");
-
-    try {
-        const res = await fetch('/settings/whatsapp/confirm-pairing', { method: 'POST', body: formData });
-        const data = await res.json();
-        if (data.is_connected) {
-            alert('¡WhatsApp Gateway vinculado con éxito! Ahora puede enviar recordatorios automáticamente.');
-            closeQrModal();
-            window.location.reload();
-        }
-    } catch(e) {
-        alert('Error al confirmar vinculación.');
-    }
-}
-
 async function disconnectGateway() {
-    if (!confirm('¿Está seguro de desconectar la sesión del Gateway de WhatsApp?')) return;
+    if (!confirm('¿Está seguro de desvincular el número de WhatsApp actual?')) return;
     try {
         const res = await fetch('/settings/whatsapp/disconnect', { method: 'POST' });
         const data = await res.json();
@@ -695,7 +686,7 @@ async function disconnectGateway() {
             window.location.reload();
         }
     } catch(e) {
-        alert('Error al desconectar gateway.');
+        alert('Error al desvincular WhatsApp.');
     }
 }
 
@@ -729,28 +720,63 @@ async function sendTestWhatsApp() {
     }
 }
 
-let currentQrType = 'apk';
+let currentQrType = 'cloud';
 
 function updateQrImage() {
     const img = document.getElementById('qr-display-img');
     const label = document.getElementById('qr-label-txt');
+    const desc = document.getElementById('qr-url-desc');
+    const btnCloud = document.getElementById('btn-qr-cloud');
+    const btnTailscale = document.getElementById('btn-qr-tailscale');
+    const btnLocal = document.getElementById('btn-qr-local');
     const btnApk = document.getElementById('btn-qr-apk');
-    const btnWeb = document.getElementById('btn-qr-web');
     
-    const host = "http://{{ local_ip }}:8080";
+    const localHost = "http://{{ local_ip }}:8080";
+    const tailscaleHost = "{{ tailscale_ip }}" ? "http://{{ tailscale_ip }}:8080" : "http://100.91.251.86:8080";
+    const cloudUrl = "https://sscp.laxarusdevs.com/mobile/?channel={{ setting.relay_channel_id or 'dr_cristian_garcia' }}";
+    const apkUrl = localHost + "/download/apk";
 
-    if (currentQrType === 'apk') {
-        img.src = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(host + '/download/apk')}`;
-        label.textContent = "Descargar APK (Red Local)";
-        label.className = "block text-[10px] font-bold text-emerald-700 mt-1";
-        btnApk.className = "flex-1 py-1 px-2 text-[10px] font-bold bg-white text-emerald-700 rounded shadow-sm transition";
-        btnWeb.className = "flex-1 py-1 px-2 text-[10px] font-bold text-slate-600 rounded transition";
-    } else {
-        img.src = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(host + '/mobile')}`;
-        label.textContent = "Abrir Web (Red Local)";
-        label.className = "block text-[10px] font-bold text-indigo-700 mt-1";
-        btnWeb.className = "flex-1 py-1 px-2 text-[10px] font-bold bg-white text-indigo-700 rounded shadow-sm transition";
-        btnApk.className = "flex-1 py-1 px-2 text-[10px] font-bold text-slate-600 rounded transition";
+    const inactiveClass = "py-1.5 px-2 text-[10px] font-bold text-slate-600 hover:text-slate-900 rounded-lg transition text-center";
+    const activeClass = "py-1.5 px-2 text-[10px] font-bold bg-white shadow-xs rounded-lg transition text-center ";
+
+    if (btnCloud) btnCloud.className = inactiveClass;
+    if (btnTailscale) btnTailscale.className = inactiveClass;
+    if (btnLocal) btnLocal.className = inactiveClass;
+    if (btnApk) btnApk.className = inactiveClass;
+
+    let targetUrl = cloudUrl;
+    let title = "Cloud Relay (Internet 24/7)";
+    let colorClass = "text-sky-700";
+
+    if (currentQrType === 'cloud') {
+        targetUrl = cloudUrl;
+        title = "Cloud Relay (Internet 24/7)";
+        colorClass = "text-sky-700";
+        if (btnCloud) btnCloud.className = activeClass + "text-sky-700";
+    } else if (currentQrType === 'tailscale') {
+        targetUrl = tailscaleHost + "/mobile";
+        title = "Tailscale VPN Remoto";
+        colorClass = "text-indigo-700";
+        if (btnTailscale) btnTailscale.className = activeClass + "text-indigo-700";
+    } else if (currentQrType === 'local') {
+        targetUrl = localHost + "/mobile";
+        title = "Red Wi-Fi Local (Consultorio)";
+        colorClass = "text-emerald-700";
+        if (btnLocal) btnLocal.className = activeClass + "text-emerald-700";
+    } else if (currentQrType === 'apk') {
+        targetUrl = apkUrl;
+        title = "Descargar APK Android";
+        colorClass = "text-emerald-700";
+        if (btnApk) btnApk.className = activeClass + "text-emerald-700";
+    }
+
+    if (img) img.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(targetUrl)}`;
+    if (label) {
+        label.textContent = title;
+        label.className = `block text-[11px] font-black ${colorClass} mt-2`;
+    }
+    if (desc) {
+        desc.textContent = targetUrl;
     }
 }
 
@@ -758,5 +784,10 @@ function switchQr(type) {
     currentQrType = type;
     updateQrImage();
 }
+
+// Inicializar QR por defecto al cargar página
+document.addEventListener('DOMContentLoaded', () => {
+    updateQrImage();
+});
 </script>
 {% endblock %}

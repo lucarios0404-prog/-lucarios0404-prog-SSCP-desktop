@@ -75,6 +75,8 @@ def build_electron_dist():
     shutil.copytree(backend_src, backend_dest)
 
 
+
+
     print("[4/4] Verificando empaquetado...")
     assert target_exe.exists(), "Falta ejecutable principal"
     assert (app_dir / "src" / "main" / "main.js").exists(), "Falta main.js"

@@ -257,7 +257,12 @@ def download_insurance_form_pdf(
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
 
     setting = db.query(Setting).first()
-    pdf_buffer = generate_insurance_preauthorization_pdf(form_obj, setting)
+    try:
+        pdf_buffer = generate_insurance_preauthorization_pdf(form_obj, setting)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error al generar el documento PDF: {e}")
 
     safe_ars = "".join(c for c in form_obj.ars_name[:10] if c.isascii() and (c.isalnum() or c in ('_', '-')))
     filename = f"Preautorizacion_{safe_ars}_{form_obj.id}_{datetime.now().strftime('%Y%m%d')}.pdf"

@@ -21,7 +21,7 @@ Base.metadata.create_all(bind=engine)
 print("1. Tabla relay_messages creada/verificada en SQLite.")
 
 client = TestClient(app)
-clinic_id = "dr_carlos_heredia"
+clinic_id = "dra_especialista"
 
 # 2. Status inicial del buzón
 res_status = client.get(f"/api/relay/{clinic_id}/status")

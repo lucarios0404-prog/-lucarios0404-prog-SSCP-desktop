@@ -152,7 +152,7 @@ function createMainWindow() {
     minHeight: winConfig.minHeight || 700,
     show: false,
     icon: getAppIcon(),
-    title: config.appName || "SSCP Desktop",
+    title: (config.appName || "SSCP Desktop") + " v1.3.4",
     webPreferences: {
       preload: path.resolve(__dirname, '../preload/preload.js'),
       nodeIntegration: false,
@@ -362,16 +362,25 @@ function setupIpc() {
     const targetWin = BrowserWindow.fromWebContents(event.sender) || mainWindow;
     if (!targetWin) return false;
 
+    const currentUrl = (targetWin.webContents && targetWin.webContents.getURL) ? targetWin.webContents.getURL().toLowerCase() : '';
+    const isPreauthOrLetterDoc = 
+      currentUrl.includes('/insurance-forms') || 
+      (currentUrl.includes('/licenses') && !currentUrl.includes('/talonario')) ||
+      currentUrl.includes('/reports') || 
+      currentUrl.includes('/consents') ||
+      currentUrl.includes('/history');
+
     // Si el llamador provee márgenes explícitos, los usamos; de lo contrario, 'printableArea'
     // permite que la regla CSS @page inyectada por preload.js defina los márgenes exactos sin duplicación
     const printMargins = options.margins || { marginType: options.marginType || 'printableArea' };
+    const defaultPageSize = isPreauthOrLetterDoc ? 'Letter' : (cachedPrintConfig.print_paper_size || 'Letter');
 
     return new Promise((resolve) => {
       targetWin.webContents.print(
         {
           silent: options.silent || false,
           printBackground: true,
-          pageSize: cachedPrintConfig.print_paper_size || 'Letter',
+          pageSize: options.pageSize || defaultPageSize,
           margins: printMargins,
           ...options
         },

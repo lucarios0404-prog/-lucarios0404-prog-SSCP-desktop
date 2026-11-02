@@ -17,11 +17,13 @@ class Setting(Base):
     tailscale_ip = Column(String, nullable=True)
     sync_interval_minutes = Column(Integer, default=5)
     doctor_logo_path = Column(String, nullable=True)  # Ruta local del logo/membrete del doctor
+    doctor_exequatur = Column(String, default="165-10")  # Exequátur legal del médico titular
+    doctor_cedula = Column(String, default="001-1418378-3")  # Cédula oficial del médico titular
 
     # Rol de Estación y Topología de Red (v1.2.0)
     station_role = Column(String, default="doctor_principal")  # doctor_principal, secretaria
     central_station_url = Column(String, nullable=True)        # URL / IP del nodo central o Tailscale
-    relay_channel_id = Column(String, default="dr_carlos_heredia", nullable=True) # Canal único de Buzón Cloud Relay
+    relay_channel_id = Column(String, default=None, nullable=True) # Canal único de Buzón Cloud Relay
 
 
     # Integración WhatsApp (1-Clic + Gateway Autónomo)

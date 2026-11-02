@@ -26,6 +26,16 @@ def assign_next_queue_number(db: Session, target_date: date) -> int:
     max_q = db.query(func.max(Appointment.queue_number)).filter(Appointment.date == target_date).scalar() or 0
     return int(max_q) + 1
 
+@router.get("/waiting-count")
+def get_waiting_count(db: Session = Depends(get_db)):
+    """Devuelve la cantidad de pacientes actualmente en sala de espera hoy."""
+    today = date.today()
+    count = db.query(Appointment).filter(
+        Appointment.date == today,
+        Appointment.status.in_(["En Espera", "En espera", "en espera"])
+    ).count()
+    return {"count": count, "date": today.isoformat()}
+
 @router.get("/")
 def list_appointments(
     request: Request,
@@ -35,7 +45,33 @@ def list_appointments(
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
+    from app.routers.patients import resolve_current_doctor_id
+    doc_id = resolve_current_doctor_id(db, current_user)
+
+    from app.models.consultation import Consultation
+    
+    # Auto-reconciliación: Si un paciente ya tuvo consulta médica posterior al registro de su cita, marcar la cita como Completada
+    try:
+        pending_candidates = db.query(Appointment).filter(
+            Appointment.status.in_(["Pendiente", "Confirmada"])
+        ).all()
+        reconciled = False
+        for cand in pending_candidates:
+            has_consultation = db.query(Consultation).filter(
+                Consultation.patient_id == cand.patient_id,
+                Consultation.created_at >= cand.created_at
+            ).first()
+            if has_consultation:
+                cand.status = "Completada"
+                reconciled = True
+        if reconciled:
+            db.commit()
+    except Exception:
+        pass
+
     query = db.query(Appointment).order_by(Appointment.date.asc(), Appointment.start_time.asc())
+    if doc_id:
+        query = query.filter(or_(Appointment.doctor_id == doc_id, Appointment.doctor_id == None))
     
     if filter_date:
         try:
@@ -44,8 +80,13 @@ def list_appointments(
         except ValueError:
             pass
 
-    if status:
+    if status and status not in ["all", "pendientes"]:
         query = query.filter(Appointment.status == status)
+    elif status == "all":
+        pass  # Histórico completo solicitado explícitamente
+    else:
+        # Por defecto (Citas Pendientes): únicamente mostrar citas pendientes, confirmadas o en espera (NO completadas)
+        query = query.filter(Appointment.status.in_(["Pendiente", "Confirmada", "En Espera"]))
 
     appointments = query.all()
     
@@ -73,11 +114,18 @@ def list_appointments(
             unsent_reminders_count += 1
 
     today_str = date.today().strftime("%Y-%m-%d")
-    all_patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.last_name).all()
-    waiting_count = db.query(Appointment).filter(
+    pat_q = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None))
+    if doc_id:
+        pat_q = pat_q.filter(Patient.doctor_id == doc_id)
+    all_patients = pat_q.order_by(Patient.last_name).all()
+
+    wait_q = db.query(Appointment).filter(
         Appointment.date == date.today(),
         Appointment.status == "En Espera"
-    ).count()
+    )
+    if doc_id:
+        wait_q = wait_q.filter(Appointment.doctor_id == doc_id)
+    waiting_count = wait_q.count()
 
     gateway_status = gateway_manager.get_status()
     services = db.query(Service).filter(Service.is_active == True).order_by(Service.category.asc(), Service.name.asc()).all()
@@ -96,7 +144,7 @@ def list_appointments(
             "calendar_events": calendar_events,
             "today_str": today_str,
             "filter_date": filter_date or "",
-            "status_filter": status or "all",
+            "status_filter": status or "pendientes",
             "whatsapp_info": whatsapp_info,
             "unsent_reminders_count": unsent_reminders_count,
             "gateway_status": gateway_status,
@@ -377,6 +425,49 @@ def attend_now(
     return RedirectResponse(url=f"/consultations/create?patient_id={patient_id}&appointment_id={appt_id}&walk_in=1", status_code=303)
 
 
+@router.get("/patient-consultations/{patient_id}")
+def get_patient_recent_consultations(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
+):
+    """Retorna las últimas 5 consultas de un paciente para vista previa rápida en citas."""
+    from app.models.consultation import Consultation
+    from app.models.patient import Patient
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    
+    consultations = db.query(Consultation).filter(
+        Consultation.patient_id == patient_id
+    ).order_by(Consultation.created_at.desc(), Consultation.id.desc()).limit(5).all()
+
+    items = []
+    for c in consultations:
+        doc_name = c.doctor.name if c.doctor else "Doctor"
+        date_str = c.created_at.strftime("%d/%m/%Y %H:%M") if c.created_at else "—"
+        items.append({
+            "id": c.id,
+            "date": date_str,
+            "doctor": doc_name,
+            "reason": c.reason or "Sin motivo especificado",
+            "diagnosis": c.diagnosis or "Sin diagnóstico",
+            "clinical_history": (c.display_clinical_history or "")[:280] + ("..." if len(c.display_clinical_history or "") > 280 else ""),
+            "treatment": c.treatment or "",
+            "prescription": c.prescription or ""
+        })
+
+    return {
+        "patient": {
+            "id": patient.id,
+            "name": f"{patient.first_name} {patient.last_name}",
+            "document_id": patient.document_id or "Sin documento",
+            "phone": patient.phone or "Sin teléfono"
+        },
+        "consultations": items
+    }
+
+
 @router.get("/secretary-daily-pdf")
 def redirect_secretary_daily_pdf(report_date: str = Query(None)):
     """Acceso directo para secretaría al reporte diario en PDF."""
@@ -514,5 +605,42 @@ def send_all_daily_reminders(
         "skipped_count": skipped_count,
         "results": results
     })
+
+@router.post("/close-day")
+def close_day_appointments(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('appointments'))
+):
+    """
+    Cierre de jornada / Limpieza de sala de espera:
+    Marca todas las citas en espera o pendientes de hoy y días anteriores como 'Completada',
+    libera la sala para reiniciar turnos y sincroniza de inmediato al Cloud Relay.
+    """
+    from app.services.relay_service import RelayService
+    today = date.today()
+    pending_appts = db.query(Appointment).filter(
+        Appointment.date <= today,
+        Appointment.status.in_(["En Espera", "Pendiente", "Confirmada", "En Consulta", "en_consulta", "En espera", "en espera"])
+    ).all()
+
+    closed_count = 0
+    for a in pending_appts:
+        a.status = "Completada"
+        closed_count += 1
+
+    db.commit()
+
+    # Publicar inmediatamente el snapshot actualizado a la nube
+    try:
+        RelayService.push_snapshot_to_cloud(db)
+    except Exception:
+        pass
+
+    return JSONResponse(content={
+        "success": True,
+        "closed_count": closed_count,
+        "message": f"Jornada cerrada correctamente. Se completaron {closed_count} turnos pendientes."
+    })
+
 
 

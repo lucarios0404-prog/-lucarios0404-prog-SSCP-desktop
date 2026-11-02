@@ -1,10 +1,11 @@
+import re
 from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from typing import Optional
 import random
 import string
@@ -28,21 +29,110 @@ def generate_receipt_number():
 def list_payments(
     request: Request,
     status: str = Query("all", pattern="^(all|paid|pending|receivables)$"),
+    date_filter: str = Query("all"),
+    custom_date: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
+    today = date.today()
+    today_str = today.strftime("%Y-%m-%d")
+    start_today = datetime.combine(today, datetime.min.time())
+    end_today = datetime.combine(today, datetime.max.time())
+
+    # 1. Calcular siempre el total cobrado el DÍA DE HOY (métrica fija destacada)
+    today_records = db.query(Payment).filter(
+        Payment.created_at >= start_today,
+        Payment.created_at <= end_today
+    ).all()
+    total_cobrado_hoy = sum(p.total for p in today_records if p.status == "paid")
+    total_cobrado_hoy_count = sum(1 for p in today_records if p.status == "paid")
+    breakdown_hoy = {
+        "cash": sum(p.total for p in today_records if p.status == "paid" and p.payment_method == "cash"),
+        "card": sum(p.total for p in today_records if p.status == "paid" and p.payment_method == "card"),
+        "transfer": sum(p.total for p in today_records if p.status == "paid" and p.payment_method == "transfer"),
+        "insurance": sum(p.total for p in today_records if p.status == "paid" and p.payment_method == "insurance"),
+    }
+
+    # 2. Filtrado de la lista principal
     query = db.query(Payment).order_by(Payment.created_at.desc())
     
     if status == "paid":
         query = query.filter(Payment.status == "paid")
     elif status == "pending":
         query = query.filter(Payment.status == "pending")
+
+    # Aplicar filtro por día / fecha
+    active_date_filter = date_filter
+    if custom_date and custom_date.strip():
+        try:
+            c_date = datetime.strptime(custom_date.strip(), "%Y-%m-%d").date()
+            query = query.filter(
+                Payment.created_at >= datetime.combine(c_date, datetime.min.time()),
+                Payment.created_at <= datetime.combine(c_date, datetime.max.time())
+            )
+            active_date_filter = custom_date.strip()
+        except ValueError:
+            pass
+    elif date_filter == "today":
+        query = query.filter(
+            Payment.created_at >= start_today,
+            Payment.created_at <= end_today
+        )
+    elif date_filter == "yesterday":
+        yesterday = today - timedelta(days=1)
+        query = query.filter(
+            Payment.created_at >= datetime.combine(yesterday, datetime.min.time()),
+            Payment.created_at <= datetime.combine(yesterday, datetime.max.time())
+        )
+    elif date_filter == "this_week":
+        start_week = today - timedelta(days=today.weekday())
+        query = query.filter(
+            Payment.created_at >= datetime.combine(start_week, datetime.min.time())
+        )
+    elif date_filter and re.match(r"^\d{4}-\d{2}-\d{2}$", date_filter):
+        try:
+            spec_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+            query = query.filter(
+                Payment.created_at >= datetime.combine(spec_date, datetime.min.time()),
+                Payment.created_at <= datetime.combine(spec_date, datetime.max.time())
+            )
+        except ValueError:
+            pass
     
     payments = query.all()
     
-    # Calcular totales y cuentas por cobrar (F13)
+    # Calcular totales del período filtrado
     total_cobrado = sum(p.total for p in payments if p.status == "paid")
     total_pendiente = sum(p.total for p in payments if p.status == "pending")
+
+    # 3. Agrupación y división por días
+    from collections import OrderedDict
+    payments_by_day = OrderedDict()
+    for p in payments:
+        p_date = p.created_at.date() if p.created_at else today
+        p_key = p_date.strftime("%Y-%m-%d")
+        if p_key not in payments_by_day:
+            if p_date == today:
+                day_lbl = f"Hoy ({p_date.strftime('%d/%m/%Y')})"
+            elif p_date == today - timedelta(days=1):
+                day_lbl = f"Ayer ({p_date.strftime('%d/%m/%Y')})"
+            else:
+                day_lbl = p_date.strftime("%d/%m/%Y")
+
+            payments_by_day[p_key] = {
+                "date_key": p_key,
+                "label": day_lbl,
+                "records": [],
+                "day_paid": 0.0,
+                "day_pending": 0.0,
+                "count": 0
+            }
+        payments_by_day[p_key]["records"].append(p)
+        if p.status == "paid":
+            payments_by_day[p_key]["day_paid"] += p.total
+        elif p.status == "pending":
+            payments_by_day[p_key]["day_pending"] += p.total
+        payments_by_day[p_key]["count"] += 1
     
     # Lista de pacientes con saldo pendiente (Cuentas por cobrar F13)
     pending_payments = db.query(Payment).filter(Payment.status == "pending").all()
@@ -72,8 +162,15 @@ def list_payments(
             "services": services,
             "ars_list": get_all_ars(),
             "status_filter": status,
+            "date_filter": active_date_filter,
+            "custom_date": custom_date or (active_date_filter if re.match(r"^\d{4}-\d{2}-\d{2}$", active_date_filter) else ""),
+            "today_str": today_str,
             "total_cobrado": total_cobrado,
             "total_pendiente": total_pendiente,
+            "total_cobrado_hoy": total_cobrado_hoy,
+            "total_cobrado_hoy_count": total_cobrado_hoy_count,
+            "breakdown_hoy": breakdown_hoy,
+            "payments_by_day": payments_by_day,
             "debtors": debtors,
         }
     )
@@ -160,9 +257,20 @@ def create_payment(
     base_amount = float(amount or 0.0)
     total = max(0.0, base_amount - disc)
 
+    appt_id = appointment_id if appointment_id and appointment_id > 0 else None
+    if not appt_id:
+        from datetime import date
+        today = date.today()
+        today_appt = db.query(Appointment).filter(
+            Appointment.patient_id == patient_id,
+            Appointment.date == today
+        ).first()
+        if today_appt:
+            appt_id = today_appt.id
+
     new_payment = Payment(
         patient_id=patient_id,
-        appointment_id=appointment_id if appointment_id and appointment_id > 0 else None,
+        appointment_id=appt_id,
         service_id=service_id if service_id and service_id > 0 else None,
         service_name=service_name or "Consulta Médica General",
         insurance_name=insurance_name or "Privado / Particular",

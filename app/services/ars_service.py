@@ -159,9 +159,89 @@ ARS_LIST = [
     }
 ]
 
+import json
+import os
+from typing import List, Dict, Any, Optional
+
+CUSTOM_ARS_FILENAME = "custom_ars.json"
+
+def _get_custom_ars_path():
+    try:
+        from app.database import get_data_dir
+        return get_data_dir() / CUSTOM_ARS_FILENAME
+    except Exception:
+        return None
+
 def get_all_ars():
-    """Retorna la lista completa de ARS disponibles."""
+    """Retorna la lista completa de ARS disponibles (incluyendo personalizados o actualizados)."""
+    path = _get_custom_ars_path()
+    if path and path.exists():
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list) and len(data) > 0:
+                    return data
+        except Exception as e:
+            print(f"[WARN] Error reading custom ARS file: {e}")
     return ARS_LIST
+
+def save_or_update_ars(ars_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Crea un nuevo seguro/ARS o actualiza uno existente y lo persiste en disco."""
+    current_list = [dict(a) for a in get_all_ars()]
+    ars_id = ars_data.get("id")
+    name = (ars_data.get("name") or "").strip()
+    short_name = (ars_data.get("short_name") or name).strip()
+
+    if not name:
+        raise ValueError("El nombre del seguro o ARS es obligatorio.")
+
+    target_item = None
+    is_editing = False
+
+    # 1. Buscar por ID existente si se suministró
+    if ars_id is not None and str(ars_id).strip() != "":
+        for idx, item in enumerate(current_list):
+            if str(item.get("id")) == str(ars_id):
+                current_list[idx]["name"] = name
+                current_list[idx]["short_name"] = short_name
+                target_item = current_list[idx]
+                is_editing = True
+                break
+
+    # 2. Si no encontró por ID, buscar por coincidencia exacta de nombre
+    if not is_editing:
+        for idx, item in enumerate(current_list):
+            if item.get("name", "").strip().lower() == name.lower():
+                current_list[idx]["short_name"] = short_name
+                target_item = current_list[idx]
+                is_editing = True
+                break
+
+    # 3. Si no existe, crear nueva entrada
+    if not is_editing:
+        new_id = str(ars_id) if ars_id else f"custom_{len(current_list) + 1}"
+        target_item = {
+            "id": new_id,
+            "name": name,
+            "short_name": short_name,
+            "color": "#0284c7",
+            "bg_color": "#f0f9ff",
+            "border_color": "#bae6fd",
+            "text_color": "#0369a1",
+            "icon": "shield-alt",
+            "svg": """<svg viewBox="0 0 32 32" class="w-4 h-4 inline-block" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#0284C7"/><path d="M16 6l8 4v7c0 5.25-3.4 10.15-8 11.5-4.6-1.35-8-6.25-8-11.5v-7l8-4z" fill="#38BDF8"/><path d="M12 16l3 3 5-5" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"""
+        }
+        current_list.append(target_item)
+
+    path = _get_custom_ars_path()
+    if path:
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(current_list, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"[ERROR] Could not save custom ARS file: {e}")
+
+    return target_item
 
 def find_ars(name_or_id: str):
     """Busca y retorna los metadatos de una ARS por nombre o id."""

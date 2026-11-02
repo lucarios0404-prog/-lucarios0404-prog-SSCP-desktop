@@ -94,7 +94,14 @@ def build_targets(v: dict):
     mobile_master = WORKSPACE / "sscp-mobile" / "app" / "src" / "main" / "assets" / "www" / "index.html"
     desktop_replica = DESKTOP / "app" / "templates" / "mobile" / "index.html"
     if mobile_master.exists():
-        targets.append((desktop_replica, read_raw(desktop_replica) if desktop_replica.exists() else None, read_raw(mobile_master)))
+        mm_orig = read_raw(mobile_master)
+        mm_new = re.sub(
+            r'(<span[^>]*class="[^"]*rounded-full[^"]*"[^>]*>)v\d+\.\d+\.\d+(</span>)',
+            rf'\g<1>v{v["apk"]}\g<2>',
+            mm_orig
+        )
+        targets.append((mobile_master, mm_orig, mm_new))
+        targets.append((desktop_replica, read_raw(desktop_replica) if desktop_replica.exists() else None, mm_new))
 
     return targets
 

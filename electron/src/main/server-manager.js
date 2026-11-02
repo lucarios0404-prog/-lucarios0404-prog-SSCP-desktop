@@ -170,7 +170,16 @@ class ServerManager {
 
   // Inicia el backend de FastAPI
   async start() {
-    this.port = await this.findAvailablePort(this.config.defaultPort || 8080);
+    const defaultPort = this.config.defaultPort || 8080;
+    const isDefaultRunning = await this.pingServer(defaultPort);
+    if (isDefaultRunning) {
+      this.port = defaultPort;
+      this.baseUrl = `http://127.0.0.1:${this.port}`;
+      console.log(`[ServerManager] Servidor existente reutilizado en ${this.baseUrl}`);
+      return this.baseUrl;
+    }
+
+    this.port = await this.findAvailablePort(defaultPort);
     this.baseUrl = `http://127.0.0.1:${this.port}`;
 
     const isAlreadyRunning = await this.pingServer(this.port);

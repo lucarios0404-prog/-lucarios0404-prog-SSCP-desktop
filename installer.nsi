@@ -11,7 +11,7 @@ Unicode true
 ; Definiciones Generales
 !define PRODUCT_NAME "SSCP Desktop"
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "1.3.1"
+  !define PRODUCT_VERSION "1.8.1"
 !endif
 !define PRODUCT_PUBLISHER "SSCP Medical Systems"
 !define PRODUCT_WEB_SITE "https://sscp.laxarusdevs.com"
@@ -63,13 +63,20 @@ FunctionEnd
 Section "MainSection" SEC01
   ; Cerrar cualquier instancia previa de la aplicación para asegurar sobreescritura limpia
   nsExec::Exec 'taskkill /F /IM SSCP-Desktop.exe /T'
-  Sleep 500
+  nsExec::Exec 'taskkill /F /IM "SSCP Desktop.exe" /T'
+  nsExec::Exec 'taskkill /F /IM electron.exe /T'
+  Sleep 1000
 
   SetOutPath "$INSTDIR"
   SetOverwrite on
 
   ; Copiar todos los archivos de la distribución Electron (Shell Chromium + App + Backend Python)
   File /r "dist\SSCP-Desktop-Electron\*.*"
+
+  ; Directorio de datos de usuario limpio
+  SetShellVarContext current
+  CreateDirectory "$LOCALAPPDATA\SSCP\data"
+  SetShellVarContext all
 
   ; Copiar icono oficial garantizado para accesos directos
   File "/oname=app_icon.ico" "static\app_icon.ico"

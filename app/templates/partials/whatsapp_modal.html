@@ -1,4 +1,4 @@
-<!-- MODAL GLOBAL: VINCULACIÓN DE WHATSAPP GATEWAY (DOCTOR, SECRETARÍA Y ADMIN) -->
+<!-- MODAL GLOBAL: VINCULACIÓN DE WHATSAPP DEL CONSULTORIO (DOCTOR, SECRETARÍA Y ADMIN) -->
 <div id="globalWhatsAppModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-fade-in text-slate-800">
         <!-- Header del Modal -->
@@ -9,81 +9,131 @@
                 </div>
                 <div>
                     <h3 class="text-base font-bold text-slate-900">WhatsApp del Consultorio</h3>
-                    <p class="text-xs text-slate-500">Vinculación del celular para recordatorios automáticos</p>
+                    <p class="text-xs text-slate-500">Recordatorios de citas y avisos directos</p>
                 </div>
             </div>
             <button type="button" onclick="closeWhatsAppModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none">&times;</button>
         </div>
 
-        <!-- Estado de Conexión Dinámico -->
-        <div id="wa-modal-connected-view" class="hidden space-y-4 text-center">
-            <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
-                <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-2 text-xl">
-                    <i class="fas fa-check-circle"></i>
+        <!-- Vista Conectada / Activa -->
+        <div id="wa-modal-connected-view" class="hidden space-y-4 text-left">
+            <!-- Tarjeta de Estado Activo y Número del Consultorio -->
+            <div class="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold shadow-xs">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-bold text-emerald-950">WhatsApp Conectado y Activo</h4>
+                            <p class="text-[10px] text-emerald-700">Listo para enviar avisos y recordatorios</p>
+                        </div>
+                    </div>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1 animate-pulse"></span> Activo
+                    </span>
                 </div>
-                <h4 class="text-sm font-bold text-emerald-950">WhatsApp Conectado y Activo</h4>
-                <p class="text-xs text-emerald-800 mt-1" id="wa-modal-connected-phone">Dispositivo vinculado correctamente</p>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200/60 text-emerald-900 mt-2">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5 animate-pulse"></span> Listo para enviar recordatorios
-                </span>
+
+                <!-- CAMPO PRINCIPAL: AQUÍ SE ESCRIBE / EDITA EL NÚMERO DEL CONSULTORIO -->
+                <div class="pt-2 border-t border-emerald-200/60">
+                    <label for="wa_active_phone_input" class="block text-[11px] font-bold text-slate-800 uppercase tracking-wider mb-1">
+                        <i class="fab fa-whatsapp text-emerald-600 mr-1 text-xs"></i> Número de WhatsApp del Consultorio (Secretaría):
+                    </label>
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-emerald-600">
+                                <i class="fas fa-phone-alt text-xs"></i>
+                            </div>
+                            <input type="tel" id="wa_active_phone_input" placeholder="Ej: 809-555-0199"
+                                   autocomplete="tel" tabindex="0"
+                                   onclick="this.focus(); this.select();"
+                                   style="pointer-events: auto !important; user-select: text !important;"
+                                   class="w-full pl-8 pr-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900 shadow-xs">
+                        </div>
+                        <button type="button" onclick="updateClinicWhatsAppPhone()" 
+                                id="btn-save-wa-phone"
+                                class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs active:scale-95 flex items-center gap-1.5 shrink-0">
+                            <i class="fas fa-save"></i> Guardar
+                        </button>
+                    </div>
+                    <div id="wa_active_phone_feedback" class="text-xs mt-1.5"></div>
+                    <p class="text-[10px] text-slate-500 mt-1">
+                        Escribe aquí el número de celular del consultorio con o sin guiones y presiona <strong>Guardar</strong>.
+                    </p>
+                </div>
             </div>
 
-            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-left space-y-2">
-                <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">Probar Envío de Mensaje</label>
+            <!-- Sección de Probar Envío -->
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
+                <label for="wa_modal_test_phone" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    <i class="fas fa-paper-plane text-slate-500 mr-1 text-xs"></i> Probar Envío de Mensaje de Prueba
+                </label>
                 <div class="flex gap-2">
-                    <input type="text" id="wa_modal_test_phone" placeholder="Ej: 809-555-0199" 
-                           class="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <input type="tel" id="wa_modal_test_phone" placeholder="Número de prueba (ej: 809-555-0199)" 
+                           onclick="this.focus(); this.select();" onfocus="this.select();"
+                           autocomplete="tel" tabindex="0"
+                           style="pointer-events: auto !important; user-select: text !important;"
+                           class="flex-1 px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800 shadow-xs">
                     <button type="button" onclick="sendModalTestWhatsApp()" 
-                            class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs">
-                        Enviar Prueba
+                            class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition shadow-xs active:scale-95 flex items-center gap-1 shrink-0">
+                        <i class="fas fa-paper-plane text-[10px]"></i> Enviar Prueba
                     </button>
                 </div>
                 <div id="wa_modal_test_result" class="text-xs"></div>
+                <p class="text-[10px] text-slate-400">
+                    Se enviará un aviso de confirmación al número indicado para verificar la conexión.
+                </p>
             </div>
 
-            <div class="pt-2 flex justify-between items-center">
+            <!-- Footer con Cerrar y Desvincular -->
+            <div class="pt-2 flex justify-between items-center border-t border-slate-100">
                 <button type="button" onclick="closeWhatsAppModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
                     Cerrar
                 </button>
                 <button type="button" onclick="disconnectModalGateway()" 
-                        class="px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-xl transition">
-                    <i class="fas fa-unlink mr-1"></i> Desvincular / Cambiar Celular
+                        class="px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-xl transition flex items-center gap-1.5">
+                    <i class="fas fa-unlink text-[10px]"></i> Desvincular Teléfono
                 </button>
             </div>
         </div>
 
-        <!-- Vista de Escaneo de QR (Cuando está desconectado) -->
-        <div id="wa-modal-disconnected-view" class="space-y-4 text-center">
-            <div>
-                <label class="block text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                    Número de Teléfono del Celular (Secretaría / Consultorio):
-                </label>
-                <input type="text" id="wa-pairing-phone-input" placeholder="Ej: 809-555-0199 o +1809..." 
-                       class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
-            </div>
-
-            <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col items-center justify-center min-h-[220px]" id="globalQrContainer">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-2"></div>
-                <span class="text-xs text-slate-500">Generando código QR de vinculación...</span>
-            </div>
-
-            <div class="text-left bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3.5 text-xs text-slate-700 space-y-1.5">
-                <p class="font-bold text-emerald-950 flex items-center">
-                    <i class="fas fa-mobile-screen-button text-emerald-600 mr-1.5 text-sm"></i> Instrucciones desde el celular:
+        <!-- Vista de Configuración Inicial (Cuando no hay número registrado) -->
+        <div id="wa-modal-disconnected-view" class="space-y-4 text-left">
+            <div class="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl text-left space-y-1.5">
+                <div class="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+                    <i class="fas fa-shield-alt text-emerald-600 text-sm"></i>
+                    <span>Vinculación de WhatsApp del Consultorio</span>
+                </div>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Ingresa el número de WhatsApp de la clínica o secretaría. No necesitas escanear códigos QR: el sistema redactará los recordatorios oficiales y los enviará al paciente con un solo toque.
                 </p>
-                <ol class="list-decimal list-inside space-y-1 text-[11px] text-slate-600 font-medium">
-                    <li>Abra WhatsApp en el teléfono de la secretaria o consultorio.</li>
-                    <li>Toque los <strong>3 puntos / Ajustes</strong> &gt; <strong>Dispositivos vinculados</strong>.</li>
-                    <li>Presione <strong>Vincular un dispositivo</strong> y apunte la cámara al código QR.</li>
-                </ol>
             </div>
 
-            <div class="flex items-center justify-between pt-2">
-                <button type="button" onclick="refreshGlobalQr()" class="px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl font-semibold flex items-center">
-                    <i class="fas fa-redo-alt mr-1.5"></i> Regenerar QR
+            <div class="space-y-1">
+                <label for="wa-pairing-phone-input" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Número de Celular con WhatsApp (Secretaría / Consultorio):
+                </label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-emerald-600">
+                        <i class="fas fa-phone-alt text-xs"></i>
+                    </div>
+                    <input type="tel" id="wa-pairing-phone-input" placeholder="Ej: 809-555-0199 o 8295550199" 
+                           onclick="this.focus(); this.select();" onfocus="this.select();"
+                           autocomplete="tel" tabindex="0"
+                           style="pointer-events: auto !important; user-select: text !important;"
+                           class="w-full pl-8 pr-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900 shadow-xs">
+                </div>
+                <p class="text-[10px] text-slate-400">
+                    Introduce el número con o sin guiones (ej. 809-555-0199 o 8295550199).
+                </p>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                <button type="button" onclick="closeWhatsAppModal()" class="px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-xl transition">
+                    Cerrar
                 </button>
                 <button type="button" onclick="confirmGlobalPairing()" class="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/25 transition-all flex items-center active:scale-95">
-                    <i class="fas fa-check mr-1.5"></i> Confirmar Vinculación
+                    <i class="fas fa-check mr-1.5"></i> Vincular WhatsApp
                 </button>
             </div>
         </div>
@@ -110,7 +160,7 @@
                 }
                 if (btn) {
                     btn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-all shadow-xs active:scale-95';
-                    btn.setAttribute('title', `WhatsApp Conectado (${data.connected_phone || 'Activo'}). Clic para ver opciones o cambiar celular.`);
+                    btn.setAttribute('title', `WhatsApp Vinculado (${data.connected_phone || 'Activo'}). Clic para ver opciones o cambiar número.`);
                 }
             } else {
                 if (btnDot) {
@@ -121,7 +171,7 @@
                 }
                 if (btn) {
                     btn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition-all shadow-xs active:scale-95';
-                    btn.setAttribute('title', 'WhatsApp Desconectado. Clic para escanear código QR y vincular el celular de la secretaria.');
+                    btn.setAttribute('title', 'WhatsApp no vinculado. Clic para registrar el número de teléfono para recordatorios.');
                 }
             }
         } catch (e) {
@@ -140,18 +190,34 @@
 
             const connView = document.getElementById('wa-modal-connected-view');
             const discView = document.getElementById('wa-modal-disconnected-view');
+            const activePhoneInput = document.getElementById('wa_active_phone_input');
+            const testPhoneInput = document.getElementById('wa_modal_test_phone');
+            const pairingPhoneInput = document.getElementById('wa-pairing-phone-input');
+            const feedback = document.getElementById('wa_active_phone_feedback');
+            const testResult = document.getElementById('wa_modal_test_result');
+            
+            if (feedback) feedback.innerHTML = '';
+            if (testResult) testResult.innerHTML = '';
 
             if (data.is_connected) {
                 connView.classList.remove('hidden');
                 discView.classList.add('hidden');
-                document.getElementById('wa-modal-connected-phone').textContent = `Dispositivo: ${data.connected_phone || 'Celular Principal'}`;
+                if (activePhoneInput) {
+                    activePhoneInput.value = data.connected_phone || '';
+                }
+                if (testPhoneInput) {
+                    testPhoneInput.value = data.connected_phone || '';
+                }
             } else {
                 connView.classList.add('hidden');
                 discView.classList.remove('hidden');
-                await refreshGlobalQr();
+                if (pairingPhoneInput && data.connected_phone) {
+                    pairingPhoneInput.value = data.connected_phone;
+                }
+                setTimeout(() => { if (pairingPhoneInput) { pairingPhoneInput.focus(); pairingPhoneInput.select(); } }, 120);
             }
         } catch (e) {
-            await refreshGlobalQr();
+            console.error('Error al abrir modal de WhatsApp:', e);
         }
     }
 
@@ -160,40 +226,20 @@
         if (modal) modal.classList.add('hidden');
     }
 
-    async function refreshGlobalQr() {
-        const container = document.getElementById('globalQrContainer');
-        if (!container) return;
+    async function updateClinicWhatsAppPhone() {
+        const input = document.getElementById('wa_active_phone_input');
+        const feedback = document.getElementById('wa_active_phone_feedback');
+        const btn = document.getElementById('btn-save-wa-phone');
+        const phone = input ? input.value.trim() : '';
 
-        container.innerHTML = `
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-2"></div>
-            <span class="text-xs text-slate-500">Generando código QR dinámico...</span>
-        `;
-
-        const phoneInput = document.getElementById('wa-pairing-phone-input');
-        const phone = phoneInput ? phoneInput.value.trim() : '';
-
-        const formData = new FormData();
-        if (phone) formData.append('phone', phone);
-
-        try {
-            const res = await fetch('/settings/whatsapp/generate-qr', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.qr_image_base64) {
-                container.innerHTML = `
-                    <img src="${data.qr_image_base64}" alt="Código QR WhatsApp" class="w-48 h-48 rounded-xl shadow-sm border border-slate-200 bg-white p-1">
-                    <p class="text-[11px] text-slate-500 mt-2 font-medium"><i class="fas fa-qrcode mr-1 text-emerald-600"></i>Código listo para vincular</p>
-                `;
-            } else {
-                container.innerHTML = `<p class="text-xs text-red-500">Error al generar código QR</p>`;
-            }
-        } catch (e) {
-            container.innerHTML = `<p class="text-xs text-red-500">No se pudo conectar con el servidor.</p>`;
+        if (!phone) {
+            if (feedback) feedback.innerHTML = '<span class="text-rose-600 font-bold text-xs"><i class="fas fa-exclamation-circle mr-1"></i>Por favor ingrese un número de teléfono.</span>';
+            if (input) input.focus();
+            return;
         }
-    }
 
-    async function confirmGlobalPairing() {
-        const phoneInput = document.getElementById('wa-pairing-phone-input');
-        const phone = (phoneInput && phoneInput.value.trim()) ? phoneInput.value.trim() : "+1 (809) 555-0199";
+        if (feedback) feedback.innerHTML = '<span class="text-slate-500 text-xs"><i class="fas fa-spinner fa-spin mr-1"></i>Guardando número...</span>';
+        if (btn) btn.disabled = true;
 
         const formData = new FormData();
         formData.append('phone', phone);
@@ -202,9 +248,44 @@
             const res = await fetch('/settings/whatsapp/confirm-pairing', { method: 'POST', body: formData });
             const data = await res.json();
             if (data.is_connected) {
-                alert('¡WhatsApp vinculado exitosamente! Los recordatorios y avisos se enviarán desde este dispositivo.');
+                if (feedback) feedback.innerHTML = '<span class="text-emerald-700 font-bold text-xs"><i class="fas fa-check-circle mr-1"></i>¡Número guardado exitosamente!</span>';
+                const testPhone = document.getElementById('wa_modal_test_phone');
+                if (testPhone) {
+                    testPhone.value = phone;
+                }
                 checkWhatsAppGlobalStatus();
-                openWhatsAppModal(); // Cambiará a la vista conectada
+                setTimeout(() => {
+                    if (feedback) feedback.innerHTML = '';
+                }, 3500);
+            } else {
+                if (feedback) feedback.innerHTML = `<span class="text-rose-600 font-bold text-xs">${data.error || 'Error al guardar número'}</span>`;
+            }
+        } catch (e) {
+            if (feedback) feedback.innerHTML = '<span class="text-rose-600 font-bold text-xs">Error de comunicación con el servidor.</span>';
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function confirmGlobalPairing() {
+        const phoneInput = document.getElementById('wa-pairing-phone-input');
+        const phone = phoneInput ? phoneInput.value.trim() : '';
+
+        if (!phone) {
+            alert('Por favor ingrese el número de teléfono del consultorio o secretaría.');
+            if (phoneInput) phoneInput.focus();
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('phone', phone);
+
+        try {
+            const res = await fetch('/settings/whatsapp/confirm-pairing', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.is_connected) {
+                checkWhatsAppGlobalStatus();
+                openWhatsAppModal(); // Cambiará inmediatamente a la vista conectada con el número cargado
             }
         } catch (e) {
             alert('Error al confirmar vinculación de WhatsApp.');
@@ -212,13 +293,13 @@
     }
 
     async function disconnectModalGateway() {
-        if (!confirm('¿Desea desconectar la sesión de WhatsApp del consultorio para vincular otro celular?')) return;
+        if (!confirm('¿Desea desvincular este número de WhatsApp?')) return;
         try {
             const res = await fetch('/settings/whatsapp/disconnect', { method: 'POST' });
             const data = await res.json();
             if (!data.is_connected) {
                 checkWhatsAppGlobalStatus();
-                openWhatsAppModal(); // Cambiará a la vista desconectada con nuevo QR
+                openWhatsAppModal(); // Cambiará a la vista inicial para ingresar número
             }
         } catch (e) {
             alert('Error al desconectar WhatsApp.');
@@ -231,30 +312,31 @@
         const phone = phoneInput ? phoneInput.value.trim() : '';
 
         if (!phone) {
-            resElem.innerHTML = '<span class="text-red-500 font-bold">Ingrese un número con código de área</span>';
+            resElem.innerHTML = '<span class="text-rose-600 font-bold text-xs"><i class="fas fa-exclamation-circle mr-1"></i>Ingrese un número de teléfono de prueba</span>';
+            if (phoneInput) phoneInput.focus();
             return;
         }
 
-        resElem.innerHTML = '<span class="text-slate-500"><i class="fas fa-spinner fa-spin mr-1"></i>Enviando prueba...</span>';
+        resElem.innerHTML = '<span class="text-slate-500 text-xs"><i class="fas fa-spinner fa-spin mr-1"></i>Enviando prueba...</span>';
         const formData = new FormData();
         formData.append('phone', phone);
-        formData.append('message', 'Prueba de conexión: WhatsApp Gateway de SSCP Desktop está vinculado y listo para operar.');
+        formData.append('message', 'Prueba de conexión: WhatsApp de SSCP Desktop está vinculado y listo para enviar recordatorios a pacientes.');
 
         try {
             const res = await fetch('/settings/whatsapp/send-test', { method: 'POST', body: formData });
             const data = await res.json();
             if (data.success) {
-                if (data.mode === 'wa_link') {
-                    resElem.innerHTML = `<a href="${data.wa_link}" target="_blank" class="text-emerald-700 font-bold underline"><i class="fas fa-external-link-alt mr-1"></i>Abrir WhatsApp (1-Clic)</a>`;
+                if (data.wa_link) {
+                    resElem.innerHTML = `<a href="${data.wa_link}" target="_blank" class="text-emerald-700 font-bold text-xs underline flex items-center gap-1 mt-1"><i class="fas fa-external-link-alt"></i>Abrir WhatsApp (1-Clic)</a>`;
                     window.open(data.wa_link, '_blank');
                 } else {
-                    resElem.innerHTML = `<span class="text-emerald-600 font-bold"><i class="fas fa-check-circle mr-1"></i>¡Mensaje enviado con éxito vía Gateway!</span>`;
+                    resElem.innerHTML = `<span class="text-emerald-600 font-bold text-xs"><i class="fas fa-check-circle mr-1"></i>¡Mensaje enviado con éxito!</span>`;
                 }
             } else {
-                resElem.innerHTML = `<span class="text-red-500 font-bold">${data.error || 'Error en el envío'}</span>`;
+                resElem.innerHTML = `<span class="text-rose-600 font-bold text-xs">${data.error || 'Error en el envío'}</span>`;
             }
         } catch (e) {
-            resElem.innerHTML = '<span class="text-red-500 font-bold">Error de comunicación con el servidor.</span>';
+            resElem.innerHTML = '<span class="text-rose-600 font-bold text-xs">Error de comunicación con el servidor.</span>';
         }
     }
 

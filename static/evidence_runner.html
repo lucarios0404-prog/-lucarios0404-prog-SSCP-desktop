@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Evidence Runner</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 412px; height: 915px; overflow: hidden; background: #f8fafc; }
+        iframe { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+    <iframe id="app-frame" src="http://127.0.0.1:8080/mobile"></iframe>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const scenario = urlParams.get('scenario') || 'default';
+
+        const frame = document.getElementById('app-frame');
+        frame.onload = () => {
+            const fWin = frame.contentWindow;
+            const fDoc = frame.contentDocument;
+
+            if (scenario === 'linked_card') {
+                // Simular terminal enlazada con la Dra. Especialista
+                fWin.localStorage.setItem('sscp_relay_clinic_id', 'dra_especialista');
+                fWin.localStorage.setItem('sscp_doctor_name', 'Dra. Especialista v1.2');
+                fWin.localStorage.setItem('sscp_specialty', 'Medicina Interna');
+                fWin.localStorage.setItem('sscp_clinic_name', 'Centro Médico Especializado SSCP');
+                fWin.localStorage.setItem('sscp_local_station_url', 'http://127.0.0.1:8080');
+                fWin.renderLinkingStatus();
+            } else if (scenario === 'search_perez' || scenario === 'search_maria' || scenario === 'search_cedula') {
+                // Iniciar sesión y navegar al directorio
+                fWin.authToken = 'mock-test-token';
+                fWin.currentUser = { id: 1, name: 'Doctor Especialista', role: 'doctor' };
+                fDoc.getElementById('screen-auth').classList.add('hidden');
+                fDoc.getElementById('screen-main').classList.remove('hidden');
+
+                // Switch tab to patients
+                fWin.switchTab('patients');
+
+                setTimeout(async () => {
+                    const searchInput = fDoc.getElementById('mobile-patients-search-input');
+                    if (scenario === 'search_perez') {
+                        searchInput.value = 'Pérez';
+                        fWin.currentPatientsQuery = 'Pérez';
+                        await fWin.loadMobilePatients(1, 'Pérez');
+                    } else if (scenario === 'search_maria') {
+                        searchInput.value = 'María';
+                        fWin.currentPatientsQuery = 'María';
+                        await fWin.loadMobilePatients(1, 'María');
+                    } else if (scenario === 'search_cedula') {
+                        searchInput.value = '40227888038';
+                        fWin.currentPatientsQuery = '40227888038';
+                        await fWin.loadMobilePatients(1, '40227888038');
+                    }
+                    window.__READY__ = true;
+                }, 400);
+            } else if (scenario === 'modal_filter') {
+                fWin.authToken = 'mock-test-token';
+                fDoc.getElementById('screen-auth').classList.add('hidden');
+                fDoc.getElementById('screen-main').classList.remove('hidden');
+                fWin.openQuickAppointmentModal();
+                setTimeout(() => {
+                    const filterInput = fDoc.getElementById('qa-patient-filter');
+                    filterInput.value = 'perez';
+                    fWin.filterQaPatients('perez');
+                    window.__READY__ = true;
+                }, 500);
+            }
+        };
+    </script>
+</body>
+</html>

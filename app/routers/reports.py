@@ -267,6 +267,7 @@ def export_executive_pdf(
 @router.get("/export/secretary-daily-pdf")
 def export_secretary_daily_pdf(
     report_date: str = Query(None),
+    download: bool = Query(False),
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
@@ -468,10 +469,11 @@ def export_secretary_daily_pdf(
     )
 
     filename = f"reporte_recepcion_{target_date.strftime('%Y%m%d')}.pdf"
+    disposition = "attachment" if download else "inline"
     return StreamingResponse(
         pdf_buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f"{disposition}; filename={filename}"}
     )
 
 

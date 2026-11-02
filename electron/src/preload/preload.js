@@ -35,11 +35,44 @@ contextBridge.exposeInMainWorld('sscpElectron', {
 // Inyección automática de @page { margin: ... } para respetar los márgenes clínicos configurados
 function injectPrintMargins(config) {
   if (!config) return;
-  const top = config.print_margin_top !== undefined ? config.print_margin_top : 15.0;
-  const bottom = config.print_margin_bottom !== undefined ? config.print_margin_bottom : 15.0;
-  const left = config.print_margin_left !== undefined ? config.print_margin_left : 20.0;
-  const right = config.print_margin_right !== undefined ? config.print_margin_right : 15.0;
-  const size = config.print_paper_size || 'Letter';
+
+  const pathname = (window.location && window.location.pathname ? window.location.pathname.toLowerCase() : '');
+  const isPreauthOrLetterDoc = 
+    pathname.includes('/insurance-forms') ||
+    (pathname.includes('/licenses') && !pathname.includes('/talonario')) ||
+    pathname.includes('/reports') ||
+    pathname.includes('/consents') ||
+    pathname.includes('/history') ||
+    (document && document.getElementById('preauth-printable-sheet') !== null);
+
+  let size = 'Letter';
+  let top = 15.0;
+  let bottom = 15.0;
+  let left = 18.0;
+  let right = 18.0;
+
+  if (isPreauthOrLetterDoc) {
+    // Las pre-autorizaciones médicas para ARS, historias clínicas completas y reportes
+    // se imprimen siempre en Formato Carta Estándar (Letter 8.5 × 11 pulg).
+    size = 'Letter portrait';
+    top = 15.0;
+    bottom = 15.0;
+    left = 18.0;
+    right = 18.0;
+  } else if (config.print_mode === 'talonario') {
+    // Si la página corresponde a recetas o talonario preimpreso
+    size = config.print_paper_size || (config.paper_width_mm && config.paper_height_mm ? `${config.paper_width_mm}mm ${config.paper_height_mm}mm` : 'HalfLetter');
+    top = config.print_margin_top !== undefined ? config.print_margin_top : 15.0;
+    bottom = config.print_margin_bottom !== undefined ? config.print_margin_bottom : 15.0;
+    left = config.print_margin_left !== undefined ? config.print_margin_left : 20.0;
+    right = config.print_margin_right !== undefined ? config.print_margin_right : 15.0;
+  } else {
+    size = config.print_paper_size || 'Letter';
+    top = config.print_margin_top !== undefined ? config.print_margin_top : 15.0;
+    bottom = config.print_margin_bottom !== undefined ? config.print_margin_bottom : 15.0;
+    left = config.print_margin_left !== undefined ? config.print_margin_left : 20.0;
+    right = config.print_margin_right !== undefined ? config.print_margin_right : 15.0;
+  }
 
   let styleTag = document.getElementById('sscp-print-margins-style');
   if (!styleTag) {

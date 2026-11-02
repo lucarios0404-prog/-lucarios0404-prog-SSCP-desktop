@@ -121,6 +121,8 @@ def update_settings(
     clinic_name: str = Form(...),
     doctor_name: str = Form(None),
     specialty: str = Form(None),
+    doctor_exequatur: str = Form("165-10"),
+    doctor_cedula: str = Form("001-1418378-3"),
     phone: str = Form(None),
     email: str = Form(None),
     address: str = Form(None),
@@ -146,6 +148,8 @@ def update_settings(
     setting.clinic_name = clinic_name
     setting.doctor_name = doctor_name
     setting.specialty = specialty
+    setting.doctor_exequatur = doctor_exequatur or "165-10"
+    setting.doctor_cedula = doctor_cedula or "001-1418378-3"
     setting.phone = phone
     setting.email = email
     setting.address = address
@@ -158,13 +162,16 @@ def update_settings(
     
     # Canal Cloud Relay único del médico
     import unicodedata
-    if relay_channel_id and relay_channel_id.strip():
+    if relay_channel_id and relay_channel_id.strip() and relay_channel_id.strip().lower() != "dr_carlos_heredia":
         norm_channel = unicodedata.normalize('NFKD', relay_channel_id.strip()).encode('ASCII', 'ignore').decode('utf-8').lower()
         setting.relay_channel_id = re.sub(r'[^a-zA-Z0-9_\-]+', '_', norm_channel).strip('_')
-    elif doctor_name and doctor_name.strip() and doctor_name.strip() not in ("Dr. Especialista", "Dr. Carlos Heredia"):
+    elif doctor_name and doctor_name.strip() and doctor_name.strip() != "Dr. Carlos Heredia":
         norm_name = unicodedata.normalize('NFKD', doctor_name.strip()).encode('ASCII', 'ignore').decode('utf-8').lower()
         raw_slug = re.sub(r'[^a-zA-Z0-9_\-]+', '_', norm_name).strip('_')
-        setting.relay_channel_id = f"dr_{raw_slug}" if not raw_slug.startswith("dr") else raw_slug
+        prefix = "dra_" if "dra" in norm_name else "dr_"
+        setting.relay_channel_id = raw_slug if (raw_slug.startswith("dr_") or raw_slug.startswith("dra_")) else f"{prefix}{raw_slug}"
+    else:
+        setting.relay_channel_id = "consultorio_principal"
     
     # Guardar campos WhatsApp
     setting.whatsapp_doctor_phone = whatsapp_doctor_phone
@@ -215,6 +222,26 @@ def _detect_image_type(content: bytes) -> str | None:
                 continue
             return ext
     return None
+
+
+@router.post("/reset-logo")
+def reset_doctor_logo(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("settings"))
+):
+    """
+    Restablece el logo del consultorio al logo oficial predeterminado (Dr. Carlos Miguel Heredia Jorge).
+    """
+    setting = get_or_create_settings(db)
+    if setting.doctor_logo_path and os.path.isfile(setting.doctor_logo_path):
+        try:
+            os.remove(setting.doctor_logo_path)
+        except Exception:
+            pass
+    setting.doctor_logo_path = None
+    setting.updated_at = datetime.utcnow()
+    db.commit()
+    return RedirectResponse(url="/settings?logo_reset=1", status_code=303)
 
 
 @router.post("/upload-logo")

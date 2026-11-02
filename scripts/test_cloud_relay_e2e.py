@@ -26,7 +26,7 @@ print("=" * 70)
 # Asegurar tablas locales
 Base.metadata.create_all(bind=engine)
 client = TestClient(app)
-CLINIC_ID = "dr_carlos_heredia"
+CLINIC_ID = "dr_cristian_garcia"
 TIMESTAMP_TAG = int(datetime.utcnow().timestamp())
 TEST_DOC = f"TEST-RELAY-{TIMESTAMP_TAG}"
 TEST_FN = f"PacienteRelay{TIMESTAMP_TAG}"

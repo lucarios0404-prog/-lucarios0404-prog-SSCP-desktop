@@ -37,3 +37,9 @@ class Appointment(Base):
     patient = relationship("Patient", backref="appointments")
     doctor = relationship("User", backref="appointments")
     service = relationship("Service", backref="appointments")
+
+    @property
+    def is_paid(self) -> bool:
+        if self.payments:
+            return any(p.status == "paid" for p in self.payments)
+        return False

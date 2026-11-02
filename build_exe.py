@@ -38,12 +38,12 @@ def build():
     data_dest.mkdir(parents=True, exist_ok=True)
 
     print("\n[2/3] Preparando directorio de datos limpio en dist/...")
-    # SECURITY: Never package an sscp.db in the installer distributable.
-    # SQLite and Alembic initialise the real clinic database in %APPDATA%/SSCP Desktop/data.
+    # SEGURIDAD Y LIMPIEZA: El instalador NUNCA debe empaquetar base de datos con pacientes.
+    # El sistema debe iniciar limpio y vacío.
     db_dest = data_dest / "sscp.db"
-    if db_dest.exists() and db_dest.stat().st_size == 0:
+    if db_dest.exists():
         db_dest.unlink()
-        print("  -> Eliminado sscp.db dummy (0 bytes) para evitar colisiones.")
+        print("  -> sscp.db excluido de dist (instalador limpio y vacío sin pacientes)")
 
 
     # 3. Resumen final

@@ -10,6 +10,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     role = Column(String)  # admin, doctor, secretaria
+    assigned_doctor_id = Column(Integer, nullable=True)  # Si es secretaria, médico asignado
     permissions = Column(String, nullable=True)  # JSON array con permisos personalizados si aplica
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -260,8 +260,11 @@ def _get_page_setup(cfg: dict = None):
     paper_size_name = str(std_margins.get("paperSize", cfg.get("print_paper_size", "Letter"))).strip().lower()
     
     if paper_size_name in ("halfletter", "media carta", "halfcarta", "half_letter"):
-        from reportlab.lib.pagesizes import halfletter
-        pagesize = halfletter
+        try:
+            from reportlab.lib.pagesizes import HALF_LETTER as halfletter
+            pagesize = halfletter
+        except Exception:
+            pagesize = (5.5 * inch, 8.5 * inch)
     elif paper_size_name in ("a4",):
         from reportlab.lib.pagesizes import A4
         pagesize = A4
@@ -289,6 +292,30 @@ def _get_page_setup(cfg: dict = None):
     return pagesize, left_margin, right_margin, top_margin, bottom_margin, usable_width
 
 
+def _resolve_doctor_logo(setting=None):
+    """
+    Resuelve la ruta física del logo médico oficial:
+    1. Si el médico cargó un logo propio en settings y existe el archivo físico en disco, lo retorna.
+    2. Si no se ha configurado logo personalizado o fue restablecido, retorna el logo oficial por defecto (Dr. Carlos Miguel Heredia Jorge).
+    3. Retorna None si no se encuentra ninguno.
+    """
+    if setting and getattr(setting, "doctor_logo_path", None):
+        custom_p = setting.doctor_logo_path
+        if custom_p and os.path.isfile(custom_p):
+            return custom_p
+
+    base_proj = Path(__file__).resolve().parent.parent.parent
+    default_logo = base_proj / "static" / "images" / "logo_dr_heredia_bw.png"
+    if default_logo.exists():
+        return str(default_logo)
+
+    default_alt = base_proj / "static" / "images" / "logo_dr_heredia_bw_transparent.png"
+    if default_alt.exists():
+        return str(default_alt)
+
+    return None
+
+
 def _build_letterhead(story: list, styles: dict, setting=None, subtitle_text: str = "", usable_width: float = None) -> None:
     """
     Construye el membrete profesional del consultorio con logo opcional,
@@ -299,7 +326,7 @@ def _build_letterhead(story: list, styles: dict, setting=None, subtitle_text: st
     specialty = getattr(setting, "specialty", "Medicina General") if setting else "Medicina General"
     phone = getattr(setting, "phone", "") if setting else ""
     email = getattr(setting, "email", "") if setting else ""
-    logo_path = getattr(setting, "doctor_logo_path", None) if setting else None
+    logo_path = _resolve_doctor_logo(setting)
 
     # Columna derecha: nombre, especialidad, tel
     right_text = f"<b>{doctor_name}</b><br/>{specialty}"
@@ -705,10 +732,19 @@ def generate_quick_prescription_pdf(patient, prescription_text: str, diagnosis: 
 
 def generate_medical_license_pdf(license, setting=None) -> io.BytesIO:
     """
-    Genera el Certificado Oficial de Licencia Médica / Reposo Laboral (F5),
-    respetando los márgenes configurados.
+    Genera el Certificado / Licencia Médica Oficial en formato optimizado
+    para impresora blanco y negro, con logo invertido centrado, membrete médico
+    oficial de Ginecología & Obstetricia, datos del paciente y firma.
     """
-    pagesize, left_m, right_m, top_m, bottom_m, usable_w = _get_page_setup()
+    # Certificado / Licencia Médica Oficial en PDF es SIEMPRE en formato Hoja Carta (Letter 8.5 × 11 pulg)
+    pagesize = letter
+    left_m = 0.85 * inch
+    right_m = 0.85 * inch
+    top_m = 0.65 * inch
+    bottom_m = 0.65 * inch
+    page_w, page_h = letter
+    usable_w = page_w - left_m - right_m
+
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -721,59 +757,149 @@ def generate_medical_license_pdf(license, setting=None) -> io.BytesIO:
     styles = _get_styles()
     story = []
 
-    clinic_name = getattr(setting, "clinic_name", "Centro Médico SSCP") if setting else "Centro Médico SSCP"
-    doctor_name = getattr(setting, "doctor_name", "Dr. Especialista") if setting else "Dr. Especialista"
-    specialty = getattr(setting, "specialty", "Medicina General") if setting else "Medicina General"
-    address = getattr(setting, "address", "") if setting else ""
+    # 1. LOGO OFICIAL CENTRADO PARA IMPRESIÓN B/N (EN FORMATO GRANDE)
+    logo_path = _resolve_doctor_logo(setting)
 
-    # Membrete con logo opcional
-    _build_letterhead(story, styles, setting, subtitle_text="", usable_width=usable_w)
+    if logo_path and os.path.isfile(logo_path):
+        try:
+            # Proporción exacta 980 x 514 px (1.906 : 1)
+            # En Hoja Carta Oficial, el logo centrado sale en tamaño grande (4.8 pulg / 12.2 cm de ancho)
+            logo_w = 4.8 * inch
+            logo_h = 2.52 * inch
+            logo_img = Image(logo_path, width=logo_w, height=logo_h)
+            logo_img.hAlign = 'CENTER'
+            story.append(logo_img)
+            story.append(Spacer(1, 14))
+        except Exception:
+            pass
 
-    # Título del Certificado
-    title_p = Paragraph("<font size=14 color='#0f766e'><b>CERTIFICADO MÉDICO</b></font>", styles["title"])
-    story.append(title_p)
-    story.append(Spacer(1, 10))
-
-    dest = getattr(license, "workplace_or_school", None) or "A QUIEN PUEDA INTERESAR"
-    story.append(Paragraph(f"<b>Dirigido a:</b> {dest}", styles["body_bold"]))
-    story.append(Spacer(1, 10))
-
-    patient = getattr(license, "patient", None)
-    p_info = _extract_patient_display_data(patient)
-    start_str = license.start_date.strftime("%d/%m/%Y") if getattr(license, "start_date", None) else datetime.now().strftime("%d/%m/%Y")
-    end_str = license.end_date.strftime("%d/%m/%Y") if getattr(license, "end_date", None) else ""
-
-    days_cnt = getattr(license, "days_rest", getattr(license, "days", 1))
-    cert_text = (
-        f"Por medio de la presente certifico que he examinado clínicamente a <b>{p_info['name']}</b>, "
-        f"identificado(a) con <b>{p_info['doc_id']}</b>, diagnosticándole:<br/><br/>"
-        f"<b>DIAGNÓSTICO:</b> {getattr(license, 'diagnosis', 'Evaluación médica')}<br/><br/>"
-        f"Por tal motivo, se indica reposo médico por un período de <b>{days_cnt} día(s)</b>, "
-        f"comprendido desde el día <b>{start_str}</b> hasta el día <b>{end_str}</b> inclusive, "
-        f"debiendo reincorporarse a sus labores habituales al término del mismo."
+    # 2. DESTINATARIO / TÍTULO CENTRADO
+    dest = (getattr(license, "workplace_or_school", None) or "A quien pueda interesar").strip()
+    dest_style = ParagraphStyle(
+        "CertDestTitle",
+        parent=styles["body"],
+        fontName="Helvetica-Bold",
+        fontSize=12,
+        leading=16,
+        alignment=1, # Centrado
+        textColor=colors.black,
+        spaceAfter=14,
     )
-    story.append(Paragraph(cert_text, styles["body"]))
+    story.append(Paragraph(f"<b>{dest}</b>", dest_style))
     story.append(Spacer(1, 12))
 
-    if getattr(license, "notes", None) and license.notes.strip():
-        story.append(Paragraph(f"<b>Observaciones e Indicaciones Médicas:</b><br/>{license.notes}", styles["body"]))
-        story.append(Spacer(1, 12))
+    # 3. DATOS DEL DOCTOR Y DEL PACIENTE
+    patient = getattr(license, "patient", None)
+    p_info = _extract_patient_display_data(patient)
+    doctor_name = getattr(setting, "doctor_name", "Dr. Carlos Miguel Heredia Jorge") if setting else "Dr. Carlos Miguel Heredia Jorge"
+    specialty = getattr(setting, "specialty", "Ginecólogo Obstetra") if setting else "Ginecólogo Obstetra"
+    exequatur = getattr(setting, "doctor_exequatur", "165-10") if setting else "165-10"
+    cedula = getattr(setting, "doctor_cedula", "001-1418378-3") if setting else "001-1418378-3"
 
-    # Fecha y lugar
-    today_str = datetime.now().strftime("%d de %B de %Y")
-    story.append(Paragraph(f"Expedido para los fines pertinentes en fecha {today_str}.", styles["body"]))
-    story.append(Spacer(1, 25))
+    prefix = "la Sra." if p_info.get("gender", "").lower() in ["f", "femenino"] else "el Sr./la Sra."
+    patient_name = p_info["name"]
+    doc_id = p_info["doc_id"]
+    doc_part = f"ced {doc_id}" if doc_id and doc_id != "Sin documento" else ""
 
-    # Firma
-    sig_data = [
-        [
-            Paragraph(f"<font size=8 color='#64748b'>{address}</font>", styles["body"]),
-            Paragraph(f"________________________________________<br/><b>{doctor_name}</b><br/>{specialty}", styles["body"])
-        ]
+    # 4. CUERPO DE LA CERTIFICACIÓN
+    notes_text = (getattr(license, "notes", None) or "").strip()
+
+    body_style = ParagraphStyle(
+        "CertBodyText",
+        parent=styles["body"],
+        fontName="Helvetica",
+        fontSize=11,
+        leading=17,
+        alignment=4, # Justificado
+        textColor=colors.black,
+        spaceAfter=14,
+    )
+
+    if notes_text.lower().startswith("yo dr.") or "certifico haber examinado" in notes_text.lower():
+        full_cert = notes_text
+    else:
+        if notes_text:
+            narrative = notes_text
+        else:
+            narrative = (
+                f"la cual cursando con un embarazo pre-término, paciente refiere sentirse imposibilitada "
+                f"para realizar su jornada actual, con dicho químico y soldadura ya que estas liberan partículas "
+                f"al inhalar los gases metales calentados (como el oro, la plata o las aleaciones con níquel) "
+                f"liberan partículas microscópicas. La inhalación constante de vapores metálicos puede ser perjudicial "
+                f"para el desarrollo fetal, por lo que consideramos que la misma sea colocada en otro lugar dentro "
+                f"de la empresa donde pueda desarrollar dichas labores."
+            )
+        
+        full_cert = (
+            f"Yo <b>{doctor_name.upper()}</b>, <b>{specialty.upper()}</b> Exequátur <b>{exequatur}</b> "
+            f"Cédula # <b>{cedula}</b> Certifico haber examinado a {prefix} <b>{patient_name}</b> "
+            f"<b>{doc_part}</b> {narrative}"
+        )
+
+    story.append(Paragraph(full_cert, body_style))
+    story.append(Spacer(1, 10))
+
+    # 5. DIAGNÓSTICO (Dx)
+    diagnosis_val = (getattr(license, "diagnosis", None) or "Embarazo de 28 sem/usl").strip()
+    dx_style = ParagraphStyle(
+        "CertDx",
+        parent=styles["body"],
+        fontName="Helvetica-Bold",
+        fontSize=11,
+        leading=15,
+        textColor=colors.black,
+        spaceAfter=14,
+    )
+    story.append(Paragraph(f"<b>Dx</b> {diagnosis_val}", dx_style))
+    story.append(Spacer(1, 14))
+
+    # 6. LUGAR Y FECHA DE EXPEDICIÓN
+    created_date = getattr(license, "created_at", None)
+    if isinstance(created_date, datetime):
+        d_day = created_date.day
+        d_year = created_date.year
+        months_es = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        d_month = months_es[created_date.month - 1]
+    else:
+        now = datetime.now()
+        d_day = now.day
+        d_year = now.year
+        months_es = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        d_month = months_es[now.month - 1]
+
+    date_str = f"Se expide la presente certificación en Santo Domingo, DN , {d_day}  {d_month}  {d_year}"
+    date_style = ParagraphStyle(
+        "CertDate",
+        parent=styles["body"],
+        fontName="Helvetica",
+        fontSize=10,
+        leading=14,
+        textColor=colors.black,
+        spaceAfter=25,
+    )
+    story.append(Paragraph(date_str, date_style))
+    story.append(Spacer(1, 35))
+
+    # 7. FIRMA Y SELLO CENTRADA
+    sig_style = ParagraphStyle(
+        "CertSignature",
+        parent=styles["body"],
+        fontName="Helvetica-Bold",
+        fontSize=10,
+        leading=14,
+        alignment=1, # Centrado
+        textColor=colors.black,
+    )
+    sig_content = [
+        Paragraph("____________________________________________", sig_style),
+        Spacer(1, 4),
+        Paragraph(f"<b>{doctor_name}</b>", sig_style),
+        Paragraph(f"<font size=9>{specialty}</font>", sig_style),
+        Paragraph(f"<font size=9>Exeq. {exequatur} | Céd. {cedula}</font>", sig_style),
+        Spacer(1, 6),
+        Paragraph("<font size=9><b>FIRMA Y SELLO</b></font>", sig_style),
     ]
-    sig_t = Table(sig_data, colWidths=[usable_w * 0.52, usable_w * 0.48])
-    sig_t.setStyle(TableStyle([('ALIGN', (1, 0), (1, 0), 'CENTER')]))
-    story.append(KeepTogether(sig_t))
+    story.append(KeepTogether(sig_content))
 
     doc.build(story)
     buffer.seek(0)
@@ -781,10 +907,18 @@ def generate_medical_license_pdf(license, setting=None) -> io.BytesIO:
 
 def generate_medical_reference_pdf(reference, setting=None) -> io.BytesIO:
     """
-    Genera la Carta Oficial de Referencia e Interconsulta Médica (F10),
-    respetando los márgenes configurados.
+    Genera la Carta Oficial de Referencia e Interconsulta Médica en formato oficial de
+    Hoja Completa Carta (Letter 8.5 x 11 pulg), con logo centrado en gran formato B/N,
+    encabezado oficial, datos clínicos estructurados y firma y sello médico centrado.
     """
-    pagesize, left_m, right_m, top_m, bottom_m, usable_w = _get_page_setup()
+    pagesize = letter
+    left_m = 0.85 * inch
+    right_m = 0.85 * inch
+    top_m = 0.65 * inch
+    bottom_m = 0.65 * inch
+    page_w, page_h = letter
+    usable_w = page_w - left_m - right_m
+
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -797,67 +931,181 @@ def generate_medical_reference_pdf(reference, setting=None) -> io.BytesIO:
     styles = _get_styles()
     story = []
 
-    doctor_name = getattr(setting, "doctor_name", "Dr. Especialista") if setting else "Dr. Especialista"
-    specialty = getattr(setting, "specialty", "Medicina General") if setting else "Medicina General"
-    address = getattr(setting, "address", "") if setting else ""
+    # 1. LOGO OFICIAL CENTRADO (FORMATO GRANDE 4.8 pulg)
+    logo_path = _resolve_doctor_logo(setting)
+    if logo_path and os.path.isfile(logo_path):
+        try:
+            logo_w = 4.8 * inch
+            logo_h = 2.52 * inch
+            logo_img = Image(logo_path, width=logo_w, height=logo_h)
+            logo_img.hAlign = 'CENTER'
+            story.append(logo_img)
+            story.append(Spacer(1, 10))
+        except Exception:
+            pass
 
-    # Membrete con logo opcional
-    _build_letterhead(story, styles, setting, subtitle_text="", usable_width=usable_w)
+    # 2. TÍTULO Y DESTINATARIO CENTRADO
+    title_style = ParagraphStyle(
+        "RefTitle",
+        parent=styles["body"],
+        fontName="Helvetica-Bold",
+        fontSize=12,
+        leading=16,
+        alignment=1, # Centrado
+        textColor=colors.black,
+        spaceAfter=6,
+    )
+    story.append(Paragraph("<b>CARTA DE REFERENCIA MÉDICA / INTERCONSULTA</b>", title_style))
 
-    story.append(Paragraph("<font size=14 color='#0f766e'><b>CARTA DE REFERENCIA E INTERCONSULTA MÉDICA</b></font>", styles["title"]))
-    story.append(Spacer(1, 10))
+    referred_to = (getattr(reference, "referred_to_doctor_or_specialty", "") or "Especialista Tratante").strip()
+    institution = (getattr(reference, "institution", "") or "").strip()
+    dest_str = f"Dirigido a: <b>{referred_to}</b>"
+    if institution:
+        dest_str += f" &bull; Institución: <b>{institution}</b>"
 
+    dest_style = ParagraphStyle(
+        "RefDestTitle",
+        parent=styles["body"],
+        fontName="Helvetica",
+        fontSize=10.5,
+        leading=14,
+        alignment=1, # Centrado
+        textColor=colors.HexColor("#1e293b"),
+        spaceAfter=12,
+    )
+    story.append(Paragraph(dest_str, dest_style))
+    story.append(Spacer(1, 4))
+
+    # 3. DATOS DEL DOCTOR Y DEL PACIENTE
     patient = getattr(reference, "patient", None)
     p_info = _extract_patient_display_data(patient)
+    doctor_name = getattr(setting, "doctor_name", "Dr. Carlos Miguel Heredia Jorge") if setting else "Dr. Carlos Miguel Heredia Jorge"
+    specialty = getattr(setting, "specialty", "Ginecólogo Obstetra") if setting else "Ginecólogo Obstetra"
+    exequatur = getattr(setting, "doctor_exequatur", "165-10") if setting else "165-10"
+    cedula = getattr(setting, "doctor_cedula", "001-1418378-3") if setting else "001-1418378-3"
 
-    ref_info = [
-        [
-            Paragraph(f"<b>Dirigido a:</b> {reference.referred_to_doctor_or_specialty}", styles["body"]),
-            Paragraph(f"<b>Institución:</b> {reference.institution or 'Centro de Referencia'}", styles["body"])
-        ],
-        [
-            Paragraph(f"<b>Paciente:</b> {p_info['name']} (Doc: {p_info['doc_id']})", styles["body"]),
-            Paragraph(f"<b>Alergias:</b> <font color='#b91c1c'>{p_info['allergies']}</font>", styles["body"])
-        ]
+    prefix = "a la paciente" if p_info.get("gender", "").lower() in ["f", "femenino"] else "al paciente"
+    patient_name = p_info["name"]
+    doc_id = p_info["doc_id"]
+    doc_part = f"Cédula # <b>{doc_id}</b>" if doc_id and doc_id != "Sin documento" else ""
+    age_str = f"edad: <b>{p_info['age']}</b>" if p_info.get("age") and p_info['age'] != 'N/D' else ""
+    allergies_val = p_info.get("allergies", "")
+    allergies_note = f" &bull; Alergias: <b>{allergies_val}</b>" if allergies_val and allergies_val != "Negadas" else ""
+
+    patient_details = ", ".join(filter(bool, [doc_part, age_str]))
+    if patient_details:
+        patient_details = f"({patient_details}{allergies_note})"
+
+    body_style = ParagraphStyle(
+        "RefBodyText",
+        parent=styles["body"],
+        fontName="Helvetica",
+        fontSize=10,
+        leading=15,
+        alignment=4, # Justificado
+        textColor=colors.black,
+        spaceAfter=10,
+    )
+
+    preamble = (
+        f"Yo <b>{doctor_name.upper()}</b>, <b>{specialty.upper()}</b>, Exequátur <b>{exequatur}</b>, "
+        f"Cédula # <b>{cedula}</b>, certifico por medio de la presente haber evaluado y referir formalmente "
+        f"{prefix} <b>{patient_name}</b> {patient_details}, para su debida valoración e interconsulta médica."
+    )
+    story.append(Paragraph(preamble, body_style))
+    story.append(Spacer(1, 4))
+
+    # 4. SECCIONES CLÍNICAS DESTACADAS
+    sec_label_style = ParagraphStyle(
+        "RefSecLabel",
+        parent=styles["body"],
+        fontName="Helvetica-Bold",
+        fontSize=10,
+        leading=14,
+        textColor=colors.black,
+        spaceAfter=3,
+    )
+    sec_content_style = ParagraphStyle(
+        "RefSecContent",
+        parent=styles["body"],
+        fontName="Helvetica",
+        fontSize=9.5,
+        leading=14,
+        alignment=4,
+        textColor=colors.HexColor("#0f172a"),
+        spaceAfter=8,
+    )
+
+    # Motivo de la derivación
+    reason_txt = (getattr(reference, "reason_for_referral", "") or "").strip().replace("\n", "<br/>")
+    story.append(Paragraph("<b>MOTIVO DE LA REFERENCIA / DERIVACIÓN:</b>", sec_label_style))
+    story.append(Paragraph(reason_txt or "Valoración especializada.", sec_content_style))
+
+    # Resumen Clínico
+    summary_txt = (getattr(reference, "clinical_summary", "") or "").strip().replace("\n", "<br/>")
+    if summary_txt:
+        story.append(Paragraph("<b>RESUMEN CLÍNICO Y HALLAZGOS RELEVANTES:</b>", sec_label_style))
+        story.append(Paragraph(summary_txt, sec_content_style))
+
+    # Notas adicionales
+    notes_txt = (getattr(reference, "notes", "") or "").strip().replace("\n", "<br/>")
+    if notes_txt:
+        story.append(Paragraph("<b>NOTAS ADICIONALES / EXÁMENES ADJUNTOS:</b>", sec_label_style))
+        story.append(Paragraph(notes_txt, sec_content_style))
+
+    story.append(Spacer(1, 8))
+
+    # 5. LUGAR Y FECHA DE EXPEDICIÓN
+    created_date = getattr(reference, "created_at", None)
+    if isinstance(created_date, datetime):
+        d_day = created_date.day
+        d_year = created_date.year
+        months_es = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        d_month = months_es[created_date.month - 1]
+    else:
+        now = datetime.now()
+        d_day = now.day
+        d_year = now.year
+        months_es = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        d_month = months_es[now.month - 1]
+
+    date_str = f"Se expide la presente carta de referencia en Santo Domingo, D.N., a los {d_day} días del mes de {d_month} del año {d_year}."
+    date_style = ParagraphStyle(
+        "RefDate",
+        parent=styles["body"],
+        fontName="Helvetica",
+        fontSize=9.5,
+        leading=14,
+        textColor=colors.black,
+        spaceAfter=18,
+    )
+    story.append(Paragraph(date_str, date_style))
+    story.append(Spacer(1, 14))
+
+    # 6. FIRMA Y SELLO CENTRADA
+    sig_style = ParagraphStyle(
+        "RefSignature",
+        parent=styles["body"],
+        fontName="Helvetica-Bold",
+        fontSize=10,
+        leading=14,
+        alignment=1, # Centrado
+        textColor=colors.black,
+    )
+    sig_content = [
+        Paragraph("____________________________________________", sig_style),
+        Spacer(1, 4),
+        Paragraph(f"<b>{doctor_name}</b>", sig_style),
+        Paragraph(f"<font size=9>{specialty}</font>", sig_style),
+        Paragraph(f"<font size=9>Exeq. {exequatur} | Céd. {cedula}</font>", sig_style),
+        Spacer(1, 5),
+        Paragraph("<font size=9><b>FIRMA Y SELLO MÉDICO</b></font>", sig_style),
     ]
-    rtable = Table(ref_info, colWidths=[usable_w * 0.5, usable_w * 0.5])
-    rtable.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), BG_LIGHT),
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('PADDING', (0, 0), (-1, -1), 6),
-    ]))
-    story.append(rtable)
-    story.append(Spacer(1, 12))
-
-    story.append(Paragraph("<b>Motivo de la Derivación:</b>", styles["section"]))
-    story.append(Paragraph(reference.reason_for_referral.replace("\n", "<br/>"), styles["body"]))
-    story.append(Spacer(1, 10))
-
-    if reference.clinical_summary and reference.clinical_summary.strip():
-        story.append(Paragraph("<b>Resumen Clínico y Hallazgos Relevantes:</b>", styles["section"]))
-        story.append(Paragraph(reference.clinical_summary.replace("\n", "<br/>"), styles["body"]))
-        story.append(Spacer(1, 10))
-
-    if reference.notes and reference.notes.strip():
-        story.append(Paragraph("<b>Notas Adicionales / Exámenes Adjuntos:</b>", styles["section"]))
-        story.append(Paragraph(reference.notes.replace("\n", "<br/>"), styles["body"]))
-        story.append(Spacer(1, 10))
-
-    story.append(Spacer(1, 20))
-    sig_data = [
-        [
-            Paragraph(f"<font size=8 color='#64748b'>{address}</font>", styles["body"]),
-            Paragraph(f"________________________________________<br/><b>{doctor_name}</b><br/>{specialty}", styles["body"])
-        ]
-    ]
-    sig_t = Table(sig_data, colWidths=[usable_w * 0.52, usable_w * 0.48])
-    sig_t.setStyle(TableStyle([('ALIGN', (1, 0), (1, 0), 'CENTER')]))
-    story.append(KeepTogether(sig_t))
+    story.append(KeepTogether(sig_content))
 
     doc.build(story)
     buffer.seek(0)
     return buffer
-
 
 def generate_executive_report_pdf(
     setting=None,
@@ -2063,7 +2311,14 @@ def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesI
     para compañías aseguradoras (ARS SeNaSa, Humano, Universal, Mapfre, etc.)
     en formato HOJA CARTA (Letter 8.5 × 11 pulg) conforme a los estándares de la Rep. Dominicana.
     """
-    pagesize, left_m, right_m, top_m, bottom_m, usable_w = _get_page_setup()
+    # Pre-Autorizaciones e Historias Clínicas para ARS son SIEMPRE en formato Hoja Carta (Letter 8.5 × 11 pulg)
+    pagesize = letter
+    left_m = 18 * mm
+    right_m = 18 * mm
+    top_m = 15 * mm
+    bottom_m = 15 * mm
+    page_w, page_h = letter
+    usable_w = page_w - left_m - right_m
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -2076,13 +2331,25 @@ def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesI
     styles = _get_styles()
     story = []
 
+    def _s_esc(val):
+        if val is None:
+            return ""
+        return str(val).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    def _s_multiline(val):
+        if val is None:
+            return ""
+        escaped = str(val).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        return escaped.replace("\r\n", "<br/>").replace("\n", "<br/>")
+
     # Membrete superior del médico y clínica
-    ars_title = str(getattr(auth_obj, "ars_name", "SEGURO NACIONAL DE SALUD (SeNaSa)")).upper()
+    ars_raw = str(getattr(auth_obj, "ars_name", "SEGURO NACIONAL DE SALUD (SeNaSa)") or "SEGURO NACIONAL DE SALUD (SeNaSa)").upper()
+    ars_title = _s_esc(ars_raw)
     _build_letterhead(story, styles, setting, subtitle_text=f"SOLICITUD DE COBERTURA • {ars_title}", usable_width=usable_w)
 
     # Título Principal del Formulario
     title_html = f"<font size=12 color='#0f766e'><b>{ars_title}</b></font><br/>" \
-                 f"<font size=11 color='#1e293b'><b>HISTORIA CLÍNICA & SOLICITUD DE PRE-AUTORIZACIÓN</b></font><br/>" \
+                 f"<font size=11 color='#1e293b'><b>HISTORIA CLÍNICA &amp; SOLICITUD DE PRE-AUTORIZACIÓN</b></font><br/>" \
                  f"<font size=8 color='#64748b'><i>(Para fines de solicitud de procedimientos, cirugías electivas y estudios especiales)</i></font>"
     story.append(Paragraph(title_html, ParagraphStyle("FormHeader", parent=styles["body"], alignment=1, leading=14)))
     story.append(Spacer(1, 8))
@@ -2098,11 +2365,11 @@ def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesI
         fecha_str = datetime.now().strftime("%d/%m/%Y")
 
     # Datos del Afiliado / Póliza
-    nss_val = getattr(auth_obj, "affiliate_nss", None) or "N/D"
-    card_val = getattr(auth_obj, "affiliate_card_number", None) or p_info.get("insurance_badge", "N/D")
-    contr_val = getattr(auth_obj, "contract_number", None) or "N/D"
-    plan_val = getattr(auth_obj, "plan_type", None) or "Básico"
-    center_val = getattr(auth_obj, "health_center", None) or (getattr(setting, "clinic_name", "Centro Médico"))
+    nss_val = _s_esc(getattr(auth_obj, "affiliate_nss", None) or "N/D")
+    card_val = _s_esc(getattr(auth_obj, "affiliate_card_number", None) or p_info.get("insurance_badge", "N/D"))
+    contr_val = _s_esc(getattr(auth_obj, "contract_number", None) or "N/D")
+    plan_val = _s_esc(getattr(auth_obj, "plan_type", None) or "Básico")
+    center_val = _s_esc(getattr(auth_obj, "health_center", None) or (getattr(setting, "clinic_name", "Centro Médico") if setting else "Centro Médico"))
     traffic_acc = "SÍ" if getattr(auth_obj, "is_traffic_accident", False) else "NO"
 
     # ── BLOQUE 1: DATOS GENERALES DEL AFILIADO Y SEGURO ────────────────────────
@@ -2118,19 +2385,19 @@ def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesI
             Paragraph(f"<b>Accidente de Tránsito:</b> <b>{traffic_acc}</b>", lbl_style),
         ],
         [
-            Paragraph(f"<b>Nombre del Afiliado:</b><br/>{p_info['name']}", val_bold),
-            Paragraph(f"<b>Cédula / DNI:</b><br/>{p_info['doc_id']}", val_style),
+            Paragraph(f"<b>Nombre del Afiliado:</b><br/>{_s_esc(p_info['name'])}", val_bold),
+            Paragraph(f"<b>Cédula / DNI:</b><br/>{_s_esc(p_info['doc_id'])}", val_style),
             Paragraph(f"<b>NSS (Seguridad Social):</b><br/>{nss_val}", val_style),
         ],
         [
             Paragraph(f"<b>No. Carnet / Póliza:</b><br/>{card_val}", val_style),
             Paragraph(f"<b>Contrato No. / Plan:</b><br/>{contr_val} • {plan_val}", val_style),
-            Paragraph(f"<b>Edad / Sexo:</b><br/>{p_info['age_str'] or 'N/D'} / {p_info['gender'] or 'N/D'}", val_style),
+            Paragraph(f"<b>Edad / Sexo:</b><br/>{_s_esc(p_info['age_str'] or 'N/D')} / {_s_esc(p_info['gender'] or 'N/D')}", val_style),
         ],
         [
-            Paragraph(f"<b>Teléfonos:</b><br/>{p_info['phone']}", val_style),
+            Paragraph(f"<b>Teléfonos:</b><br/>{_s_esc(p_info['phone'])}", val_style),
             Paragraph(f"<b>Centro donde se realizará:</b><br/>{center_val}", val_style),
-            Paragraph(f"<b>Alergias Conocidas:</b><br/><font color='#b91c1c'>{p_info['allergies']}</font>", val_style),
+            Paragraph(f"<b>Alergias Conocidas:</b><br/><font color='#b91c1c'>{_s_esc(p_info['allergies'])}</font>", val_style),
         ]
     ]
 
@@ -2149,7 +2416,7 @@ def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesI
     story.append(Spacer(1, 6))
 
     # ── BLOQUE 2: HISTORIA DE LA ENFERMEDAD ACTUAL & SÍNTOMAS ─────────────────
-    onset_date = getattr(auth_obj, "symptoms_onset_date", None) or "No especificado"
+    onset_date = _s_esc(getattr(auth_obj, "symptoms_onset_date", None) or "No especificado")
     cur_history = getattr(auth_obj, "current_illness_history", None) or "Sin registro de cuadro clínico actual."
 
     illness_data = [
@@ -2158,7 +2425,7 @@ def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesI
             Paragraph(f"<b>¿Desde qué fecha iniciaron los síntomas?:</b> <b>{onset_date}</b>", lbl_style),
         ],
         [
-            Paragraph(cur_history.replace("\n", "<br/>"), val_style),
+            Paragraph(_s_multiline(cur_history), val_style),
             Paragraph("", val_style),
         ]
     ]
@@ -2186,8 +2453,8 @@ def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesI
             Paragraph("<b>IV. LABORATORIOS Y ESTUDIOS REALIZADOS</b>", sec_cell_style),
         ],
         [
-            Paragraph(pers_fam.replace("\n", "<br/>"), val_style),
-            Paragraph(labs_studies.replace("\n", "<br/>"), val_style),
+            Paragraph(_s_multiline(pers_fam), val_style),
+            Paragraph(_s_multiline(labs_studies), val_style),
         ]
     ]
     ant_table = Table(ant_data, colWidths=[usable_w * 0.50, usable_w * 0.50])
@@ -2215,17 +2482,17 @@ def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesI
         ],
         [
             Paragraph("<b>Diagnóstico Presuntivo:</b>", lbl_style),
-            Paragraph(str(dx_pres), val_bold),
+            Paragraph(_s_esc(dx_pres), val_bold),
         ],
         [
             Paragraph("<b>Diagnóstico Definitivo (CIE-10):</b>", lbl_style),
-            Paragraph(f"<font color='#0f766e'><b>{dx_def}</b></font>", val_bold),
+            Paragraph(f"<font color='#0f766e'><b>{_s_esc(dx_def)}</b></font>", val_bold),
         ]
     ]
     if sec_dx and str(sec_dx).strip():
         dx_rows.append([
             Paragraph("<b>Otros Diagnósticos:</b>", lbl_style),
-            Paragraph(str(sec_dx).replace("\n", " • "), val_style),
+            Paragraph(_s_multiline(str(sec_dx)).replace("<br/>", " • "), val_style),
         ])
 
     dx_table = Table(dx_rows, colWidths=[usable_w * 0.30, usable_w * 0.70])
@@ -2272,8 +2539,8 @@ def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesI
 
     if proc_list:
         for idx, item in enumerate(proc_list):
-            c_code = item.get("code", "") if isinstance(item, dict) else ""
-            c_name = item.get("procedure", "") if isinstance(item, dict) else str(item)
+            c_code = _s_esc(item.get("code", "") if isinstance(item, dict) else "")
+            c_name = _s_esc(item.get("procedure", "") if isinstance(item, dict) else str(item))
             proc_table_rows.append([
                 Paragraph(f"{idx + 1}.", val_bold),
                 Paragraph(f"<font color='#0f766e'><b>{c_code or '---'}</b></font>", val_bold),
@@ -2303,15 +2570,15 @@ def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesI
     treatment_val = getattr(auth_obj, "treatment_plan", None) or ""
     notes_val = getattr(auth_obj, "notes", None) or ""
 
-    if (treatment_val and treatment_val.strip()) or (notes_val and notes_val.strip()):
+    if (treatment_val and str(treatment_val).strip()) or (notes_val and str(notes_val).strip()):
         tx_data = [
             [Paragraph("<b>VII. TRATAMIENTO PROPUESTO Y OBSERVACIONES</b>", sec_cell_style)],
         ]
         comb_tx = ""
-        if treatment_val.strip():
-            comb_tx += f"<b>Plan Terapéutico:</b> {treatment_val.strip()}<br/>"
-        if notes_val.strip():
-            comb_tx += f"<b>Observaciones:</b> {notes_val.strip()}"
+        if str(treatment_val).strip():
+            comb_tx += f"<b>Plan Terapéutico:</b> {_s_multiline(str(treatment_val).strip())}<br/>"
+        if str(notes_val).strip():
+            comb_tx += f"<b>Observaciones:</b> {_s_multiline(str(notes_val).strip())}"
         tx_data.append([Paragraph(comb_tx, val_style)])
 
         tx_table = Table(tx_data, colWidths=[usable_w])
@@ -2328,9 +2595,9 @@ def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesI
 
     # ── BLOQUE 7: FIRMA Y SELLO DEL MÉDICO TRATANTE ────────────────────────────
     doc_user = getattr(auth_obj, "doctor", None)
-    doc_name = getattr(doc_user, "name", None) or getattr(setting, "doctor_name", "Dr. Carlos M. Heredia")
-    doc_spec = getattr(doc_user, "specialty", None) or getattr(setting, "specialty", "Ginecología y Obstetricia")
-    doc_code = getattr(auth_obj, "doctor_code", None) or getattr(setting, "exequatur", "24241")
+    doc_name = _s_esc(getattr(doc_user, "name", None) or (getattr(setting, "doctor_name", "Dr. Carlos M. Heredia") if setting else "Dr. Carlos M. Heredia"))
+    doc_spec = _s_esc(getattr(doc_user, "specialty", None) or (getattr(setting, "specialty", "Ginecología y Obstetricia") if setting else "Ginecología y Obstetricia"))
+    doc_code = _s_esc(getattr(auth_obj, "doctor_code", None) or (getattr(setting, "exequatur", "24241") if setting else "24241"))
 
     sig_data = [
         [

@@ -18,6 +18,8 @@ def run_mobile_api_tests():
     # 1. Asegurar usuarios y datos iniciales en SQLite
     with SessionLocal() as db:
         seed_initial_data_if_empty(db)
+        doctor_user = db.query(User).filter(User.role == "doctor").first()
+        doctor_email = doctor_user.email if doctor_user else "doctor@sscp.com"
 
     client = TestClient(app)
 
@@ -32,7 +34,7 @@ def run_mobile_api_tests():
     # 3. Prueba de Login Doctor
     print("\n[2/6] Probando POST /api/mobile/login (Doctor)...")
     res_doc = client.post("/api/mobile/login", json={
-        "email": "doctor@sscp.com",
+        "email": doctor_email,
         "password": "password123"
     })
     assert res_doc.status_code == 200, f"Error login doctor: {res_doc.text}"

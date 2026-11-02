@@ -68,6 +68,22 @@ SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH.as_posix()}"
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
+
+from sqlalchemy import event
+import unicodedata
+
+@event.listens_for(engine, "connect")
+def register_sqlite_functions(dbapi_connection, connection_record):
+    def unaccent(value):
+        if value is None:
+            return ""
+        nfkd = unicodedata.normalize('NFKD', str(value))
+        return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
+    try:
+        dbapi_connection.create_function("unaccent", 1, unaccent)
+    except Exception:
+        pass
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

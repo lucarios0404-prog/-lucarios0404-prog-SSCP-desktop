@@ -318,14 +318,14 @@ function initPatientLiveSearch(config) {
             });
             if (res.ok) {
                 const data = await res.json();
-                const totalMerged = (data.total_appointments_merged || 0) + (data.total_patients_merged || 0);
+                const totalMerged = (data.total_appointments_merged || 0) + (data.total_patients_merged || 0) + (data.new_cloud_messages || 0);
                 if (totalMerged > 0) {
                     showRelayNotification(`Recepción: ${totalMerged} actualización(es) sincronizada(s) desde la tablet.`);
-                    // Si estamos en la página del dashboard o citas, recargar datos en 2s para mostrar el nuevo turno
+                    // Si estamos en la página del dashboard o citas, recargar datos en 1.2s para mostrar el nuevo turno
                     if (window.location.pathname === '/' || window.location.pathname.includes('/appointments') || window.location.pathname.includes('/dashboard')) {
                         setTimeout(() => {
                             window.location.reload();
-                        }, 2500);
+                        }, 1200);
                     }
                 }
             }
@@ -351,10 +351,10 @@ function initPatientLiveSearch(config) {
         }, 4500);
     }
 
-    // Iniciar 3 segundos después de cargar la página, luego verificar cada 30 segundos
+    // Iniciar 1.5 segundos después de cargar la página, luego verificar cada 6 segundos para actualización casi instantánea
     window.addEventListener('load', () => {
-        setTimeout(checkRelayUpdates, 3000);
-        setInterval(checkRelayUpdates, 30000);
+        setTimeout(checkRelayUpdates, 1500);
+        setInterval(checkRelayUpdates, 6000);
     });
 })();
 

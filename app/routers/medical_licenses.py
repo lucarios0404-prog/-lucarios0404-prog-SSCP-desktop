@@ -99,7 +99,32 @@ def submit_license(
 
     if print_format == "talonario":
         return RedirectResponse(url=f"/licenses/{license_obj.id}/talonario/pdf", status_code=303)
+    elif print_format == "print_html":
+        return RedirectResponse(url=f"/licenses/{license_obj.id}/print", status_code=303)
     return RedirectResponse(url=f"/licenses/{license_obj.id}/pdf", status_code=303)
+
+@router.get("/{license_id}/print")
+def print_license_html(
+    request: Request,
+    license_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('licenses'))
+):
+    license_obj = db.query(MedicalLicense).filter(MedicalLicense.id == license_id).first()
+    if not license_obj:
+        raise HTTPException(status_code=404, detail="Licencia médica no encontrada")
+
+    setting = db.query(Setting).first()
+    return templates.TemplateResponse(
+        request=request,
+        name="licenses/print.html",
+        context={
+            "user": current_user,
+            "license": license_obj,
+            "patient": license_obj.patient,
+            "setting": setting,
+        }
+    )
 
 @router.get("/{license_id}/pdf")
 def download_license_pdf(
