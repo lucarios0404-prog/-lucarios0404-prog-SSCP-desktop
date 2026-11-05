@@ -24,7 +24,7 @@ function openPrintConfigurator(parentWindow, baseUrl, getAppIcon) {
       preload: path.resolve(__dirname, '../preload/preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false
+      sandbox: true
     }
   });
 

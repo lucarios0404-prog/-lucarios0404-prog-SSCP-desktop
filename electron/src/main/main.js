@@ -272,7 +272,7 @@ function createMainWindow() {
       preload: path.resolve(__dirname, '../preload/preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false,
+      sandbox: true,
       spellcheck: true
     }
   });
@@ -307,6 +307,27 @@ function createMainWindow() {
       return { action: 'deny' };
     }
     return { action: 'allow' };
+  });
+
+  // Prevenir navegacion arbitraria de primer nivel fuera del backend clinico
+  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    try {
+      const parsedUrl = new URL(navigationUrl);
+      const parsedBase = baseUrl ? new URL(baseUrl) : null;
+      if (parsedBase && parsedUrl.origin === parsedBase.origin) {
+        return;
+      }
+      if (navigationUrl.startsWith('file://')) {
+        return;
+      }
+      event.preventDefault();
+      if (['https:', 'http:', 'mailto:'].includes(parsedUrl.protocol)) {
+        require('electron').shell.openExternal(navigationUrl);
+      }
+    } catch (err) {
+      event.preventDefault();
+      console.warn('[Security] Bloqueada navegacion no segura: ' + navigationUrl);
+    }
   });
 
   mainWindow.once('ready-to-show', () => {
