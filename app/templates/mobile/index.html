@@ -17,6 +17,19 @@
             document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
         }
     </script>
+    <!-- Chart.js 4 (Offline Local + Fallback CDN) -->
+    <script>
+        (function() {
+            var isLocalAsset = (location.protocol === 'file:' || location.hostname.indexOf('appassets') !== -1);
+            var src = isLocalAsset ? 'chart.min.js' : '/mobile/chart.min.js';
+            document.write('<script src="' + src + '"><\/script>');
+        })();
+    </script>
+    <script>
+        if (typeof Chart === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"><\/script>');
+        }
+    </script>
     <!-- Standalone QR Code & Barcode Scanner Engine -->
     <script>
         (function() {
@@ -160,7 +173,7 @@
             </div>
             <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-2">
                 <span>SSCP Móvil</span>
-                <span class="text-xs font-black bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full shadow-2xs">v1.9.6</span>
+                <span class="text-xs font-black bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full shadow-2xs">v1.9.10</span>
             </h1>
             <p class="text-xs font-medium text-slate-500 mt-1">Terminal de Consulta y Recepción Clínica</p>
             <div id="login-clinic-banner" class="mt-2 inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-700 text-[11px] font-bold rounded-full">
@@ -332,7 +345,7 @@
                 </div>
 
                 <div class="flex items-center space-x-1.5">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">v1.9.6</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">v1.9.10</span>
                     <button onclick="loadDashboardData()" title="Actualizar" 
                             class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition active:rotate-180">
                         <i class="fas fa-sync-alt text-xs"></i>
@@ -442,10 +455,11 @@
                         <i class="fas fa-shield-alt text-xs"></i>
                         <span>Seguros / ARS</span>
                     </button>
-                    <button onclick="openPreauthModal()" type="button"
-                            class="col-span-2 sm:col-span-1 py-2.5 px-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1 shadow-sm active:scale-95 transition">
-                        <i class="fas fa-file-medical text-xs"></i>
-                        <span>ARS Carta</span>
+                    <button onclick="openUpcomingModal()" type="button"
+                            class="col-span-2 sm:col-span-1 py-2.5 px-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1 shadow-sm active:scale-95 transition"
+                            title="Seguimiento de próximas citas agendadas y recordatorios WhatsApp">
+                        <i class="fas fa-calendar-alt text-xs"></i>
+                        <span>Próximas Citas</span>
                     </button>
                 </div>
 
@@ -574,8 +588,23 @@
 
             <!-- VISTA 3: REPORTES Y CUADRE (PAGOS, VISTOS, CITAS PREVIAS Y PDF) -->
             <div id="view-reports" class="hidden space-y-4">
-                
-                <!-- Selector de Fecha de Reporte -->
+                <!-- SELECTOR DE MODO DE REPORTES (DIARIO VS MENSUAL) -->
+                <div class="bg-slate-200/80 p-1 rounded-2xl flex items-center space-x-1 shadow-inner">
+                    <button type="button" id="tab-rep-daily-btn" onclick="switchReportsMode('daily')" 
+                            class="flex-1 py-2 text-xs font-bold rounded-xl bg-white text-indigo-700 shadow-sm transition flex items-center justify-center space-x-1.5">
+                        <i class="fas fa-calendar-day"></i>
+                        <span>Diario / Cuadre</span>
+                    </button>
+                    <button type="button" id="tab-rep-monthly-btn" onclick="switchReportsMode('monthly')" 
+                            class="flex-1 py-2 text-xs font-medium rounded-xl text-slate-600 hover:text-slate-900 transition flex items-center justify-center space-x-1.5">
+                        <i class="fas fa-chart-pie"></i>
+                        <span>Informe Mensual</span>
+                    </button>
+                </div>
+
+                <!-- MODO 1: REPORTE DIARIO Y CUADRE (EXISTENTE) -->
+                <div id="reports-mode-daily" class="space-y-4">
+                    <!-- Selector de Fecha de Reporte -->
                 <div class="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-sm space-y-2.5">
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center">
@@ -729,8 +758,171 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </main>
+                </div>
+
+                <!-- MODO 2: INFORME MENSUAL DE ACTIVIDAD Y ANÁLISIS SEMANAL (NUEVO) -->
+                <div id="reports-mode-monthly" class="hidden space-y-4">
+                    
+                    <!-- Selector de Mes y Navegación -->
+                    <div class="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-sm space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center">
+                                <i class="fas fa-calendar-check text-indigo-600 mr-1.5"></i> Período Mensual
+                            </span>
+                            <span id="mobile-rep-month-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                Mensual
+                            </span>
+                        </div>
+                        <div class="flex items-center space-x-1.5">
+                            <button type="button" onclick="changeMobileReportMonth('prev')" title="Mes Anterior" 
+                                    class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold transition active:scale-95">
+                                <i class="fas fa-chevron-left text-xs"></i>
+                            </button>
+                            <select id="mobile-rep-month-select" onchange="loadMobileMonthlyData(this.value)" 
+                                    class="flex-1 px-3 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-800">
+                                <option value="">Cargando meses...</option>
+                            </select>
+                            <button type="button" onclick="changeMobileReportMonth('next')" title="Mes Siguiente" 
+                                    class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold transition active:scale-95">
+                                <i class="fas fa-chevron-right text-xs"></i>
+                            </button>
+                            <button type="button" onclick="loadMobileMonthlyData()" title="Refrescar informe" 
+                                    class="w-9 h-9 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold transition active:rotate-180">
+                                <i class="fas fa-sync-alt text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 4 Tarjetas KPI de Resumen Mensual -->
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div class="bg-gradient-to-br from-indigo-50 to-white p-3 rounded-2xl border border-indigo-100/90 shadow-sm flex flex-col justify-between">
+                            <div class="flex items-center justify-between text-indigo-600 mb-1">
+                                <span class="text-[10px] font-black uppercase tracking-wider text-indigo-800">Consultas</span>
+                                <i class="fas fa-stethoscope text-sm"></i>
+                            </div>
+                            <div class="flex items-baseline space-x-1">
+                                <span id="rep-month-consultations" class="text-xl font-black text-slate-900 tracking-tight">0</span>
+                                <span class="text-[10px] font-bold text-indigo-600">vistas</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-sky-50 to-white p-3 rounded-2xl border border-sky-100/90 shadow-sm flex flex-col justify-between">
+                            <div class="flex items-center justify-between text-sky-600 mb-1">
+                                <span class="text-[10px] font-black uppercase tracking-wider text-sky-800">Citas</span>
+                                <i class="fas fa-calendar-alt text-sm"></i>
+                            </div>
+                            <div class="flex items-baseline space-x-1">
+                                <span id="rep-month-appointments" class="text-xl font-black text-slate-900 tracking-tight">0</span>
+                                <span class="text-[10px] font-bold text-sky-600">agendadas</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-emerald-50 to-white p-3 rounded-2xl border border-emerald-100/90 shadow-sm flex flex-col justify-between">
+                            <div class="flex items-center justify-between text-emerald-600 mb-1">
+                                <span class="text-[10px] font-black uppercase tracking-wider text-emerald-800">Pacientes</span>
+                                <i class="fas fa-users text-sm"></i>
+                            </div>
+                            <div class="flex items-baseline space-x-1">
+                                <span id="rep-month-patients" class="text-xl font-black text-slate-900 tracking-tight">0</span>
+                                <span class="text-[10px] font-bold text-emerald-600">únicos</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-amber-50 to-white p-3 rounded-2xl border border-amber-100/90 shadow-sm flex flex-col justify-between">
+                            <div class="flex items-center justify-between text-amber-600 mb-1">
+                                <span class="text-[10px] font-black uppercase tracking-wider text-amber-800">Facturación</span>
+                                <i class="fas fa-wallet text-sm"></i>
+                            </div>
+                            <div class="flex items-baseline space-x-1">
+                                <span id="rep-month-revenue" class="text-lg font-black text-slate-900 tracking-tight">RD$ 0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CARD: TIPOS DE CITAS CON % Y GRÁFICA INTERACTIVA -->
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm space-y-3">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <div>
+                                <h3 class="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center">
+                                    <i class="fas fa-pie-chart text-indigo-600 mr-1.5"></i> Tipos de Citas y Porcentajes (%)
+                                </h3>
+                                <p class="text-[10px] text-slate-400 mt-0.5">Distribución porcentual de motivos de consulta</p>
+                            </div>
+                            <span id="rep-types-total-badge" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700">
+                                0 total
+                            </span>
+                        </div>
+
+                        <!-- Gráfica Doughnut -->
+                        <div class="relative h-44 w-full flex items-center justify-center">
+                            <canvas id="mobileTypesChart"></canvas>
+                        </div>
+
+                        <!-- Estado Vacío -->
+                        <div id="mobile-types-empty" class="hidden py-6 text-center text-slate-400 text-xs italic">
+                            No se registraron citas ni consultas en este mes.
+                        </div>
+
+                        <!-- Lista de Desglose con Barra y Porcentaje -->
+                        <div id="mobile-types-list" class="space-y-2.5 pt-1">
+                            <!-- Inyectado por JS -->
+                        </div>
+                    </div>
+
+                    <!-- CARD: ANÁLISIS SEMANAL (DÍA MÁS FUERTE VS DÍA MÁS FLOJO) -->
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm space-y-3.5">
+                        <div class="border-b border-slate-100 pb-2">
+                            <h3 class="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center">
+                                <i class="fas fa-chart-column text-indigo-600 mr-1.5"></i> Análisis Semanal de Demanda
+                            </h3>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Días con mayor afluencia de pacientes vs días de menor volumen</p>
+                        </div>
+
+                        <!-- Banners de Comparación: Día Más Fuerte vs Día Más Flojo -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <!-- Día Más Fuerte (Pico) -->
+                            <div class="bg-emerald-50/90 border border-emerald-200 p-3 rounded-xl flex flex-col justify-between">
+                                <div>
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-600 text-white text-[9px] font-black uppercase tracking-wider mb-1">
+                                        <i class="fas fa-arrow-trend-up mr-1"></i> Día Más Fuerte
+                                    </span>
+                                    <h4 id="mobile-strongest-name" class="text-sm font-black text-emerald-900 mt-0.5">--</h4>
+                                </div>
+                                <div class="mt-2 text-right">
+                                    <span id="mobile-strongest-stat" class="text-xs font-bold text-emerald-700">0 citas (0%)</span>
+                                </div>
+                            </div>
+
+                            <!-- Día Más Flojo (Oportunidad) -->
+                            <div class="bg-amber-50/90 border border-amber-200 p-3 rounded-xl flex flex-col justify-between">
+                                <div>
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-600 text-white text-[9px] font-black uppercase tracking-wider mb-1">
+                                        <i class="fas fa-arrow-trend-down mr-1"></i> Día Más Flojo
+                                    </span>
+                                    <h4 id="mobile-weakest-name" class="text-sm font-black text-amber-900 mt-0.5">--</h4>
+                                </div>
+                                <div class="mt-2 text-right">
+                                    <span id="mobile-weakest-stat" class="text-xs font-bold text-amber-700">0 citas (0%)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Gráfica de Barras Semanal (Lun - Dom) -->
+                        <div class="relative h-44 w-full flex items-center justify-center">
+                            <canvas id="mobileWeeklyChart"></canvas>
+                        </div>
+
+                        <!-- Desglose por Días de la Semana -->
+                        <div class="space-y-1.5 pt-1">
+                            <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Afluencia de Lunes a Domingo</div>
+                            <div id="mobile-weekly-breakdown-list" class="space-y-1.5">
+                                <!-- Inyectado por JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div></main>
 
         <!-- BARRA DE NAVEGACIÓN INFERIOR LIMPIA (DOCTOR Y SECRETARIA) -->
         <nav class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 safe-pb z-30 flex items-center justify-around py-1.5 shadow-lg max-w-md mx-auto">
@@ -795,13 +987,13 @@
                     </div>
                 </button>
 
-                <button onclick="closeModal('modal-reception-actions'); openPreauthModal()" class="w-full p-3.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-2xl text-left flex items-center space-x-3 shadow-xs transition active:scale-98">
-                    <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-lg shrink-0">
-                        <i class="fas fa-file-medical"></i>
+                <button onclick="closeModal('modal-reception-actions'); openUpcomingModal()" class="w-full p-3.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-2xl text-left flex items-center space-x-3 shadow-xs transition active:scale-98">
+                    <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg shrink-0">
+                        <i class="fas fa-calendar-alt"></i>
                     </div>
                     <div>
-                        <div class="text-sm font-black">Solicitud Pre-Autorización ARS</div>
-                        <div class="text-[11px] text-slate-500 font-medium">Generar hoja médica formal para el seguro</div>
+                        <div class="text-sm font-black">Próximas Citas & Seguimiento</div>
+                        <div class="text-[11px] text-slate-500 font-medium">Recordatorios WhatsApp, llamadas y confirmaciones</div>
                     </div>
                 </button>
 
@@ -2186,6 +2378,121 @@
     </div>
 
     <!-- VISTA IMPRIMIBLE PARA HOJA CARTA OFICIAL -->
+
+    <!-- MODAL: PRÓXIMAS CITAS & SEGUIMIENTO (SECRETARIA) -->
+    <div id="modal-upcoming-appointments" class="hidden fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-slate-50 w-full max-w-xl rounded-t-3xl sm:rounded-3xl p-5 max-h-[94vh] flex flex-col shadow-2xl space-y-3.5">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between border-b border-slate-200 pb-3 bg-white -mx-5 -mt-5 p-5 rounded-t-3xl shadow-xs">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-base shadow-xs">
+                        <i class="fas fa-calendar-alt"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-base leading-tight">Próximas Citas & Seguimiento</h3>
+                        <p class="text-xs text-slate-500">Recordatorios WhatsApp, confirmaciones y llamadas</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-upcoming-appointments')" class="text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none p-1">&times;</button>
+            </div>
+
+            <!-- Resumen Rápido / Mini Tarjetas -->
+            <div class="grid grid-cols-3 gap-2 shrink-0">
+                <div class="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs text-center">
+                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Citas Mañana</span>
+                    <span id="upcoming-stat-tomorrow" class="text-lg font-black text-amber-600">0</span>
+                </div>
+                <div class="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs text-center">
+                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Por Confirmar</span>
+                    <span id="upcoming-stat-unconfirmed" class="text-lg font-black text-rose-600">0</span>
+                </div>
+                <div class="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs text-center">
+                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Futuras</span>
+                    <span id="upcoming-stat-total" class="text-lg font-black text-slate-800">0</span>
+                </div>
+            </div>
+
+            <!-- Filtros de Rango Temporal (Chips Táctiles) -->
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0 no-scrollbar">
+                <button type="button" onclick="setUpcomingRange('tomorrow')" id="chip-upcoming-tomorrow"
+                        class="px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 bg-white text-slate-700 border border-slate-200">
+                    Mañana
+                </button>
+                <button type="button" onclick="setUpcomingRange('this_week')" id="chip-upcoming-this_week"
+                        class="px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 bg-white text-slate-700 border border-slate-200">
+                    Esta Semana
+                </button>
+                <button type="button" onclick="setUpcomingRange('next_15_days')" id="chip-upcoming-next_15_days"
+                        class="px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 bg-white text-slate-700 border border-slate-200">
+                    Próx. 15 Días
+                </button>
+                <button type="button" onclick="setUpcomingRange('all')" id="chip-upcoming-all"
+                        class="px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 bg-amber-600 text-white shadow-xs">
+                    Todas
+                </button>
+            </div>
+
+            <!-- Buscador y Filtro de Confirmación -->
+            <div class="flex gap-2 shrink-0">
+                <div class="relative flex-1">
+                    <i class="fas fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                    <input type="text" id="upcoming-search-input" oninput="debounceUpcomingSearch(this.value)"
+                           placeholder="Buscar paciente, cédula o tel..."
+                           class="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none shadow-2xs">
+                </div>
+                <select id="upcoming-status-filter" onchange="onUpcomingStatusFilterChange(this.value)"
+                        class="bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 px-2 py-2 focus:ring-2 focus:ring-amber-500 shadow-2xs">
+                    <option value="all">Todos los estados</option>
+                    <option value="unconfirmed">⏳ Sin Confirmar</option>
+                    <option value="confirmed">✅ Confirmadas</option>
+                </select>
+            </div>
+
+            <!-- Contenedor Scrolleable de Lista de Pacientes -->
+            <div id="upcoming-appointments-list" class="flex-1 overflow-y-auto space-y-2.5 pr-0.5 min-h-[220px]">
+                <!-- Llenado dinámico -->
+            </div>
+        </div>
+    </div>
+
+    <!-- SUB-MODAL: REAGENDAR CITA -->
+    <div id="modal-reschedule-appointment" class="hidden fixed inset-0 z-60 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
+                        <i class="fas fa-calendar-days"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-900 text-sm">Reagendar Cita</h4>
+                        <p id="reschedule-patient-name" class="text-xs text-purple-700 font-semibold truncate max-w-[200px]">Paciente</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-reschedule-appointment')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <form onsubmit="handleSaveReschedule(event)" class="space-y-3">
+                <input type="hidden" id="reschedule-appt-id">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nueva Fecha *</label>
+                    <input type="date" id="reschedule-new-date" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-500">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nueva Hora (Opcional)</label>
+                    <input type="time" id="reschedule-new-time" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-500">
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="closeModal('modal-reschedule-appointment')" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="flex-1 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-xs">
+                        Guardar Cambio
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="preauth-printable-sheet" class="hidden"></div>
     <script>
         // Configuración de servidor por defecto y Cloud Relay
@@ -2314,13 +2621,17 @@
                 fetchOpts.headers['Accept'] = 'application/json';
             }
 
-            const timeoutMs = options.timeout || 3000;
+            const isMutation = fetchOpts.method && fetchOpts.method.toUpperCase() !== 'GET';
+            const defaultTimeout = isMutation ? 12000 : 4500;
+            const timeoutMs = options.timeout || defaultTimeout;
 
             try {
                 if (!fetchOpts.signal) {
                     ctrl = new AbortController();
                     fetchOpts.signal = ctrl.signal;
-                    tid = setTimeout(() => ctrl.abort(), timeoutMs);
+                    tid = setTimeout(() => {
+                        try { ctrl.abort(); } catch (_) {}
+                    }, timeoutMs);
                 }
                 const res = await fetch(primaryUrl, fetchOpts);
                 if (tid) clearTimeout(tid);
@@ -2331,8 +2642,30 @@
             } catch (err) {
                 if (tid) clearTimeout(tid);
                 // Conexión estrictamente local con la PC del doctor.
-                // Si la PC del doctor está apagada o no responde, la app trabaja 100% offline
-                // desde su memoria local. NUNCA se conecta a laxarusdevs.com.
+                // Normalizar abortos por timeout y fallos de red en mensajes comprensibles y amigables.
+                const isAbort = err.name === 'AbortError' || 
+                    (err.message && (
+                        err.message.toLowerCase().includes('abort') ||
+                        err.message.toLowerCase().includes('signal is aborted')
+                    ));
+                const isNetworkFailed = err.message && (
+                    err.message.toLowerCase().includes('failed to fetch') ||
+                    err.message.toLowerCase().includes('networkerror') ||
+                    err.message.toLowerCase().includes('network request failed') ||
+                    err.message.toLowerCase().includes('load failed')
+                );
+                if (isAbort) {
+                    const enhancedErr = new Error('Tiempo de espera agotado: No se pudo conectar con la PC del consultorio.');
+                    enhancedErr.name = 'ConnectionTimeoutError';
+                    enhancedErr.isOffline = true;
+                    throw enhancedErr;
+                }
+                if (isNetworkFailed) {
+                    const enhancedErr = new Error('Sin conexión: No se pudo comunicar con la PC del consultorio.');
+                    enhancedErr.name = 'ConnectionNetworkError';
+                    enhancedErr.isOffline = true;
+                    throw enhancedErr;
+                }
                 throw err;
             }
         }
@@ -2789,6 +3122,7 @@
                 return null;
             }
         };
+        window.SSCPStorage = SSCPStorage;
 
         // ==============================================================================
         // MOTOR DE SINCRONIZACIÓN OFFLINE-FIRST (SSCP STORE-AND-FORWARD P2P)
@@ -2815,11 +3149,12 @@
 
             getOutbox() {
                 try {
-                    const ob = JSON.parse(localStorage.getItem(this.OUTBOX_KEY) || '{"patients":[], "appointments":[], "patient_updates":[]}');
+                    const ob = JSON.parse(localStorage.getItem(this.OUTBOX_KEY) || '{"patients":[], "appointments":[], "patient_updates":[], "payments":[]}');
                     if (!ob.patient_updates) ob.patient_updates = [];
+                    if (!ob.payments) ob.payments = [];
                     return ob;
                 } catch (e) {
-                    return { patients: [], appointments: [], patient_updates: [] };
+                    return { patients: [], appointments: [], patient_updates: [], payments: [] };
                 }
             },
 
@@ -2830,7 +3165,19 @@
 
             getPendingCount() {
                 const ob = this.getOutbox();
-                return (ob.patients?.length || 0) + (ob.appointments?.length || 0) + (ob.patient_updates?.length || 0);
+                return (ob.patients?.length || 0) + (ob.appointments?.length || 0) + (ob.patient_updates?.length || 0) + (ob.payments?.length || 0);
+            },
+
+            enqueuePayment(paymentData) {
+                const ob = this.getOutbox();
+                if (!ob.payments) ob.payments = [];
+                const clientUuid = 'pay-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+                paymentData.client_uuid = clientUuid;
+                paymentData.created_at = new Date().toISOString();
+                paymentData.pending_sync = true;
+                ob.payments.push(paymentData);
+                this.saveOutbox(ob);
+                return clientUuid;
             },
 
             isPendingPatientUpdate(patientId) {
@@ -3032,8 +3379,9 @@
                 const pList = Array.isArray(ob.patients) ? ob.patients : [];
                 const aList = Array.isArray(ob.appointments) ? ob.appointments : [];
                 const uList = Array.isArray(ob.patient_updates) ? ob.patient_updates : [];
+                const payList = Array.isArray(ob.payments) ? ob.payments : [];
 
-                const totalInitial = pList.length + aList.length + uList.length;
+                const totalInitial = pList.length + aList.length + uList.length + payList.length;
                 if (totalInitial === 0) {
                     this.updateSyncUI();
                     return;
@@ -3273,6 +3621,72 @@
                     }
 
                     // =========================================================================
+                    // FASE 4: PAGOS / COBROS RÁPIDOS (Uno a uno)
+                    // =========================================================================
+                    while (ob.payments && ob.payments.length > 0) {
+                        const pay = ob.payments[0];
+                        const currentItemNum = processedSuccess + 1;
+                        let targetPatientId = pay.patient_id;
+                        if (clientUuidToId[targetPatientId]) {
+                            targetPatientId = clientUuidToId[targetPatientId];
+                        }
+                        const payDesc = `Cobro RD$ ${(pay.amount || 0).toLocaleString()} (${pay.service_name || 'Servicio'})`;
+                        updateProgress(payDesc, currentItemNum, totalInitial);
+
+                        let paySuccess = false;
+                        try {
+                            const payPayload = {
+                                patient_id: (typeof targetPatientId === 'number' || (typeof targetPatientId === 'string' && /^\d+$/.test(targetPatientId))) ? parseInt(targetPatientId) : targetPatientId,
+                                amount: pay.amount ? parseFloat(pay.amount) : 0,
+                                payment_method: pay.payment_method || 'Efectivo',
+                                service_id: pay.service_id ? parseInt(pay.service_id) : null,
+                                service_name: pay.service_name || 'Consulta Médica General',
+                                insurance_name: pay.insurance_name || 'Privado / Particular (Sin Seguro)',
+                                item_type: pay.item_type || 'servicio',
+                                appointment_id: pay.appointment_id ? parseInt(pay.appointment_id) : null,
+                                notes: pay.notes || 'Cobro registrado desde móvil en modo sin conexión'
+                            };
+
+                            const res = await apiFetch('/api/mobile/payments/quick', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payPayload),
+                                timeout: 5000
+                            });
+
+                            if (res && res.ok) {
+                                paySuccess = true;
+                            } else if (res && res.status === 401) {
+                                showSyncToast('⚠️ Sesión en la PC caducada.', 'warning');
+                                connectionInterrupted = true;
+                                break;
+                            } else if (!res) {
+                                connectionInterrupted = true;
+                                break;
+                            }
+                        } catch (errNet) {
+                            console.warn('Error de red al enviar cobro a PC:', errNet);
+                            connectionInterrupted = true;
+                            break;
+                        }
+
+                        if (paySuccess) {
+                            ob.payments.shift();
+                            this.saveOutbox(ob);
+                            processedSuccess++;
+                            await sleep(250);
+                        } else {
+                            connectionInterrupted = true;
+                            break;
+                        }
+                    }
+
+                    if (connectionInterrupted) {
+                        showSyncToast(`⚠️ Pausado: Se transfirieron ${processedSuccess} de ${totalInitial} cambios. Se reanudará al reconectar con la PC.`, 'warning');
+                        return;
+                    }
+
+                    // =========================================================================
                     // FINALIZACIÓN EXITOSA
                     // =========================================================================
                     localStorage.setItem(this.LAST_SYNC_KEY, new Date().toISOString());
@@ -3291,12 +3705,13 @@
             clearOutboxPrompt() {
                 const pending = this.getPendingCount();
                 if (confirm(`¿Desea limpiar los ${pending} registros pendientes de la cola local? Realice esto si ya fueron registrados directamente en la PC del doctor.`)) {
-                    this.saveOutbox({ patients: [], appointments: [], patient_updates: [] });
+                    this.saveOutbox({ patients: [], appointments: [], patient_updates: [], payments: [] });
                     showSyncToast('✓ Cola de sincronización local limpiada.');
                     this.updateSyncUI();
                 }
             }
         };
+        window.OfflineSyncManager = OfflineSyncManager;
 
         // --- FUNCIONES DE PRE-AUTORIZACIÓN ARS (HOJA CARTA) & RELAY ---
         function openPreauthModal(patient = null) {
@@ -6087,12 +6502,382 @@
                 if (typeof loadMobileDashboard === 'function') loadMobileDashboard();
                 if (typeof loadReportsData === 'function') loadReportsData();
             } catch (err) {
+                const rawMsg = String((err && err.message) ? err.message : '').toLowerCase();
+                const isOffline = !navigator.onLine || 
+                    (err && (
+                        err.isOffline ||
+                        err.name === 'AbortError' || 
+                        err.name === 'ConnectionTimeoutError' ||
+                        err.name === 'ConnectionNetworkError' ||
+                        rawMsg.includes('abort') || 
+                        rawMsg.includes('signal is aborted') ||
+                        rawMsg.includes('failed to fetch') || 
+                        rawMsg.includes('sin conexión') ||
+                        rawMsg.includes('tiempo de espera') ||
+                        rawMsg.includes('network') ||
+                        rawMsg.includes('load failed')
+                    ));
+
+                const syncMgr = window.OfflineSyncManager || (typeof OfflineSyncManager !== 'undefined' ? OfflineSyncManager : null);
+                if (isOffline && syncMgr) {
+                    const selectedPatientName = document.getElementById('qp-selected-name')?.textContent?.trim() || 'Paciente';
+                    const payPayload = {
+                        patient_id: patientId,
+                        patient_name: selectedPatientName,
+                        amount: amount,
+                        payment_method: method,
+                        service_id: serviceId,
+                        service_name: serviceName,
+                        insurance_name: insurance,
+                        item_type: itemType,
+                        appointment_id: appointmentId,
+                        notes: `Cobro sin conexión para ${selectedPatientName}`
+                    };
+                    OfflineSyncManager.enqueuePayment(payPayload);
+                    closeModal('modal-quick-payment');
+                    const conceptLabel = itemType === 'articulo' ? `Artículo/Insumo (${serviceName})` : serviceName;
+                    alert(`📱 ¡Cobro guardado en modo sin conexión!\n\nSe guardó en el celular el cobro de RD$ ${amount.toLocaleString()} (${conceptLabel}) para ${selectedPatientName}.\n\nSe transferirá automáticamente a la PC cuando se conecte a la red Wi-Fi del consultorio.`);
+                    if (typeof showSyncToast === 'function') {
+                        showSyncToast('📱 Cobro guardado en el celular. Se sincronizará con la PC al conectar.', 'warning');
+                    }
+                    if (typeof loadDashboardData === 'function') loadDashboardData();
+                    if (typeof loadMobileDashboard === 'function') loadMobileDashboard();
+                    return;
+                }
+
                 alert(err.message || 'Error al registrar cobro');
             } finally {
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = origBtnHtml;
                 }
+            }
+        }
+
+
+        // --- MÓDULO DE PRÓXIMAS CITAS & SEGUIMIENTO (SECRETARIA) ---
+        let currentUpcomingRange = 'all';
+        let currentUpcomingStatus = 'all';
+        let currentUpcomingSearch = '';
+        let rawUpcomingAppointments = [];
+        let upcomingSearchDebounce = null;
+
+        async function openUpcomingModal() {
+            const modal = document.getElementById('modal-upcoming-appointments');
+            if (modal) modal.classList.remove('hidden');
+            await loadUpcomingAppointments();
+        }
+
+        async function loadUpcomingAppointments() {
+            const listEl = document.getElementById('upcoming-appointments-list');
+            if (listEl) {
+                listEl.innerHTML = '<div class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin text-2xl text-amber-600 mb-2"></i><p class="text-xs font-bold">Cargando próximas citas...</p></div>';
+            }
+
+            try {
+                let url = `/api/mobile/appointments/upcoming?range=${encodeURIComponent(currentUpcomingRange)}`;
+                if (currentUpcomingStatus && currentUpcomingStatus !== 'all') {
+                    url += `&status=${encodeURIComponent(currentUpcomingStatus)}`;
+                }
+                const res = await apiFetch(url);
+                if (res && res.ok) {
+                    const data = await res.json();
+                    rawUpcomingAppointments = data.appointments || [];
+                    const tEl = document.getElementById('upcoming-stat-tomorrow');
+                    const uEl = document.getElementById('upcoming-stat-unconfirmed');
+                    const totEl = document.getElementById('upcoming-stat-total');
+                    if (tEl) tEl.textContent = data.tomorrow_count ?? 0;
+                    if (uEl) uEl.textContent = data.unconfirmed_count ?? 0;
+                    if (totEl) totEl.textContent = rawUpcomingAppointments.length;
+                    localStorage.setItem('sscp_mobile_cached_upcoming', JSON.stringify(data));
+                    renderUpcomingAppointmentsList();
+                    return;
+                }
+            } catch (err) {
+                console.warn('Fallo al obtener próximas citas de red, intentando caché local:', err);
+            }
+
+            // Fallback a caché local si está offline
+            try {
+                const cached = JSON.parse(localStorage.getItem('sscp_mobile_cached_upcoming') || 'null');
+                if (cached && Array.isArray(cached.appointments)) {
+                    rawUpcomingAppointments = cached.appointments;
+                    const tEl = document.getElementById('upcoming-stat-tomorrow');
+                    const uEl = document.getElementById('upcoming-stat-unconfirmed');
+                    const totEl = document.getElementById('upcoming-stat-total');
+                    if (tEl) tEl.textContent = cached.tomorrow_count ?? 0;
+                    if (uEl) uEl.textContent = cached.unconfirmed_count ?? 0;
+                    if (totEl) totEl.textContent = rawUpcomingAppointments.length;
+                    renderUpcomingAppointmentsList();
+                    return;
+                }
+            } catch (_) {}
+
+            if (listEl) {
+                listEl.innerHTML = '<div class="p-8 text-center text-slate-400"><i class="fas fa-calendar-xmark text-3xl mb-2 text-slate-300"></i><p class="text-xs font-bold">No hay citas futuras registradas para este rango.</p></div>';
+            }
+        }
+
+        function setUpcomingRange(range) {
+            currentUpcomingRange = range;
+            ['tomorrow', 'this_week', 'next_15_days', 'all'].forEach(r => {
+                const btn = document.getElementById(`chip-upcoming-${r}`);
+                if (!btn) return;
+                if (r === range) {
+                    btn.className = 'px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 bg-amber-600 text-white shadow-xs';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 bg-white text-slate-700 border border-slate-200';
+                }
+            });
+            loadUpcomingAppointments();
+        }
+
+        function onUpcomingStatusFilterChange(val) {
+            currentUpcomingStatus = val;
+            renderUpcomingAppointmentsList();
+        }
+
+        function debounceUpcomingSearch(val) {
+            clearTimeout(upcomingSearchDebounce);
+            upcomingSearchDebounce = setTimeout(() => {
+                currentUpcomingSearch = (val || '').trim().toLowerCase();
+                renderUpcomingAppointmentsList();
+            }, 250);
+        }
+
+        function renderUpcomingAppointmentsList() {
+            const listEl = document.getElementById('upcoming-appointments-list');
+            if (!listEl) return;
+
+            let filtered = rawUpcomingAppointments.slice();
+
+            if (currentUpcomingStatus === 'unconfirmed') {
+                filtered = filtered.filter(a => a.status === 'Pendiente' || a.status === 'Sin Confirmar' || !a.status);
+            } else if (currentUpcomingStatus === 'confirmed') {
+                filtered = filtered.filter(a => a.status === 'Confirmada');
+            }
+
+            if (currentUpcomingSearch) {
+                filtered = filtered.filter(a => {
+                    const name = (a.patient_name || '').toLowerCase();
+                    const doc = (a.patient_document_id || '').toLowerCase();
+                    const phone = (a.patient_phone || '').toLowerCase();
+                    return name.includes(currentUpcomingSearch) || doc.includes(currentUpcomingSearch) || phone.includes(currentUpcomingSearch);
+                });
+            }
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = '<div class="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200"><i class="fas fa-calendar-check text-3xl text-emerald-500 mb-2"></i><p class="text-xs font-bold text-slate-600">No se encontraron citas con los filtros seleccionados.</p></div>';
+                return;
+            }
+
+            let html = '';
+            filtered.forEach(a => {
+                const isConfirmed = a.status === 'Confirmada';
+                const statusBadge = isConfirmed 
+                    ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200"><i class="fas fa-check-circle mr-1"></i>Confirmada</span>'
+                    : (a.status === 'Reagendada'
+                        ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200"><i class="fas fa-arrows-rotate mr-1"></i>Reagendada</span>'
+                        : '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200"><i class="fas fa-hourglass-half mr-1"></i>Por Confirmar</span>');
+
+                const cleanPhone = (a.patient_phone || '').replace(/[^0-9]/g, '');
+                const hasPhone = cleanPhone.length >= 7;
+
+                let dateDisplay = a.date;
+                try {
+                    const parts = a.date.split('-');
+                    if (parts.length === 3) {
+                        const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                        const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+                        const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                        dateDisplay = `${days[dObj.getDay()]} ${parts[2]} de ${months[dObj.getMonth()]}`;
+                    }
+                } catch (_) {}
+
+                const safeName = (a.patient_name || '').replace(/'/g, "\\'");
+
+                html += `
+                <div class="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs space-y-2.5 transition hover:border-amber-300">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <div class="flex items-center gap-1.5 text-xs font-extrabold text-slate-900">
+                            <span class="w-2 h-2 rounded-full ${isConfirmed ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
+                            <span>${dateDisplay}</span>
+                            <span class="text-slate-400 font-normal">•</span>
+                            <span class="text-indigo-600">${a.start_time || 'Por definir'}</span>
+                        </div>
+                        <div>${statusBadge}</div>
+                    </div>
+
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <h4 class="font-bold text-slate-900 text-sm leading-tight">${a.patient_name}</h4>
+                            <p class="text-[11px] text-slate-400 mt-0.5">
+                                ${a.patient_document_id ? `<span class="mr-1.5"><i class="fas fa-id-card mr-1 text-slate-400"></i>${a.patient_document_id}</span>` : ''}
+                                ${a.patient_phone ? `<span><i class="fas fa-phone mr-1 text-slate-400"></i>${a.patient_phone}</span>` : '<span class="text-rose-400">Sin teléfono</span>'}
+                            </p>
+                        </div>
+                        <span class="px-2 py-0.5 bg-slate-100 text-slate-700 font-semibold text-[10px] rounded-lg border border-slate-200 shrink-0">
+                            ${a.insurance_name || 'Privado'}
+                        </span>
+                    </div>
+
+                    ${a.reason ? `<div class="text-[11px] text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100"><i class="fas fa-stethoscope text-[10px] text-slate-400 mr-1"></i>${a.reason}</div>` : ''}
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+                        <button type="button" onclick="sendUpcomingWhatsApp('${cleanPhone}', '${safeName}', '${a.date}', '${a.start_time}', ${a.id})"
+                                ${!hasPhone ? 'disabled' : ''}
+                                class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition ${hasPhone ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}"
+                                title="Enviar mensaje de confirmación por WhatsApp">
+                            <i class="fab fa-whatsapp text-sm"></i>
+                            <span>WhatsApp</span>
+                        </button>
+
+                        <button type="button" onclick="callUpcomingPatient('${cleanPhone}')"
+                                ${!hasPhone ? 'disabled' : ''}
+                                class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition ${hasPhone ? 'bg-sky-600 hover:bg-sky-700 text-white' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}"
+                                title="Llamar a la paciente">
+                            <i class="fas fa-phone text-xs"></i>
+                            <span>Llamar</span>
+                        </button>
+
+                        <button type="button" onclick="confirmUpcomingAppointment(${a.id})"
+                                class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition ${isConfirmed ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-teal-600 hover:bg-teal-700 text-white'}"
+                                title="${isConfirmed ? 'Cita ya confirmada' : 'Marcar como confirmada'}">
+                            <i class="fas fa-check text-xs"></i>
+                            <span>${isConfirmed ? 'Confirmada' : 'Confirmar'}</span>
+                        </button>
+
+                        <button type="button" onclick="openRescheduleUpcomingModal(${a.id}, '${safeName}', '${a.date}', '${a.start_time}')"
+                                class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition bg-purple-600 hover:bg-purple-700 text-white"
+                                title="Cambiar fecha u hora de la cita">
+                            <i class="fas fa-calendar-days text-xs"></i>
+                            <span>Reagendar</span>
+                        </button>
+                    </div>
+                </div>`;
+            });
+
+            listEl.innerHTML = html;
+        }
+
+        function sendUpcomingWhatsApp(phone, patientName, dateStr, timeStr, apptId) {
+            if (!phone) {
+                alert('La paciente no tiene teléfono registrado.');
+                return;
+            }
+            const clean = phone.replace(/[^0-9]/g, '');
+            const targetPhone = clean.startsWith('1') ? clean : ('1' + clean);
+
+            let fechaTexto = dateStr;
+            try {
+                const parts = dateStr.split('-');
+                if (parts.length === 3) {
+                    const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                    fechaTexto = `${days[dObj.getDay()]} ${parts[2]} de ${months[dObj.getMonth()]}`;
+                }
+            } catch (_) {}
+
+            const doctorName = localStorage.getItem('sscp_doctor_name') || 'Dr. Especialista';
+
+            const msg = `Estimada/o *${patientName}*, le saludamos del consultorio médico del *${doctorName}*.
+
+Le recordamos su cita programada para el *${fechaTexto}* a las *${timeStr || 'hora coordinada'}*.
+
+📌 *Indicaciones importantes para su consulta:*
+• Favor presentarse 15 minutos antes de su hora acordada.
+• Traer su documento de identidad (cédula) y carnet de seguro médico (ARS).
+
+¿Nos confirma su asistencia a la consulta? ¡Le esperamos!`;
+
+            const waUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}`;
+            window.open(waUrl, '_blank');
+
+            if (apptId) {
+                apiFetch(`/api/mobile/appointments/${apptId}/whatsapp-sent`, { method: 'POST' }).catch(() => {});
+            }
+        }
+
+        function callUpcomingPatient(phone) {
+            if (!phone) {
+                alert('La paciente no tiene teléfono registrado.');
+                return;
+            }
+            const clean = phone.replace(/[^0-9]/g, '');
+            window.location.href = `tel:${clean}`;
+        }
+
+        async function confirmUpcomingAppointment(apptId) {
+            try {
+                const res = await apiFetch(`/api/mobile/appointments/${apptId}/status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Confirmada' })
+                });
+                if (res && res.ok) {
+                    if (typeof showSyncToast === 'function') showSyncToast('✓ Cita marcada como Confirmada');
+                    const item = rawUpcomingAppointments.find(a => a.id === apptId);
+                    if (item) item.status = 'Confirmada';
+                    renderUpcomingAppointmentsList();
+                } else {
+                    throw new Error('No se pudo actualizar');
+                }
+            } catch (err) {
+                const item = rawUpcomingAppointments.find(a => a.id === apptId);
+                if (item) item.status = 'Confirmada';
+                renderUpcomingAppointmentsList();
+                if (typeof showSyncToast === 'function') showSyncToast('📱 Cita confirmada (guardada localmente).', 'warning');
+            }
+        }
+
+        function openRescheduleUpcomingModal(apptId, patientName, currentDate, currentTime) {
+            const idInput = document.getElementById('reschedule-appt-id');
+            const nameEl = document.getElementById('reschedule-patient-name');
+            const dateInput = document.getElementById('reschedule-new-date');
+            const timeInput = document.getElementById('reschedule-new-time');
+            if (idInput) idInput.value = apptId;
+            if (nameEl) nameEl.textContent = patientName;
+            if (dateInput) dateInput.value = currentDate || '';
+            if (timeInput) timeInput.value = currentTime ? currentTime.replace(/[^0-9:]/g, '').substring(0, 5) : '';
+            const m = document.getElementById('modal-reschedule-appointment');
+            if (m) m.classList.remove('hidden');
+        }
+
+        async function handleSaveReschedule(e) {
+            e.preventDefault();
+            const apptId = document.getElementById('reschedule-appt-id').value;
+            const newDate = document.getElementById('reschedule-new-date').value;
+            const newTime = document.getElementById('reschedule-new-time').value;
+
+            if (!newDate) {
+                alert('Debe seleccionar la nueva fecha.');
+                return;
+            }
+
+            try {
+                const res = await apiFetch(`/api/mobile/appointments/${apptId}/reschedule`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ new_date: newDate, new_time: newTime })
+                });
+                if (res && res.ok) {
+                    closeModal('modal-reschedule-appointment');
+                    if (typeof showSyncToast === 'function') showSyncToast('✓ Cita reagendada con éxito');
+                    loadUpcomingAppointments();
+                    return;
+                }
+                throw new Error('Error al reagendar');
+            } catch (err) {
+                closeModal('modal-reschedule-appointment');
+                if (typeof showSyncToast === 'function') showSyncToast('⚠️ Cita reagendada localmente.', 'warning');
+                const item = rawUpcomingAppointments.find(a => String(a.id) === String(apptId));
+                if (item) {
+                    item.date = newDate;
+                    if (newTime) item.start_time = newTime;
+                    item.status = 'Reagendada';
+                }
+                renderUpcomingAppointmentsList();
             }
         }
 
@@ -7130,7 +7915,11 @@
                 if (!dateInput.value) {
                     dateInput.value = currentReportDate;
                 }
-                loadReportsData(dateInput.value);
+                if (currentReportsMode === 'monthly') {
+                    loadMobileMonthlyData(currentSelectedMonth);
+                } else {
+                    loadReportsData(dateInput.value);
+                }
             }
         }
 
@@ -7165,6 +7954,290 @@
             dateInput.value = dateStr;
             currentReportDate = dateStr;
             loadReportsData(dateStr);
+        }
+
+        let currentReportsMode = 'daily';
+        let currentMonthlyReportData = null;
+        let mobileTypesChartInstance = null;
+        let mobileWeeklyChartInstance = null;
+        let currentSelectedMonth = '';
+
+        function switchReportsMode(mode) {
+            currentReportsMode = mode;
+            const dailyBox = document.getElementById('reports-mode-daily');
+            const monthlyBox = document.getElementById('reports-mode-monthly');
+            const btnDaily = document.getElementById('tab-rep-daily-btn');
+            const btnMonthly = document.getElementById('tab-rep-monthly-btn');
+
+            if (mode === 'daily') {
+                dailyBox.classList.remove('hidden');
+                monthlyBox.classList.add('hidden');
+                btnDaily.className = 'flex-1 py-2 text-xs font-bold rounded-xl bg-white text-indigo-700 shadow-sm transition flex items-center justify-center space-x-1.5';
+                btnMonthly.className = 'flex-1 py-2 text-xs font-medium rounded-xl text-slate-600 hover:text-slate-900 transition flex items-center justify-center space-x-1.5';
+                loadReportsData();
+            } else {
+                dailyBox.classList.add('hidden');
+                monthlyBox.classList.remove('hidden');
+                btnDaily.className = 'flex-1 py-2 text-xs font-medium rounded-xl text-slate-600 hover:text-slate-900 transition flex items-center justify-center space-x-1.5';
+                btnMonthly.className = 'flex-1 py-2 text-xs font-bold rounded-xl bg-white text-indigo-700 shadow-sm transition flex items-center justify-center space-x-1.5';
+                loadMobileMonthlyData(currentSelectedMonth);
+            }
+        }
+
+        async function loadMobileMonthlyData(optMonth) {
+            const mVal = optMonth || currentSelectedMonth || '';
+            try {
+                const query = mVal ? `?month=${encodeURIComponent(mVal)}` : '';
+                const res = await apiFetch(`/api/mobile/reports/monthly${query}`);
+                if (res.status === 401) {
+                    handleLogout(false);
+                    return;
+                }
+                const data = await res.json();
+                currentMonthlyReportData = data;
+                currentSelectedMonth = data.selected_month;
+                renderMobileMonthlyReport(data);
+            } catch (err) {
+                console.error('Error cargando informe mensual móvil:', err);
+            }
+        }
+
+        function changeMobileReportMonth(dir) {
+            if (!currentMonthlyReportData) return;
+            const targetMonth = dir === 'prev' ? currentMonthlyReportData.prev_month : currentMonthlyReportData.next_month;
+            if (targetMonth) {
+                currentSelectedMonth = targetMonth;
+                loadMobileMonthlyData(targetMonth);
+            }
+        }
+
+        function renderMobileMonthlyReport(data) {
+            // 1. Selector de meses
+            const select = document.getElementById('mobile-rep-month-select');
+            select.innerHTML = '';
+            if (data.available_months && data.available_months.length > 0) {
+                data.available_months.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    const parts = m.split('-');
+                    const y = parts[0];
+                    const monthNames = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                    const mName = monthNames[parseInt(parts[1], 10)] || m;
+                    opt.textContent = `${mName} ${y}`;
+                    if (m === data.selected_month) opt.selected = true;
+                    select.appendChild(opt);
+                });
+            } else {
+                const opt = document.createElement('option');
+                opt.value = data.selected_month;
+                opt.textContent = data.month_name;
+                opt.selected = true;
+                select.appendChild(opt);
+            }
+
+            // 2. 4 KPIs
+            const curr = data.currency || 'RD$';
+            document.getElementById('rep-month-consultations').textContent = data.summary.total_consultations || 0;
+            document.getElementById('rep-month-appointments').textContent = data.summary.total_appointments || 0;
+            document.getElementById('rep-month-patients').textContent = data.summary.unique_patients_count || 0;
+            const rev = data.summary.total_revenue || 0;
+            document.getElementById('rep-month-revenue').textContent = `${curr} ${rev.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            // 3. Tipos de Citas con % y Gráfica
+            document.getElementById('rep-types-total-badge').textContent = `${data.summary.total_activity || 0} total`;
+            const typesList = document.getElementById('mobile-types-list');
+            const typesEmpty = document.getElementById('mobile-types-empty');
+            typesList.innerHTML = '';
+
+            const breakdown = data.types_breakdown || [];
+            if (breakdown.length === 0) {
+                typesEmpty.classList.remove('hidden');
+            } else {
+                typesEmpty.classList.add('hidden');
+                breakdown.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = 'p-2.5 rounded-xl bg-slate-50 border border-slate-100 space-y-1.5';
+                    row.innerHTML = `
+                        <div class="flex items-center justify-between text-xs">
+                            <div class="flex items-center space-x-2 font-bold text-slate-800">
+                                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: ${item.color}"></span>
+                                <span class="truncate max-w-[200px]" title="${item.name}">${item.name}</span>
+                            </div>
+                            <span class="px-2 py-0.5 rounded-md text-[11px] font-black text-slate-800 bg-white border border-slate-200 shadow-2xs">
+                                ${item.count} (${item.percentage}%)
+                            </span>
+                        </div>
+                        <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                            <div class="h-1.5 rounded-full transition-all duration-500" style="width: ${item.percentage}%; background-color: ${item.color}"></div>
+                        </div>
+                    `;
+                    typesList.appendChild(row);
+                });
+            }
+
+            // Render Gráfica Doughnut Tipos de Citas
+            if (mobileTypesChartInstance) {
+                mobileTypesChartInstance.destroy();
+                mobileTypesChartInstance = null;
+            }
+
+            if (typeof Chart !== 'undefined' && document.getElementById('mobileTypesChart')) {
+                const ctx = document.getElementById('mobileTypesChart').getContext('2d');
+                if (breakdown.length > 0) {
+                    mobileTypesChartInstance = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: data.types_chart.labels,
+                            datasets: [{
+                                data: data.types_chart.data,
+                                backgroundColor: data.types_chart.colors,
+                                borderWidth: 2,
+                                borderColor: '#ffffff',
+                                hoverOffset: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(c) {
+                                            const v = c.raw || 0;
+                                            const total = data.summary.total_activity || 1;
+                                            const p = ((v / total) * 100).toFixed(1);
+                                            return ` ${c.label}: ${v} citas (${p}%)`;
+                                        }
+                                    }
+                                }
+                            },
+                            cutout: '66%'
+                        }
+                    });
+                } else {
+                    // Empty chart placeholder
+                    mobileTypesChartInstance = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Sin citas'],
+                            datasets: [{ data: [1], backgroundColor: ['#e2e8f0'], borderWidth: 0 }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                            cutout: '66%'
+                        }
+                    });
+                }
+            }
+
+            // 4. Análisis Semanal (Día Más Fuerte vs Día Más Flojo)
+            const wa = data.weekly_analysis || {};
+            const stDay = wa.strongest_day;
+            const wkDay = wa.weakest_day;
+
+            if (stDay && stDay.count > 0) {
+                document.getElementById('mobile-strongest-name').textContent = stDay.name;
+                document.getElementById('mobile-strongest-stat').textContent = `${stDay.count} citas (${stDay.percentage}%)`;
+            } else {
+                document.getElementById('mobile-strongest-name').textContent = 'Sin datos';
+                document.getElementById('mobile-strongest-stat').textContent = '0 citas (0%)';
+            }
+
+            if (wkDay) {
+                document.getElementById('mobile-weakest-name').textContent = wkDay.name;
+                document.getElementById('mobile-weakest-stat').textContent = `${wkDay.count} citas (${wkDay.percentage}%)`;
+            } else {
+                document.getElementById('mobile-weakest-name').textContent = 'Sin datos';
+                document.getElementById('mobile-weakest-stat').textContent = '0 citas (0%)';
+            }
+
+            // Render Gráfica Semanal de Barras
+            if (mobileWeeklyChartInstance) {
+                mobileWeeklyChartInstance.destroy();
+                mobileWeeklyChartInstance = null;
+            }
+
+            if (typeof Chart !== 'undefined' && document.getElementById('mobileWeeklyChart')) {
+                const wCtx = document.getElementById('mobileWeeklyChart').getContext('2d');
+                const wb = wa.weekly_breakdown || [];
+                const barColors = wb.map(d => {
+                    if (d.is_strongest) return '#10b981'; // emerald-500
+                    if (d.is_weakest) return '#f59e0b'; // amber-500
+                    return '#6366f1'; // brand indigo
+                });
+
+                mobileWeeklyChartInstance = new Chart(wCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: wa.chart ? wa.chart.labels : ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+                        datasets: [{
+                            data: wa.chart ? wa.chart.data : [0, 0, 0, 0, 0, 0, 0],
+                            backgroundColor: barColors,
+                            borderRadius: 6,
+                            borderSkipped: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(c) {
+                                        const v = c.raw || 0;
+                                        const total = wa.total_events || 1;
+                                        const p = ((v / total) * 100).toFixed(1);
+                                        return ` ${v} citas/consultas (${p}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { precision: 0, font: { size: 10 } },
+                                grid: { color: '#f1f5f9' }
+                            },
+                            x: {
+                                ticks: { font: { size: 11, weight: 'bold' } },
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Desglose de Lunes a Domingo en lista compacta
+            const wList = document.getElementById('mobile-weekly-breakdown-list');
+            wList.innerHTML = '';
+            (wa.weekly_breakdown || []).forEach(d => {
+                const r = document.createElement('div');
+                let badgeHtml = '';
+                if (d.is_strongest) {
+                    badgeHtml = '<span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">PICO</span>';
+                } else if (d.is_weakest) {
+                    badgeHtml = '<span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800">FLOJO</span>';
+                }
+
+                r.className = 'flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-xs';
+                r.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-slate-700 w-16">${d.name}</span>
+                        ${badgeHtml}
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-20 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                            <div class="h-1.5 rounded-full ${d.is_strongest ? 'bg-emerald-500' : (d.is_weakest ? 'bg-amber-500' : 'bg-indigo-500')}" style="width: ${d.percentage}%"></div>
+                        </div>
+                        <span class="font-black text-slate-800 w-14 text-right text-[11px]">${d.count} (${d.percentage}%)</span>
+                    </div>
+                `;
+                wList.appendChild(r);
+            });
         }
 
         async function loadReportsData(optDate) {

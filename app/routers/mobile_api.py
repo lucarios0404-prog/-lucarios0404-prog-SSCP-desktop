@@ -419,6 +419,135 @@ def mobile_check_in_appointment(
         "message": f"Turno #{appt.queue_number} asignado a {p_name}"
     }
 
+# --- Próximas Citas para Seguimiento de Secretaría ---
+@router.get("/appointments/upcoming")
+def get_upcoming_appointments(
+    range: str = Query("all", description="tomorrow, this_week, next_15_days, all"),
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    from datetime import date, timedelta
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+
+    from app.routers.patients import resolve_current_doctor_id
+    doc_id = resolve_current_doctor_id(db, current_user)
+
+    query = db.query(Appointment).filter(
+        Appointment.date >= tomorrow,
+        Appointment.status.notin_(["Cancelada", "Atendida", "Completada"])
+    )
+    if doc_id:
+        query = query.filter(Appointment.doctor_id == doc_id)
+
+    if range == "tomorrow":
+        query = query.filter(Appointment.date == tomorrow)
+    elif range == "this_week":
+        end_week = today + timedelta(days=7)
+        query = query.filter(Appointment.date <= end_week)
+    elif range == "next_15_days":
+        end_15 = today + timedelta(days=15)
+        query = query.filter(Appointment.date <= end_15)
+
+    if status and status != "all":
+        if status == "unconfirmed":
+            query = query.filter(Appointment.status.in_(["Pendiente", "Sin Confirmar", None]))
+        elif status == "confirmed":
+            query = query.filter(Appointment.status == "Confirmada")
+        else:
+            query = query.filter(Appointment.status == status)
+
+    appts = query.order_by(Appointment.date.asc(), Appointment.start_time.asc()).all()
+
+    items = []
+    tomorrow_count = 0
+    unconfirmed_count = 0
+
+    for a in appts:
+        p = a.patient
+        p_name = f"{p.first_name} {p.last_name}" if p else "Paciente"
+        p_doc = p.document_id if p else ""
+        p_phone = p.phone if p else ""
+        p_ins = p.insurance_name if p and p.insurance_name else "Privado / Particular"
+
+        if search:
+            s = search.lower().strip()
+            if s not in p_name.lower() and s not in (p_doc or "").lower() and s not in (p_phone or "").lower():
+                continue
+
+        if a.date == tomorrow:
+            tomorrow_count += 1
+        if a.status in ["Pendiente", "Sin Confirmar", None]:
+            unconfirmed_count += 1
+
+        items.append({
+            "id": a.id,
+            "patient_id": a.patient_id,
+            "patient_name": p_name,
+            "patient_document_id": p_doc,
+            "patient_phone": p_phone,
+            "insurance_name": p_ins,
+            "date": a.date.isoformat() if a.date else "",
+            "start_time": a.start_time.strftime("%I:%M %p") if a.start_time else "Por Definir",
+            "reason": a.reason or "Consulta General",
+            "status": a.status or "Pendiente",
+            "whatsapp_reminder_sent": bool(a.whatsapp_reminder_sent),
+            "whatsapp_reminder_sent_at": a.whatsapp_reminder_sent_at.isoformat() if a.whatsapp_reminder_sent_at else None,
+            "notes": a.notes or ""
+        })
+
+    return {
+        "success": True,
+        "count": len(items),
+        "tomorrow_count": tomorrow_count,
+        "unconfirmed_count": unconfirmed_count,
+        "appointments": items
+    }
+
+@router.post("/appointments/{appointment_id}/whatsapp-sent")
+def mark_appointment_whatsapp_sent(
+    appointment_id: int,
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+    appt.whatsapp_reminder_sent = True
+    appt.whatsapp_reminder_sent_at = datetime.utcnow()
+    db.commit()
+    return {"success": True, "appointment_id": appt.id, "whatsapp_reminder_sent": True}
+
+@router.post("/appointments/{appointment_id}/reschedule")
+def reschedule_appointment(
+    appointment_id: int,
+    payload: dict,
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+
+    new_date_str = payload.get("new_date")
+    new_time_str = payload.get("new_time")
+    if not new_date_str:
+        raise HTTPException(status_code=422, detail="Debe especificar la nueva fecha")
+
+    from datetime import datetime as dt
+    appt.date = dt.strptime(new_date_str, "%Y-%m-%d").date()
+    if new_time_str:
+        try:
+            appt.start_time = dt.strptime(new_time_str, "%H:%M").time()
+        except Exception:
+            pass
+    appt.status = "Reagendada"
+    appt.updated_at = datetime.utcnow()
+    db.commit()
+    return {"success": True, "appointment_id": appt.id, "new_date": str(appt.date), "status": appt.status}
+
 # --- Quick Appointment Create ---
 @router.post("/appointments/quick-create")
 def quick_create_appointment(
@@ -1698,6 +1827,215 @@ def get_mobile_reports_summary(
         },
         "pdf_export_url": f"/reports/export/secretary-daily-pdf?report_date={target_date.strftime('%Y-%m-%d')}"
     }
+
+
+# --- Mobile Consolidated Monthly Reports & Weekly Analysis ---
+@router.get("/reports/monthly")
+def get_mobile_reports_monthly(
+    month: Optional[str] = Query(None),
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Informe Mensual de Actividad Médica & Análisis Semanal para la App Móvil:
+    - Tipos de citas con conteo y % exacto.
+    - Gráfica interactiva de distribución por tipo de cita.
+    - Análisis semanal: qué día fue más fuerte (pico) y cuál más flojo.
+    - Gráfica de barras semanal por días (Lunes a Domingo).
+    """
+    import calendar
+    import re
+    from collections import Counter
+
+    MONTH_NAMES_ES = {
+        1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+        5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+        9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+    }
+    PALETTE = [
+        "#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#ec4899",
+        "#8b5cf6", "#3b82f6", "#14b8a6", "#f97316", "#64748b"
+    ]
+
+    appt_dates = db.query(Appointment.date).filter(Appointment.date != None).distinct().all()
+    months_set = set()
+    for (d,) in appt_dates:
+        if d:
+            months_set.add(d.strftime('%Y-%m'))
+
+    cons_dates = db.query(Consultation.created_at).filter(Consultation.created_at != None).distinct().all()
+    for (dt,) in cons_dates:
+        if dt:
+            months_set.add(dt.strftime('%Y-%m'))
+
+    available_months = sorted(list(months_set), reverse=True)
+    today = date.today()
+    current_month_str = today.strftime("%Y-%m")
+    if current_month_str not in available_months:
+        available_months.insert(0, current_month_str)
+
+    selected_month_str = (month or "").strip()
+    if not selected_month_str or not re.match(r"^\d{4}-\d{2}$", selected_month_str):
+        selected_month_str = current_month_str
+
+    try:
+        y_int, m_int = [int(p) for p in selected_month_str.split("-")]
+        if not (1 <= m_int <= 12):
+            y_int, m_int = today.year, today.month
+            selected_month_str = f"{y_int:04d}-{m_int:02d}"
+    except Exception:
+        y_int, m_int = today.year, today.month
+        selected_month_str = f"{y_int:04d}-{m_int:02d}"
+
+    month_name_es = f"{MONTH_NAMES_ES[m_int]} {y_int}"
+
+    if m_int == 1:
+        prev_month_str = f"{y_int - 1:04d}-12"
+    else:
+        prev_month_str = f"{y_int:04d}-{m_int - 1:02d}"
+
+    if m_int == 12:
+        next_month_str = f"{y_int + 1:04d}-01"
+    else:
+        next_month_str = f"{y_int:04d}-{m_int + 1:02d}"
+
+    _, last_day = calendar.monthrange(y_int, m_int)
+    start_dt = datetime(y_int, m_int, 1, 0, 0, 0)
+    end_dt = datetime(y_int, m_int, last_day, 23, 59, 59)
+    start_d = date(y_int, m_int, 1)
+    end_d = date(y_int, m_int, last_day)
+
+    setting = db.query(Setting).first()
+    currency = getattr(setting, "currency", "RD$") if setting else "RD$"
+
+    appts = db.query(Appointment).filter(
+        ((Appointment.date >= start_d) & (Appointment.date <= end_d)) |
+        ((Appointment.date == None) & (Appointment.created_at >= start_dt) & (Appointment.created_at <= end_dt))
+    ).all()
+    total_appointments = len(appts)
+
+    conss = db.query(Consultation).filter(
+        Consultation.created_at >= start_dt,
+        Consultation.created_at <= end_dt
+    ).all()
+    total_consultations = len(conss)
+
+    p_ids = {a.patient_id for a in appts if a.patient_id} | {c.patient_id for c in conss if c.patient_id}
+    unique_patients_count = len(p_ids)
+
+    payments = db.query(Payment).filter(
+        Payment.created_at >= start_dt,
+        Payment.created_at <= end_dt
+    ).all()
+    total_revenue = sum(float(p.total or 0.0) for p in payments if (p.status in ['paid', 'Completado'] or p.status is None))
+
+    type_counter = Counter()
+    for a in appts:
+        t = (a.reason or (a.service.name if a.service else "Consulta General")).strip()
+        type_counter[t] += 1
+
+    for c in conss:
+        if not c.appointment_id:
+            t = (c.reason or "Consulta Médica General").strip()
+            type_counter[t] += 1
+
+    total_activity = sum(type_counter.values())
+    types_breakdown = []
+    for idx, (t_name, count) in enumerate(type_counter.most_common()):
+        pct = round((count / max(total_activity, 1)) * 100, 1)
+        color = PALETTE[idx % len(PALETTE)]
+        types_breakdown.append({
+            "name": t_name,
+            "count": count,
+            "percentage": pct,
+            "color": color
+        })
+
+    types_chart_labels = [item["name"] for item in types_breakdown]
+    types_chart_data = [item["count"] for item in types_breakdown]
+    types_chart_colors = [item["color"] for item in types_breakdown]
+
+    day_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    day_names_short = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+    weekday_counts = [0] * 7
+
+    for a in appts:
+        d = a.date or (a.created_at.date() if a.created_at else None)
+        if d:
+            weekday_counts[d.weekday()] += 1
+
+    for c in conss:
+        if not c.appointment_id and c.created_at:
+            d = c.created_at.date()
+            weekday_counts[d.weekday()] += 1
+
+    total_week_events = sum(weekday_counts)
+
+    strongest_day = None
+    weakest_day = None
+    if total_week_events > 0:
+        max_c = max(weekday_counts)
+        max_idx = weekday_counts.index(max_c)
+        strongest_day = {
+            "name": day_names[max_idx],
+            "short_name": day_names_short[max_idx],
+            "count": max_c,
+            "percentage": round((max_c / total_week_events) * 100, 1)
+        }
+
+        min_c = min(weekday_counts)
+        min_idx = weekday_counts.index(min_c)
+        weakest_day = {
+            "name": day_names[min_idx],
+            "short_name": day_names_short[min_idx],
+            "count": min_c,
+            "percentage": round((min_c / total_week_events) * 100, 1)
+        }
+
+    weekly_breakdown = []
+    for i in range(7):
+        c_count = weekday_counts[i]
+        weekly_breakdown.append({
+            "name": day_names[i],
+            "short_name": day_names_short[i],
+            "count": c_count,
+            "percentage": round((c_count / max(total_week_events, 1)) * 100, 1),
+            "is_strongest": bool(strongest_day and day_names[i] == strongest_day["name"] and c_count > 0),
+            "is_weakest": bool(weakest_day and day_names[i] == weakest_day["name"])
+        })
+
+    return {
+        "selected_month": selected_month_str,
+        "month_name": month_name_es,
+        "available_months": available_months,
+        "prev_month": prev_month_str,
+        "next_month": next_month_str,
+        "currency": currency,
+        "summary": {
+            "total_appointments": total_appointments,
+            "total_consultations": total_consultations,
+            "unique_patients_count": unique_patients_count,
+            "total_revenue": round(total_revenue, 2),
+            "total_activity": total_activity
+        },
+        "types_breakdown": types_breakdown,
+        "types_chart": {
+            "labels": types_chart_labels,
+            "data": types_chart_data,
+            "colors": types_chart_colors
+        },
+        "weekly_analysis": {
+            "total_events": total_week_events,
+            "strongest_day": strongest_day,
+            "weakest_day": weakest_day,
+            "weekly_breakdown": weekly_breakdown,
+            "chart": {
+                "labels": day_names_short,
+                "data": weekday_counts
+            }
+        }
+    }
+
 
 # --- Catálogo de Servicios para la App Móvil (Talonario 1-Clic) ---
 @router.get("/services")

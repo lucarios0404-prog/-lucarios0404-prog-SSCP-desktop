@@ -80,6 +80,7 @@ def build_targets(v: dict):
         (DESKTOP / "installer.nsi", r'(!define PRODUCT_VERSION ")[^"]+(")', rf'\g<1>{v["suite"]}\g<2>'),
         (WORKSPACE / "sscp-mobile" / "app" / "build.gradle", r'(versionCode\s+)\d+', rf'\g<1>{v["apk_code"]}'),
         (WORKSPACE / "sscp-mobile" / "app" / "build.gradle", r'(versionName\s+")[^"]+(")', rf'\g<1>{v["apk"]}\g<2>'),
+        (WORKSPACE / "sscp-mobile" / "app" / "src" / "main" / "java" / "com" / "sscp" / "mobile" / "MainActivity.java", r'(assets/www/index\.html\?v=)[^"]+(")', rf'\g<1>{v["apk"]}\g<2>'),
     ]
     originals, contents = {}, {}
     for path, pattern, replacement in edits:
@@ -90,9 +91,14 @@ def build_targets(v: dict):
             raise SystemExit(f"[ERROR] patron no encontrado en {path}: {pattern}")
     targets += [(path, originals[path], contents[path]) for path in originals]
 
-    # mobile/index.html: fuente única en sscp-mobile, reflejada en desktop
+    # mobile/index.html: fuente única en sscp-mobile, reflejada en desktop y sscp
     mobile_master = WORKSPACE / "sscp-mobile" / "app" / "src" / "main" / "assets" / "www" / "index.html"
-    desktop_replica = DESKTOP / "app" / "templates" / "mobile" / "index.html"
+    replicas = [
+        DESKTOP / "app" / "templates" / "mobile" / "index.html",
+        WORKSPACE / "sscp" / "public" / "mobile" / "index.html",
+        WORKSPACE / "sscp" / "resources" / "views" / "pwa" / "index.blade.php",
+        WORKSPACE / "sscp" / "resources" / "views" / "mobile" / "index.blade.php",
+    ]
     if mobile_master.exists():
         mm_orig = read_raw(mobile_master)
         mm_new = re.sub(
@@ -101,7 +107,8 @@ def build_targets(v: dict):
             mm_orig
         )
         targets.append((mobile_master, mm_orig, mm_new))
-        targets.append((desktop_replica, read_raw(desktop_replica) if desktop_replica.exists() else None, mm_new))
+        for rep in replicas:
+            targets.append((rep, read_raw(rep) if rep.exists() else None, mm_new))
 
     return targets
 
