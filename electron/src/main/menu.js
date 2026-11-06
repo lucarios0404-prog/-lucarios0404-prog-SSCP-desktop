@@ -133,6 +133,26 @@ function buildAppMenu(mainWindow, baseUrl, getAppIcon) {
         },
         { type: 'separator' },
         {
+          label: 'Garantías de Seguridad & Privacidad Clínica...',
+          accelerator: 'CmdOrCtrl+Alt+S',
+          click: () => {
+            dialog.showMessageBox(mainWindow, {
+              type: 'info',
+              title: 'Centro de Confianza & Privacidad Clínica — Laxarus',
+              message: 'SSCP Desktop: Soberanía de Datos y Protección Médica',
+              detail: `• Soberanía Local-First: La base de datos SQLite WAL se almacena localmente en su consultorio. Ningún dato clínico se envía a nubes públicas sin su autorización explícita.\n\n• Enlace P2P Doctor-Secretaría: Canales autenticados con tokens criptográficos (X-Peer-Key) y soporte de túnel WireGuard/Tailscale.\n\n• Licenciamiento Ed25519: Validación criptográfica autónoma sin telemetría de monitoreo.\n\n• Cumplimiento Sanitario: Alineado con la Ley No. 42-01 (General de Salud RD), Ley No. 172-13 de Protección de Datos Personales y directrices HIPAA.\n\n• Binario Certificado: Firmado digitalmente por Laxarus Developers con SHA-256.\n\nSoporte y Respuesta a Incidentes: seguridad@laxarusdevs.com`,
+              buttons: ['Visitar Portal Web', 'Entendido'],
+              defaultId: 1
+            }).then(({ response }) => {
+              if (response === 0) {
+                const { shell } = require('electron');
+                shell.openExternal('https://laxarusdevs.com/seguridad.html');
+              }
+            }).catch(() => {});
+          }
+        },
+        { type: 'separator' },
+        {
           label: 'Acerca de SSCP Desktop (Electron)',
           click: () => {
             dialog.showMessageBox(mainWindow, {

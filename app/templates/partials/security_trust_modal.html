@@ -1,0 +1,91 @@
+<!-- MODAL DE CONFIANZA, SEGURIDAD & PRIVACIDAD CLÍNICA LAXARUS -->
+<div id="modal-security-trust" class="hidden fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden transform transition-all">
+        <!-- Header -->
+        <div class="px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between shrink-0">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-xl shadow-inner">
+                    <i class="fas fa-shield-halved"></i>
+                </div>
+                <div>
+                    <h3 class="font-extrabold text-base leading-tight">Centro de Confianza & Seguridad</h3>
+                    <p class="text-xs text-emerald-100">Soberanía de Datos Clínicos • SSCP Desktop</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeSecurityTrustModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm transition font-bold">
+                &times;
+            </button>
+        </div>
+
+        <!-- Body Scrollable -->
+        <div class="p-6 overflow-y-auto space-y-4 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+            <!-- Pilar 1 -->
+            <div class="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-start space-x-3.5">
+                <span class="text-2xl shrink-0">🏛️</span>
+                <div>
+                    <strong class="text-emerald-950 dark:text-emerald-300 block font-bold text-sm mb-0.5">Soberanía de Datos Local-First</strong>
+                    <span>Tu base de datos SQLite WAL se encuentra físicamente en el disco de tu consultorio. Tus historias clínicas no se cargan a nubes públicas sin tu autorización explícita. Funciona 100% desconectado de internet.</span>
+                </div>
+            </div>
+
+            <!-- Pilar 2 -->
+            <div class="p-3.5 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 rounded-2xl flex items-start space-x-3.5">
+                <span class="text-2xl shrink-0">🔐</span>
+                <div>
+                    <strong class="text-sky-950 dark:text-sky-300 block font-bold text-sm mb-0.5">Enlace P2P Doctor-Secretaría Cifrado</strong>
+                    <span>La comunicación entre consultorio y recepción está asegurada con tokens criptográficos (X-Peer-Key) y soporte nativo para túneles privados WireGuard / Tailscale de extremo a extremo.</span>
+                </div>
+            </div>
+
+            <!-- Pilar 3 -->
+            <div class="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl flex items-start space-x-3.5">
+                <span class="text-2xl shrink-0">⚖️</span>
+                <div>
+                    <strong class="text-amber-950 dark:text-amber-300 block font-bold text-sm mb-0.5">Cumplimiento Sanitario y Protección Legal</strong>
+                    <span>Diseñado bajo la Ley General de Salud No. 42-01 (secreto profesional médico), Ley No. 172-13 de Protección de Datos Personales (RD) y directrices de seguridad HIPAA.</span>
+                </div>
+            </div>
+
+            <!-- Pilar 4 -->
+            <div class="p-3.5 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-2xl flex items-start space-x-3.5">
+                <span class="text-2xl shrink-0">📜</span>
+                <div>
+                    <strong class="text-purple-950 dark:text-purple-300 block font-bold text-sm mb-0.5">Software Firmado & Licencia Offline Ed25519</strong>
+                    <span>Binarios firmados digitalmente con SHA-256 por Laxarus Developers. Validación de licencia autónoma local sin rastreadores, publicidad ni telemetría invasiva.</span>
+                </div>
+            </div>
+
+            <!-- Recetas QR -->
+            <div class="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl text-[11px]">
+                <div class="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-200 mb-1">
+                    <i class="fas fa-qrcode text-emerald-600"></i>
+                    <span>Recetas Médicas Infalsificables:</span>
+                </div>
+                <p>Las recetas generadas en PDF incluyen código QR criptográfico para validación inmediata de autenticidad en farmacias y aseguradoras.</p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+            <a href="https://laxarusdevs.com/seguridad.html" target="_blank" class="text-xs font-bold text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 flex items-center gap-1.5 transition">
+                <i class="fas fa-external-link-alt text-[10px]"></i>
+                <span>Ver Portal Web Laxarus</span>
+            </a>
+            <button type="button" onclick="closeSecurityTrustModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs transition shadow-xs">
+                Entendido
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function openSecurityTrustModal() {
+    const m = document.getElementById('modal-security-trust');
+    if (m) m.classList.remove('hidden');
+}
+
+function closeSecurityTrustModal() {
+    const m = document.getElementById('modal-security-trust');
+    if (m) m.classList.add('hidden');
+}
+</script>
