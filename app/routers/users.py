@@ -94,6 +94,25 @@ def create_user_submit(
 ):
     """Procesar alta de nuevo usuario con rol y delimitación de permisos."""
     clean_email = email.strip().lower()
+    valid_roles = ("admin", "doctor", "secretaria")
+    if role not in valid_roles:
+        raise HTTPException(status_code=400, detail="Rol de usuario inválido.")
+    if role == "admin" and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo un Administrador General puede crear cuentas Administrador.")
+    if not password or len(password.strip()) < 6:
+        return templates.TemplateResponse(
+            request=request,
+            name="users/create.html",
+            context={
+                "user": current_user,
+                "available_permissions": get_available_permissions(db),
+                "default_permissions_json": json.dumps(DEFAULT_ROLE_PERMISSIONS),
+                "role_labels": ROLE_LABELS,
+                "error": "La contraseña debe tener al menos 6 caracteres."
+            },
+            status_code=400
+        )
+
     existing = db.query(User).filter(User.email == clean_email).first()
     if existing:
         return templates.TemplateResponse(
@@ -195,6 +214,15 @@ def edit_user_submit(
     if not target_user:
         return RedirectResponse(url="/users?error=usuario_no_encontrado", status_code=status.HTTP_303_SEE_OTHER)
 
+    valid_roles = ("admin", "doctor", "secretaria")
+    if role not in valid_roles:
+        return RedirectResponse(url=f"/users/{user_id}/edit?error=rol_invalido", status_code=status.HTTP_303_SEE_OTHER)
+    if (target_user.role == "admin" or role == "admin") and current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo un Administrador General puede modificar o asignar el rol Administrador."
+        )
+
     clean_email = email.strip().lower()
     # Verificar colisión de correo con otro usuario
     existing_other = db.query(User).filter(User.email == clean_email, User.id != user_id).first()
@@ -213,6 +241,8 @@ def edit_user_submit(
 
     # Contraseña opcional al editar
     if password and password.strip():
+        if len(password.strip()) < 6:
+            return RedirectResponse(url=f"/users/{user_id}/edit?error=password_corta", status_code=status.HTTP_303_SEE_OTHER)
         target_user.hashed_password = get_password_hash(password.strip())
 
     # Control de delimitación de permisos
@@ -246,6 +276,11 @@ def delete_user(
 
     target_user = db.query(User).filter(User.id == user_id).first()
     if target_user:
+        if target_user.role == "admin" and current_user.role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo un Administrador General puede eliminar una cuenta Administrador."
+            )
         db.delete(target_user)
         db.commit()
         return RedirectResponse(url="/users?success=eliminado", status_code=status.HTTP_303_SEE_OTHER)

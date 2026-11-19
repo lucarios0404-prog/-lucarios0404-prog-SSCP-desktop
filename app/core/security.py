@@ -1,4 +1,4 @@
-from passlib.context import CryptContext
+import bcrypt
 from datetime import datetime, timedelta
 from jose import jwt
 import os
@@ -36,13 +36,21 @@ SECRET_KEY = _get_or_create_secret_key()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 7 días
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+def _normalize_password_bytes(password: str | bytes) -> bytes:
+    raw = password if isinstance(password, bytes) else str(password or "").encode("utf-8")
+    return raw[:72]
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain_password, hashed_password) -> bool:
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        hashed_bytes = hashed_password if isinstance(hashed_password, bytes) else str(hashed_password).encode("utf-8")
+        return bcrypt.checkpw(_normalize_password_bytes(plain_password), hashed_bytes)
+    except Exception:
+        return False
 
-def get_password_hash(password):
-    return pwd_context.hash(password)
+def get_password_hash(password) -> str:
+    return bcrypt.hashpw(_normalize_password_bytes(password), bcrypt.gensalt()).decode("utf-8")
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()

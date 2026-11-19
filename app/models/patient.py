@@ -37,6 +37,27 @@ class Patient(Base):
     sede_origen = Column(String, default="local")
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     doctor = relationship("User", foreign_keys=[doctor_id], backref="patients")
+
+    @property
+    def birth_date(self):
+        return self.date_of_birth
+
+    @property
+    def mobile(self):
+        return self.phone
+
+    @property
+    def age(self):
+        if not self.date_of_birth:
+            return None
+        from datetime import date
+        today = date.today()
+        dob = self.date_of_birth
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+    @property
+    def chronic_conditions(self):
+        return "Ninguna"

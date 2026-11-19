@@ -11,7 +11,7 @@ from app.models.appointment import Appointment
 from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.service import Service
-from app.core.deps import require_current_user
+from app.core.deps import require_current_user, require_permission
 from app.core.templates import templates
 from app.routers.payments import generate_receipt_number
 
@@ -156,8 +156,9 @@ def reception_billing(
     month: Optional[int] = Query(None),
     token: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('payments'))
 ):
+    from app.routers.patients import resolve_current_doctor_id
     now = datetime.now()
     target_year = year or now.year
     target_month = month or now.month
@@ -170,17 +171,17 @@ def reception_billing(
     # Meses disponibles para el selector
     months_options = [{"num": i + 1, "name": SPANISH_MONTHS[i].lower()} for i in range(12)]
 
+    doc_id = resolve_current_doctor_id(db, current_user)
     # Consultar pagos del mes seleccionado
     query = db.query(Payment).filter(
         extract('year', Payment.created_at) == target_year,
         extract('month', Payment.created_at) == target_month
     )
+    if doc_id:
+        query = query.join(Patient, Payment.patient_id == Patient.id).filter(
+            or_(Patient.doctor_id == doc_id, Patient.doctor_id.is_(None))
+        )
     payments = query.order_by(Payment.created_at.desc()).all()
-
-    # Si no hay pagos para este mes específico, mostramos los últimos pagos generales
-    # para que la demo no esté vacía
-    if not payments:
-        payments = db.query(Payment).order_by(Payment.created_at.desc()).limit(50).all()
 
     # Separar en Pagados y No Pagados (Pendientes)
     paid_items = []
@@ -291,6 +292,8 @@ def update_appointment_status(
         return JSONResponse({"success": False, "error": "Cita no encontrada"}, status_code=404)
 
     appt.status = status
+    if status in ["Pendiente", "Cancelada", "canceled", "cancelled"]:
+        appt.queue_number = None
     appt.updated_at = datetime.utcnow()
     db.commit()
 
@@ -317,17 +320,32 @@ def quick_create_appointment(
     except Exception as e:
         return JSONResponse({"success": False, "error": f"Formato inválido: {e}"}, status_code=400)
 
-    # Turno siguiente del día
-    max_q = db.query(func.max(Appointment.queue_number)).filter(Appointment.date == appt_date).scalar() or 0
-    next_q = int(max_q) + 1
+    from app.routers.appointments import find_same_day_appointment
+    existing_same_day = find_same_day_appointment(db, patient_id, appt_date)
+    if existing_same_day:
+        time_disp = existing_same_day.start_time.strftime("%I:%M %p") if existing_same_day.start_time else ""
+        return JSONResponse({
+            "success": False,
+            "error": f"El paciente ya tiene una cita activa para el {appt_date.strftime('%d/%m/%Y')}{(' a las ' + time_disp) if time_disp else ''} ({existing_same_day.status}). No se permiten citas duplicadas el mismo día."
+        }, status_code=409)
+
+    # Turno siguiente del día (solo si es para hoy)
+    from app.routers.patients import resolve_current_doctor_id
+    doc_id = resolve_current_doctor_id(db, current_user) or current_user.id
+    is_today = (appt_date == date.today())
+    target_status = "En Espera" if is_today else "Pendiente"
+    next_q = None
+    if target_status == "En Espera":
+        max_q = db.query(func.max(Appointment.queue_number)).filter(Appointment.date == appt_date).scalar() or 0
+        next_q = int(max_q) + 1
 
     new_appt = Appointment(
         patient_id=patient_id,
-        doctor_id=current_user.id,
+        doctor_id=doc_id,
         date=appt_date,
         start_time=appt_time,
         reason=reason,
-        status="Pendiente",
+        status=target_status,
         price=price or 0.0,
         queue_number=next_q
     )
@@ -363,8 +381,10 @@ def quick_create_payment(
     amount: float = Form(...),
     status: str = Form("paid"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('payments'))
 ):
+    if amount is None or amount <= 0:
+        return JSONResponse({"success": False, "error": "El monto debe ser mayor a 0."}, status_code=400)
     p = db.query(Patient).filter(Patient.id == patient_id).first()
     payment = Payment(
         patient_id=patient_id,

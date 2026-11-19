@@ -368,11 +368,8 @@ class RelayService:
                     pid = appt_obj.patient_id
 
             if not pid or not db.query(Patient).filter(Patient.id == pid).first():
-                p_match = db.query(Patient).first()
-                if p_match:
-                    pid = p_match.id
-                else:
-                    continue
+                print(f"[Relay Reconcile] Pago huérfano omitido: patient_id={pid}, receipt={pay_item.get('receipt_number')}")
+                continue
 
             amt = float(pay_item.get("amount") or pay_item.get("total") or 0.0)
             receipt = pay_item.get("receipt_number") or generate_receipt_number()

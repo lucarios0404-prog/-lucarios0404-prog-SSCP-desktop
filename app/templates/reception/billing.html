@@ -185,7 +185,7 @@
                 <select name="patient_id" required class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none">
                     <option value="">-- Seleccionar Paciente --</option>
                     {% for p in patients %}
-                    <option value="{{ p.id }}">{{ p.first_name }} {{ p.last_name }} {% if p.cedula %}({{ p.cedula }}){% endif %}</option>
+                    <option value="{{ p.id }}">{{ p.first_name }} {{ p.last_name }} {% if p.document_id %}({{ p.document_id }}){% endif %}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -204,7 +204,7 @@
 
             <div>
                 <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Monto (RD$) *</label>
-                <input type="number" step="50" name="amount" required placeholder="Ej: 1500" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base font-bold text-slate-800 focus:ring-2 focus:ring-sky-500">
+                <input type="number" step="50" min="1" name="amount" required placeholder="Ej: 1500" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base font-bold text-slate-800 focus:ring-2 focus:ring-sky-500">
             </div>
 
             <div>

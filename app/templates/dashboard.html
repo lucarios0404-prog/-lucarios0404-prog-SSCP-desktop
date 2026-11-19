@@ -139,6 +139,12 @@
                                         <i class="fas fa-clock mr-1 text-[10px]"></i> En espera
                                     </span>
                                     {% endif %}
+                                    <button type="button"
+                                       onclick="openDesktopRemoveQueueModal({{ wp.id }}, '{{ (wp.patient.first_name ~ ' ' ~ wp.patient.last_name)|e }}')"
+                                       class="inline-flex items-center px-2 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs border border-rose-200 transition-all"
+                                       title="Sacar paciente de la sala de espera o anular cita por error">
+                                        <i class="fas fa-user-minus text-[10px]"></i>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -359,5 +365,74 @@
             alert('Error de conexión al cerrar la jornada: ' + err.message);
         }
     }
+
+    let pendingRemoveApptId = null;
+    function openDesktopRemoveQueueModal(apptId, patientName) {
+        pendingRemoveApptId = apptId;
+        const nameEl = document.getElementById('desktop-remove-queue-name');
+        if (nameEl) nameEl.textContent = patientName || 'este paciente';
+        document.getElementById('desktop-remove-queue-modal')?.classList.remove('hidden');
+    }
+
+    function closeDesktopRemoveQueueModal() {
+        pendingRemoveApptId = null;
+        document.getElementById('desktop-remove-queue-modal')?.classList.add('hidden');
+    }
+
+    async function executeDesktopRemoveQueue(mode) {
+        if (!pendingRemoveApptId) return;
+        const formData = new FormData();
+        formData.append('mode', mode);
+        try {
+            const resp = await fetch(`/appointments/${pendingRemoveApptId}/remove-from-queue`, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' },
+                body: formData
+            });
+            const res = await resp.json();
+            closeDesktopRemoveQueueModal();
+            if (resp.ok && res.success) {
+                window.location.reload();
+            } else {
+                alert('No se pudo sacar de la fila: ' + (res.detail || res.message || 'Error'));
+            }
+        } catch (err) {
+            alert('Error de conexión: ' + err.message);
+        }
+    }
 </script>
+
+<!-- Modal Sacar Paciente de Sala de Espera -->
+<div id="desktop-remove-queue-modal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                    <i class="fas fa-user-minus text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">Sacar de Sala de Espera</h3>
+                    <p class="text-xs text-slate-500">Paciente: <strong id="desktop-remove-queue-name" class="text-slate-800"></strong></p>
+                </div>
+            </div>
+            <button type="button" onclick="closeDesktopRemoveQueueModal()" class="text-slate-400 hover:text-slate-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <p class="text-xs text-slate-600 leading-relaxed">
+            ¿Deseas solo quitarlo de la fila dejando su cita pendiente para hoy, o anular completamente la cita porque se creó por error?
+        </p>
+        <div class="space-y-2.5 pt-1">
+            <button type="button" onclick="executeDesktopRemoveQueue('unqueue')" class="w-full py-2.5 px-4 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold rounded-xl text-xs transition flex items-center justify-center gap-2">
+                <i class="fas fa-undo"></i> Solo sacar de la fila (Dejar Pendiente hoy)
+            </button>
+            <button type="button" onclick="executeDesktopRemoveQueue('cancel')" class="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm">
+                <i class="fas fa-ban"></i> Anular cita creada por error (Quitar de hoy)
+            </button>
+            <button type="button" onclick="closeDesktopRemoveQueueModal()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition">
+                Cancelar
+            </button>
+        </div>
+    </div>
+</div>
 {% endblock %}

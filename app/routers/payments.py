@@ -15,11 +15,32 @@ from app.models.payment import Payment
 from app.models.patient import Patient
 from app.models.appointment import Appointment
 from app.models.service import Service
-from app.core.deps import require_current_user
+from app.core.deps import require_permission
 from app.core.templates import templates
 from app.services.ars_service import get_all_ars
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+
+PAID_PAYMENT_STATUSES = ("paid", "completado", "pagado")
+
+def is_paid_payment(status: Optional[str]) -> bool:
+    return (status or "").strip().lower() in PAID_PAYMENT_STATUSES
+
+def normalize_payment_method(method: Optional[str]) -> str:
+    m = (method or "").strip().lower()
+    if m in ("cash", "efectivo"):
+        return "cash"
+    if m in ("card", "tarjeta", "credito", "crédito", "debito", "débito"):
+        return "card"
+    if m in ("transfer", "transferencia"):
+        return "transfer"
+    if m in ("insurance", "seguro", "seguro médico", "seguro medico", "ars"):
+        return "insurance"
+    if m in ("copay", "copago", "copago ars"):
+        return "copay"
+    if m == "pendiente":
+        return "Pendiente"
+    return "cash"
 
 def generate_receipt_number():
     random_chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -32,7 +53,7 @@ def list_payments(
     date_filter: str = Query("all"),
     custom_date: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('payments'))
 ):
     today = date.today()
     today_str = today.strftime("%Y-%m-%d")
@@ -44,13 +65,14 @@ def list_payments(
         Payment.created_at >= start_today,
         Payment.created_at <= end_today
     ).all()
-    total_cobrado_hoy = sum(p.total for p in today_records if p.status == "paid")
-    total_cobrado_hoy_count = sum(1 for p in today_records if p.status == "paid")
+    paid_today = [p for p in today_records if is_paid_payment(p.status)]
+    total_cobrado_hoy = sum(p.total for p in paid_today)
+    total_cobrado_hoy_count = len(paid_today)
     breakdown_hoy = {
-        "cash": sum(p.total for p in today_records if p.status == "paid" and p.payment_method == "cash"),
-        "card": sum(p.total for p in today_records if p.status == "paid" and p.payment_method == "card"),
-        "transfer": sum(p.total for p in today_records if p.status == "paid" and p.payment_method == "transfer"),
-        "insurance": sum(p.total for p in today_records if p.status == "paid" and p.payment_method == "insurance"),
+        "cash": sum(p.total for p in paid_today if normalize_payment_method(p.payment_method) == "cash"),
+        "card": sum(p.total for p in paid_today if normalize_payment_method(p.payment_method) == "card"),
+        "transfer": sum(p.total for p in paid_today if normalize_payment_method(p.payment_method) == "transfer"),
+        "insurance": sum(p.total for p in paid_today if normalize_payment_method(p.payment_method) in ("insurance", "copay")),
     }
 
     # 2. Filtrado de la lista principal
@@ -102,8 +124,8 @@ def list_payments(
     payments = query.all()
     
     # Calcular totales del período filtrado
-    total_cobrado = sum(p.total for p in payments if p.status == "paid")
-    total_pendiente = sum(p.total for p in payments if p.status == "pending")
+    total_cobrado = sum(p.total for p in payments if is_paid_payment(p.status))
+    total_pendiente = sum(p.total for p in payments if not is_paid_payment(p.status))
 
     # 3. Agrupación y división por días
     from collections import OrderedDict
@@ -128,9 +150,9 @@ def list_payments(
                 "count": 0
             }
         payments_by_day[p_key]["records"].append(p)
-        if p.status == "paid":
+        if is_paid_payment(p.status):
             payments_by_day[p_key]["day_paid"] += p.total
-        elif p.status == "pending":
+        else:
             payments_by_day[p_key]["day_pending"] += p.total
         payments_by_day[p_key]["count"] += 1
     
@@ -182,7 +204,7 @@ def create_payment_form(
     appointment_id: Optional[int] = Query(None),
     service_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('payments'))
 ):
     # Si viene appointment_id pero no patient_id, obtener patient_id y posible service_id de la cita
     if appointment_id:
@@ -236,7 +258,7 @@ def create_payment(
     receipt_number: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('payments'))
 ):
     if not receipt_number:
         receipt_number = generate_receipt_number()
@@ -255,7 +277,10 @@ def create_payment(
 
     disc = float(discount or 0.0)
     base_amount = float(amount or 0.0)
+    if base_amount <= 0 or disc < 0 or disc > base_amount:
+        raise HTTPException(status_code=400, detail="Monto o descuento inválido. El monto debe ser mayor a 0 y el descuento no puede superar el monto.")
     total = max(0.0, base_amount - disc)
+    canonical_method = normalize_payment_method(payment_method) if status != "pending" else "Pendiente"
 
     appt_id = appointment_id if appointment_id and appointment_id > 0 else None
     if not appt_id:
@@ -277,10 +302,11 @@ def create_payment(
         amount=base_amount,
         discount=disc,
         total=total,
-        payment_method=payment_method,
+        payment_method=canonical_method,
         status=status,
         receipt_number=receipt_number,
         notes=notes,
+        created_at=datetime.now(),
         created_by_id=current_user.id,
     )
     db.add(new_payment)
@@ -290,13 +316,18 @@ def create_payment(
 @router.post("/{payment_id}/pay")
 def mark_payment_paid(
     payment_id: int,
+    payment_method: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('payments'))
 ):
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Pago no encontrado.")
     payment.status = "paid"
+    if payment_method and payment_method.strip():
+        payment.payment_method = normalize_payment_method(payment_method)
+    elif (payment.payment_method or "").strip().lower() in ("", "pendiente"):
+        payment.payment_method = "cash"
     payment.updated_at = datetime.utcnow()
     db.commit()
     return RedirectResponse(url="/payments", status_code=303)

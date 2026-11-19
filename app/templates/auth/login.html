@@ -79,6 +79,7 @@
             </div>
         </form>
 
+        {% if show_setup_link %}
         <div class="pt-5 border-t border-slate-100 text-center space-y-2">
             <p class="text-xs text-slate-500">
                 ¿Es la primera vez en este equipo o necesitas otro perfil?
@@ -87,6 +88,7 @@
                 <i class="fas fa-user-plus mr-1.5"></i> Configurar Perfil de este Equipo (Médico o Secretaría)
             </a>
         </div>
+        {% endif %}
 
         <!-- Trust & Security Assurance Badge in Desktop Login -->
         <div class="pt-3 border-t border-slate-100 text-center">
@@ -115,53 +117,30 @@ function togglePasswordVisibility(inputId, iconId) {
     }
 }
 
-// UTF-8 safe Base64 encoder/decoder for localStorage
-function encodeCred(str) {
-    try {
-        return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
-            return String.fromCharCode('0x' + p1);
-        }));
-    } catch (e) {
-        return '';
-    }
-}
-
-function decodeCred(str) {
-    try {
-        return decodeURIComponent(Array.prototype.map.call(atob(str), function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-    } catch (e) {
-        return '';
-    }
-}
-
 document.addEventListener('DOMContentLoaded', function() {
     const userInp = document.getElementById('username');
-    const passInp = document.getElementById('password');
     const remChk = document.getElementById('remember_me');
     const form = document.getElementById('loginForm');
 
-    // Cargar credenciales guardadas si existe preferencia
+    // Purgar cualquier contraseña heredada en localStorage (solo se recuerda el correo)
+    try { localStorage.removeItem('sscp_saved_pass'); } catch (e) {}
+
     const isRemembered = localStorage.getItem('sscp_remember_credentials') === 'true';
     if (isRemembered) {
         remChk.checked = true;
         const savedUser = localStorage.getItem('sscp_saved_user');
-        const savedPass = localStorage.getItem('sscp_saved_pass');
         if (savedUser) userInp.value = savedUser;
-        if (savedPass) passInp.value = decodeCred(savedPass);
     }
 
     if (form) {
         form.addEventListener('submit', function() {
+            try { localStorage.removeItem('sscp_saved_pass'); } catch (e) {}
             if (remChk.checked) {
                 localStorage.setItem('sscp_remember_credentials', 'true');
                 localStorage.setItem('sscp_saved_user', userInp.value.trim());
-                localStorage.setItem('sscp_saved_pass', encodeCred(passInp.value));
             } else {
                 localStorage.removeItem('sscp_remember_credentials');
                 localStorage.removeItem('sscp_saved_user');
-                localStorage.removeItem('sscp_saved_pass');
             }
         });
     }

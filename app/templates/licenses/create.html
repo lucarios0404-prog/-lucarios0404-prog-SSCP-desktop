@@ -173,11 +173,14 @@
 <script>
 function calculateEndDate() {
     const startVal = document.getElementById('start_date').value;
-    const days = parseInt(document.getElementById('days_rest').value) || 1;
-    if (!startVal) return;
-    const sDate = new Date(startVal);
-    sDate.setDate(sDate.getDate() + (days - 1));
-    document.getElementById('end_date').value = sDate.toISOString().split('T')[0];
+    const days = parseInt(document.getElementById('days_rest').value, 10) || 1;
+    if (!startVal || !startVal.includes('-')) return;
+    const parts = startVal.split('-').map(Number);
+    const localDate = new Date(parts[0], parts[1] - 1, parts[2] + (days - 1));
+    const y = localDate.getFullYear();
+    const m = String(localDate.getMonth() + 1).padStart(2, '0');
+    const d = String(localDate.getDate()).padStart(2, '0');
+    document.getElementById('end_date').value = `${y}-${m}-${d}`;
 }
 
 function applyLicenseTemplate(selectEl) {

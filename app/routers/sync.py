@@ -1,19 +1,57 @@
-from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query, Body
+from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query, Body, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from pathlib import Path
 from datetime import datetime
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
+import hmac
+import ipaddress
 import json
 
 from app.database import get_db
 from app.models.setting import Setting
-from app.core.deps import require_admin, require_permission
+from app.core.deps import get_current_user, require_admin, require_permission
 from app.services.sync_service import SyncService
+from app.services.supabase_sync_service import hash_station_secret
 
 router = APIRouter(prefix="/sync", tags=["sync"])
 from app.core.templates import templates
+
+
+def _is_safe_peer_url(raw_url: str) -> bool:
+    try:
+        parsed = urlparse((raw_url or "").strip())
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return False
+        host = parsed.hostname.lower()
+        if host in ("localhost", "127.0.0.1", "::1"):
+            return True
+        try:
+            ip = ipaddress.ip_address(host)
+            if ip.is_link_local:
+                return False
+            return ip.is_private or str(ip).startswith("100.")
+        except ValueError:
+            return host.endswith(".local") or host.endswith(".ts.net") or "." not in host
+    except Exception:
+        return False
+
+
+def require_peer_or_sync(request: Request, db: Session = Depends(get_db)):
+    peer_key = request.headers.get("X-Peer-Key", "").strip()
+    if peer_key:
+        setting = db.query(Setting).first()
+        sec = getattr(setting, "station_secret", None) if setting else None
+        if sec and (hmac.compare_digest(peer_key, sec) or hmac.compare_digest(peer_key, hash_station_secret(sec))):
+            return None
+    current_user = get_current_user(request, db)
+    if current_user and current_user.is_active and current_user.has_permission("sync"):
+        return current_user
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Autenticación o clave X-Peer-Key requerida para sincronización P2P.",
+    )
 
 def _sync_redirect(msg: str, msg_type: str = "info") -> RedirectResponse:
     query = urlencode({"msg": msg or "", "type": msg_type or "info"})
@@ -131,7 +169,8 @@ def peer_station_status(db: Session = Depends(get_db)):
 @router.get("/peer/ping")
 async def ping_peer_station(
     peer_url: str = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("sync")),
 ):
     """
     Comprueba conectividad con la estación par vía HTTP.
@@ -140,6 +179,8 @@ async def ping_peer_station(
     target_url = (peer_url or (setting.central_station_url if setting else None) or "").strip()
     if not target_url:
         return JSONResponse(status_code=400, content={"online": False, "message": "No se ha configurado la dirección URL de la estación par."})
+    if not _is_safe_peer_url(target_url):
+        return JSONResponse(status_code=400, content={"online": False, "message": "URL de estación par no permitida (solo red local o Tailscale)."})
 
     import httpx
     clean_target = target_url.rstrip("/")
@@ -172,7 +213,8 @@ async def ping_peer_station(
 @router.get("/peer/delta")
 def export_peer_delta(
     since: str = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth = Depends(require_peer_or_sync),
 ):
     """
     Exporta delta de cambios para la estación par.
@@ -183,7 +225,8 @@ def export_peer_delta(
 @router.post("/peer/import")
 def import_peer_delta(
     package: dict = Body(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth = Depends(require_peer_or_sync),
 ):
     """
     Recibe y reconcilia registros enviados por la otra estación sin sobrescritura destructiva.

@@ -88,7 +88,7 @@ def test_permissions_add_remove_and_reset():
         db.refresh(doc)
         assert doc.permissions is None, "Doctor permissions should be None after reset to defaults"
         assert doc.has_permission('reports') is True, "Doctor should have reports restored by defaults"
-        assert doc.has_permission('payments') is False, "Doctor should not have payments in defaults"
+        assert doc.has_permission('payments') is True, "Doctor should have payments restored by defaults"
 
         # 5. Implicit custom detection: user submits modified checkboxes without explicitly checking use_custom_perms
         doc.permissions = None

@@ -111,6 +111,7 @@
                 <!-- Clinical Content -->
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
                     <!-- Motivo -->
+                    {% if user.has_permission('consultations') %}
                     <div>
                         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Motivo de Consulta</h3>
                         <p class="mt-1.5 text-base font-semibold text-slate-900 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
@@ -176,6 +177,7 @@
                             {{ consultation.notes }}
                         </div>
                     </div>
+                    {% endif %}
                     {% endif %}
                 </div>
 

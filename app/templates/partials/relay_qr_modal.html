@@ -8,8 +8,8 @@
                     <i class="fas fa-qrcode"></i>
                 </div>
                 <div>
-                    <h3 class="font-bold text-base leading-tight">Enlazar Tablet / Móvil</h3>
-                    <p class="text-xs text-sky-100 font-medium mt-0.5">Buzón Cloud Relay por Internet</p>
+                    <h3 class="font-bold text-base leading-tight">Enlazar Celular / Tablet</h3>
+                    <p class="text-xs text-sky-100 font-medium mt-0.5">Sincronización Directa 100% Nube (Supabase)</p>
                 </div>
             </div>
             <button type="button" onclick="closeRelayQrModal()" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm transition-colors" title="Cerrar ventana">
@@ -51,11 +51,7 @@
                 </div>
                 <div class="flex items-start gap-2.5">
                     <span class="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">✓</span>
-                    <p class="text-xs text-emerald-800 dark:text-emerald-300 font-medium">Funciona tanto en la red Wi-Fi local del consultorio como por Internet (4G / Nube).</p>
-                </div>
-                <div class="pt-2 border-t border-sky-200/60 dark:border-slate-600/60 text-[11px] text-slate-600 dark:text-slate-300 flex items-center justify-between">
-                    <span>Acceso Wi-Fi Local directo:</span>
-                    <strong id="relayLocalUrlBadge" class="font-mono text-indigo-700 dark:text-indigo-300 font-bold select-all">Detectando IP...</strong>
+                    <p class="text-xs text-emerald-800 dark:text-emerald-300 font-medium">Funciona directo por Supabase (4G o cualquier Wi-Fi), sin puertos ni red local.</p>
                 </div>
             </div>
         </div>
@@ -101,10 +97,6 @@
                         if (code) code.textContent = pCode;
                         const doc = document.getElementById('relayDoctorBadge');
                         if (doc && data.doctor_name) doc.textContent = data.doctor_name;
-                        const localBadge = document.getElementById('relayLocalUrlBadge');
-                        if (localBadge && data.local_url) {
-                            localBadge.textContent = data.local_url + '/mobile';
-                        }
                     }
                 })
                 .catch(() => {});

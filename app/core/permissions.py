@@ -130,9 +130,13 @@ DEFAULT_ROLE_PERMISSIONS = {
         "references",
         "labs",
         "vaccines",
+        "payments",
         "inventory",
         "messages",
-        "reports"
+        "reports",
+        "users",
+        "settings",
+        "sync"
     ],
     "secretaria": [
         "dashboard",

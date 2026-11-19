@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Licencia Médica #{{ license.id }} — {{ setting.clinic_name if setting else 'SSCP' }}</title>
+    <style>
+        @page { size: letter; margin: 18mm; }
+        body { font-family: Arial, Helvetica, sans-serif; color: #1e293b; line-height: 1.5; max-width: 780px; margin: 0 auto; padding: 24px; }
+        .toolbar { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 20px; }
+        .btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; font-weight: 600; text-decoration: none; color: #334155; font-size: 13px; }
+        .btn-primary { background: #0f766e; color: #fff; border-color: #0f766e; }
+        .header { border-bottom: 2px solid #0f766e; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .clinic { font-size: 20px; font-weight: 700; color: #0f766e; margin: 0; }
+        .meta { font-size: 12px; color: #475569; margin-top: 4px; }
+        h2 { text-align: center; text-transform: uppercase; letter-spacing: 1px; color: #0f766e; font-size: 16px; margin: 20px 0; }
+        .box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; font-size: 14px; }
+        .row { margin-bottom: 8px; }
+        .label { font-weight: 700; color: #334155; }
+        .signature { margin-top: 64px; text-align: center; }
+        .sig-line { width: 260px; border-top: 1px solid #1e293b; margin: 0 auto 6px auto; }
+        @media print { .toolbar { display: none; } body { padding: 0; } }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <a href="/licenses" class="btn">Volver</a>
+        <a href="/licenses/{{ license.id }}/pdf" class="btn">Descargar PDF</a>
+        <button onclick="window.print()" class="btn btn-primary">Imprimir</button>
+    </div>
+
+    <div class="header">
+        <div>
+            <p class="clinic">{{ setting.clinic_name if setting and setting.clinic_name else 'Centro Médico SSCP' }}</p>
+            <div class="meta">
+                {{ license.doctor.name if license.doctor else (setting.doctor_name if setting else 'Médico Tratante') }} &bull; {{ setting.specialty if setting and setting.specialty else 'Medicina' }}<br>
+                {% if setting and setting.address %}{{ setting.address }}{% endif %}
+                {% if setting and setting.phone %} &bull; Tel: {{ setting.phone }}{% endif %}
+            </div>
+        </div>
+        <div class="meta" style="text-align: right;">
+            <strong>Licencia #{{ license.id }}</strong><br>
+            Fecha: {{ license.created_at.strftime('%d/%m/%Y') if license.created_at else '' }}
+        </div>
+    </div>
+
+    <h2>Certificado de Licencia / Reposo Médico</h2>
+
+    <div class="box">
+        <div class="row"><span class="label">Paciente:</span> {{ patient.first_name if patient else '' }} {{ patient.last_name if patient else '' }}</div>
+        <div class="row"><span class="label">Documento / Cédula:</span> {{ patient.document_id if patient and patient.document_id else 'N/D' }}</div>
+        {% if license.workplace_or_school %}
+        <div class="row"><span class="label">Empresa / Institución:</span> {{ license.workplace_or_school }}</div>
+        {% endif %}
+    </div>
+
+    <div class="box">
+        <div class="row"><span class="label">Diagnóstico / Motivo:</span> {{ license.diagnosis or 'Evaluación médica' }}</div>
+        <div class="row"><span class="label">Días de Reposo:</span> {{ license.days_off }} día(s)</div>
+        <div class="row">
+            <span class="label">Vigencia:</span>
+            Desde {{ license.start_date.strftime('%d/%m/%Y') if license.start_date else '' }}
+            hasta {{ license.end_date.strftime('%d/%m/%Y') if license.end_date else '' }}
+        </div>
+        {% if license.notes %}
+        <div class="row" style="margin-top: 10px; white-space: pre-line;"><span class="label">Indicaciones / Observaciones:</span><br>{{ license.notes }}</div>
+        {% endif %}
+    </div>
+
+    <div class="signature">
+        <div class="sig-line"></div>
+        <strong>{{ license.doctor.name if license.doctor else (setting.doctor_name if setting else 'Médico Tratante') }}</strong><br>
+        <span class="meta">Exequátur: {{ setting.doctor_exequatur if setting and setting.doctor_exequatur else 'N/D' }}</span>
+    </div>
+</body>
+</html>

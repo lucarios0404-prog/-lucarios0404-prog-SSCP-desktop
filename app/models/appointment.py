@@ -32,7 +32,7 @@ class Appointment(Base):
     whatsapp_reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     patient = relationship("Patient", backref="appointments")
     doctor = relationship("User", backref="appointments")

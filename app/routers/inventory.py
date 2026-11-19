@@ -8,7 +8,7 @@ from datetime import datetime
 
 from app.database import get_db
 from app.models.inventory import InventoryItem, InventoryMovement
-from app.core.deps import require_current_user
+from app.core.deps import require_current_user, require_permission
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 from app.core.templates import templates
@@ -39,7 +39,7 @@ def list_inventory(
     q: str = Query(None),
     category: str = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission("inventory"))
 ):
     query = db.query(InventoryItem)
     
@@ -83,7 +83,7 @@ def list_inventory(
 @router.get("/create")
 def create_item_form(
     request: Request,
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission("inventory"))
 ):
     return templates.TemplateResponse(
         request=request,
@@ -106,7 +106,7 @@ def create_item(
     unit: str = Form("Unidad"),
     price: float = Form(0.0),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission("inventory"))
 ):
     item = InventoryItem(
         name=name.strip(),
@@ -140,7 +140,7 @@ def view_item(
     item_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission("inventory"))
 ):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
@@ -170,7 +170,7 @@ def register_movement(
     quantity: int = Form(...),
     notes: str = Form(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission("inventory"))
 ):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
@@ -183,10 +183,11 @@ def register_movement(
         item.stock += quantity
     elif type == "out":
         if item.stock < quantity:
-            # permitir con advertencia o limitar a 0
-            item.stock = max(0, item.stock - quantity)
-        else:
-            item.stock -= quantity
+            raise HTTPException(
+                status_code=400,
+                detail=f"Stock insuficiente para salida ({quantity} solicitadas, {item.stock} disponibles)."
+            )
+        item.stock -= quantity
     elif type == "adjustment":
         item.stock = quantity
     else:
@@ -215,7 +216,7 @@ def edit_item(
     unit: str = Form("Unidad"),
     price: float = Form(0.0),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission("inventory"))
 ):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:

@@ -8,7 +8,7 @@ from datetime import datetime
 from app.database import get_db
 from app.models.vital_sign import VitalSign
 from app.models.patient import Patient
-from app.core.deps import require_current_user
+from app.core.deps import require_permission
 
 router = APIRouter(prefix="/vitals", tags=["vitals"])
 from app.core.templates import templates
@@ -18,7 +18,7 @@ def view_patient_vitals(
     request: Request,
     patient_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('consultations'))
 ):
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
@@ -54,7 +54,7 @@ def view_patient_vitals(
 def api_vitals_evolution(
     patient_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('consultations'))
 ):
     vitals = db.query(VitalSign).filter(VitalSign.patient_id == patient_id).order_by(VitalSign.recorded_at.asc()).all()
     return {
@@ -81,7 +81,7 @@ def create_vital_sign(
     glucose_mg_dl: float = Form(None),
     notes: str = Form(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('consultations'))
 ):
     bmi = None
     if weight_kg and height_cm and height_cm > 0:

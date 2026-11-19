@@ -1,3 +1,5 @@
+import hmac
+import os
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -35,28 +37,10 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
             email: str = payload.get("email")
             if email:
                 user = db.query(User).filter(User.email == email).first()
-                if user:
+                if user and user.is_active:
                     return user
         except JWTError:
             pass
-
-    # Fallback local seguro para visualización de PDFs impresos desde cliente nativo:
-    # Solo aplica para rutas de visualización de PDF si proviene de loopback (127.0.0.1)
-    # y NUNCA si la petición proviene de un sitio web externo en el navegador (cross-site).
-    client_host = getattr(request.client, "host", None) if request.client else None
-    is_local = client_host in ("127.0.0.1", "localhost", "::1", "testclient")
-    path = request.url.path
-    sec_fetch_site = request.headers.get("sec-fetch-site", "").lower()
-    origin = request.headers.get("origin", "").lower()
-    is_cross_site = sec_fetch_site == "cross-site" or (bool(origin) and "localhost" not in origin and "127.0.0.1" not in origin)
-
-    if is_local and not is_cross_site and path.endswith("/pdf"):
-        local_user = db.query(User).filter(User.is_active == True).order_by(
-            (User.role == "doctor").desc(),
-            (User.role == "admin").desc()
-        ).first()
-        if local_user:
-            return local_user
 
     return None
 
@@ -70,23 +54,56 @@ def require_current_user(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Usuario inactivo")
     return current_user
 
+def require_strict_admin(current_user: User = Depends(require_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso restringido: Se requieren privilegios de Administrador General."
+        )
+    return current_user
+
 def require_admin(current_user: User = Depends(require_current_user)):
-    if current_user.role == "admin":
-        return current_user
-    # Permitir también si el usuario cuenta con permisos administrativos asignados explícitamente
-    if (
-        current_user.has_permission("settings")
-        or current_user.has_permission("users")
+    if current_user.role in ("admin", "doctor") and (
+        current_user.role == "admin"
+        or current_user.has_permission("settings")
         or current_user.has_permission("sync")
     ):
         return current_user
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Acceso restringido: Se requieren permisos de Administrador."
+        detail="Acceso restringido: Se requieren permisos administrativos."
     )
 
 def require_permission(permission_key: str):
     def dependency(current_user: User = Depends(require_current_user)):
+        if not current_user.has_permission(permission_key):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acceso restringido: No cuenta con el permiso '{permission_key}' para esta sección."
+            )
+        return current_user
+    return dependency
+
+def is_valid_ipc_request(request: Request) -> bool:
+    """Valida llamadas locales desde el proceso principal de Electron mediante secreto IPC."""
+    client_host = request.client.host if request.client else ""
+    if client_host not in ("127.0.0.1", "::1", "localhost"):
+        return False
+    expected = os.environ.get("SSCP_IPC_SECRET", "").strip()
+    if not expected:
+        return False
+    provided = request.headers.get("X-SSCP-IPC-Secret", "").strip()
+    return bool(provided) and hmac.compare_digest(provided, expected)
+
+def require_ipc_or_permission(permission_key: str):
+    def dependency(request: Request, db: Session = Depends(get_db)):
+        if is_valid_ipc_request(request):
+            return None
+        current_user = get_current_user(request, db)
+        if not current_user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
+        if not current_user.is_active:
+            raise HTTPException(status_code=400, detail="Usuario inactivo")
         if not current_user.has_permission(permission_key):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

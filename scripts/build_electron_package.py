@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import shutil
 from pathlib import Path
 
@@ -16,7 +17,16 @@ def build_electron_dist():
     print(" Empaquetando SSCP Desktop (Edicion Electron)")
     print("==========================================================")
 
-    dist_electron = BASE_DIR / "dist" / "SSCP-Desktop-Electron"
+    version_file = BASE_DIR / "VERSION.json"
+    suite_ver = ""
+    if version_file.exists():
+        suite_ver = json.loads(version_file.read_text(encoding="utf-8")).get("suite", "").strip()
+
+    legacy_electron = BASE_DIR / "dist" / "SSCP-Desktop-Electron"
+    if legacy_electron.exists():
+        shutil.rmtree(legacy_electron, ignore_errors=True)
+
+    dist_electron = BASE_DIR / "dist" / (f"SSCP-Desktop-v{suite_ver}" if suite_ver else "SSCP-Desktop-Electron")
     if dist_electron.exists():
         print(f"Limpiando {dist_electron}...")
         shutil.rmtree(dist_electron)
@@ -46,7 +56,6 @@ def build_electron_dist():
     if icon_path.exists():
         try:
             import subprocess
-            import json
             node_script = f"const {{ rcedit }} = require('rcedit'); rcedit({json.dumps(str(target_exe))}, {{ icon: {json.dumps(str(icon_path))} }});"
             subprocess.run(["node", "-e", node_script], cwd=str(BASE_DIR / "electron"), check=True)
             print("  -> Icono oficial SSCP incrustado exitosamente en SSCP-Desktop.exe")
@@ -82,8 +91,8 @@ def build_electron_dist():
     assert (app_dir / "src" / "main" / "main.js").exists(), "Falta main.js"
     assert (backend_dest / "SSCP-Desktop.exe").exists(), "Falta backend ejecutable"
 
-    print("✅ Empaquetado de Electron completado con éxito en:")
-    print(f"   {dist_electron}")
+    print("    ✅ Empaquetado de Electron completado con éxito en:")
+    print(f"       {dist_electron}")
 
 if __name__ == "__main__":
     build_electron_dist()

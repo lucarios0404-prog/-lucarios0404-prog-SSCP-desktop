@@ -402,15 +402,18 @@ class DataImporterService:
         return patient_records
 
     @classmethod
-    def preview_data(cls, patients_data: List[Dict[str, Any]], db: Session) -> Dict[str, Any]:
+    def preview_data(cls, patients_data: List[Dict[str, Any]], db: Session, doctor_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Cross-references raw parsed records with current database to identify duplicates and stats.
         """
+        base_q = db.query(Patient).filter(Patient.is_active == True)
+        if doctor_id:
+            base_q = base_q.filter(or_(Patient.doctor_id == doctor_id, Patient.doctor_id == None))
         existing_docs = {
-            p.document_id: p for p in db.query(Patient).filter(Patient.document_id.isnot(None)).all()
+            p.document_id: p for p in base_q.filter(Patient.document_id.isnot(None)).all()
         }
         existing_names = {
-            f"{p.first_name.strip().lower()} {p.last_name.strip().lower()}": p for p in db.query(Patient).all()
+            f"{p.first_name.strip().lower()} {p.last_name.strip().lower()}": p for p in base_q.all()
         }
 
         total_patients = len(patients_data)
@@ -482,10 +485,13 @@ class DataImporterService:
                 notes = clean_utf8(item.get("notes")) or None
 
                 patient = None
+                pat_scope = db.query(Patient).filter(Patient.is_active == True)
+                if doctor_id:
+                    pat_scope = pat_scope.filter(or_(Patient.doctor_id == doctor_id, Patient.doctor_id == None))
                 if doc_id:
-                    patient = db.query(Patient).filter(Patient.document_id == doc_id).first()
+                    patient = pat_scope.filter(Patient.document_id == doc_id).first()
                 if not patient:
-                    patient = db.query(Patient).filter(
+                    patient = pat_scope.filter(
                         Patient.first_name == first_name,
                         Patient.last_name == last_name
                     ).first()
@@ -502,6 +508,7 @@ class DataImporterService:
                 else:
                     # Create new
                     patient = Patient(
+                        doctor_id=doctor_id,
                         first_name=first_name,
                         last_name=last_name,
                         document_id=doc_id,

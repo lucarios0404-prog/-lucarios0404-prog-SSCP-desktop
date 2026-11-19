@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from pathlib import Path
-from datetime import datetime
+from datetime import date, datetime
 import json
 
 from app.database import get_db
@@ -216,6 +216,13 @@ def create_consultation_form(
     current_user = Depends(require_permission('consultations'))
 ):
     patients = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None)).order_by(Patient.last_name).all()
+    if appointment_id and appointment_id > 0:
+        from app.models.appointment import Appointment
+        active_appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+        if active_appt and active_appt.status in ("Pendiente", "Confirmada", "En Espera"):
+            active_appt.status = "En Consulta"
+            active_appt.updated_at = datetime.utcnow()
+            db.commit()
     selected_patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
     last_consultation = None
     if selected_patient:
@@ -304,32 +311,44 @@ def create_consultation(
     )
     db.add(new_consultation)
     
-    # Si viene ligada a una cita, marcar la cita como completada
-    if appointment_id and appointment_id > 0:
-        appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-        if appt:
-            appt.status = "Completada"
-            appt.updated_at = datetime.utcnow()
-    else:
-        # Si no viene ligada explícitamente pero el paciente tiene cita pendiente para hoy o anterior, completarla automáticamente
-        target_date = creation_dt.date() if isinstance(creation_dt, datetime) else date.today()
-        pending_appt = db.query(Appointment).filter(
-            Appointment.patient_id == patient_id,
-            Appointment.date <= target_date,
-            Appointment.status.in_(["Pendiente", "Confirmada", "En Espera", "En Consulta", "en_consulta", "En espera", "en espera"])
-        ).order_by(Appointment.date.desc()).first()
-        if pending_appt:
-            pending_appt.status = "Completada"
-            pending_appt.updated_at = datetime.utcnow()
-            new_consultation.appointment_id = pending_appt.id
+    # Si viene ligada a una cita o existen citas activas del paciente en la ventana del día, marcarlas como completadas
+    target_date = creation_dt.date() if isinstance(creation_dt, datetime) else date.today()
+    from app.services.appointment_reconciliation import reconcile_completed_appointments
+    reconcile_completed_appointments(
+        db,
+        patient_id=patient_id,
+        appointment_id=appointment_id,
+        consultation=new_consultation,
+        target_date=target_date,
+    )
             
     db.commit()
     db.refresh(new_consultation)
 
-    # Notificar inmediatamente al Cloud Relay para que la cita pase a Completada en Móvil y Tablet
     try:
-        from app.services.relay_service import RelayService
-        RelayService.push_snapshot_to_cloud(db)
+        from app.models.vital_sign import VitalSign
+        from datetime import time as dt_time
+        day_start = datetime.combine(target_date, dt_time.min)
+        unlinked_vitals = (
+            db.query(VitalSign)
+            .filter(
+                VitalSign.patient_id == patient_id,
+                VitalSign.consultation_id == None,
+                VitalSign.recorded_at >= day_start,
+            )
+            .all()
+        )
+        for v in unlinked_vitals:
+            v.consultation_id = new_consultation.id
+        if unlinked_vitals:
+            db.commit()
+    except Exception:
+        pass
+
+    # Notificar inmediatamente al puente Supabase sin bloquear UI
+    try:
+        from app.services.supabase_sync_service import signal_supabase_sync
+        signal_supabase_sync()
     except Exception:
         pass
 
@@ -352,15 +371,14 @@ def view_consultation(
     request: Request,
     consultation_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('consultations'))
 ):
-    if not (current_user.has_permission('consultations') or current_user.has_permission('print_prescriptions')):
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: No cuenta con permisos para ver consultas clínicas ni imprimir recetas."
-        )
+    from app.routers.patients import resolve_current_doctor_id
     consultation = db.query(Consultation).filter(Consultation.id == consultation_id).first()
     if not consultation:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+    doc_id = resolve_current_doctor_id(db, current_user)
+    if doc_id and consultation.doctor_id is not None and consultation.doctor_id != doc_id:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
 
     history_entries = []

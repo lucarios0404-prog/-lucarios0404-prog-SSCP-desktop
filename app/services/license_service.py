@@ -62,21 +62,25 @@ class LicenseInfo:
 _cached_machine_id = None
 
 
+def _windows_hidden_popen_kwargs():
+    if platform.system() != "Windows":
+        return {}
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = 0
+    return {
+        "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+        "startupinfo": startupinfo,
+    }
+
+
 def _run_wmic(query):
     try:
-        startupinfo = None
-        creationflags = 0
-        if platform.system() == "Windows":
-            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0
         result = subprocess.check_output(
             ["wmic"] + query.split(),
             stderr=subprocess.DEVNULL,
             timeout=5,
-            creationflags=creationflags,
-            startupinfo=startupinfo,
+            **_windows_hidden_popen_kwargs(),
         )
         lines = result.decode(errors="ignore").strip().splitlines()
         for line in lines:
@@ -86,6 +90,59 @@ def _run_wmic(query):
     except Exception:
         pass
     return ""
+
+
+def _read_windows_cim_parts():
+    """Fallback para Windows 11 24H2+ donde wmic.exe fue removido; consulta las mismas propiedades WMI via CIM."""
+    try:
+        ps_cmd = (
+            "$b=(Get-CimInstance Win32_BaseBoard -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty SerialNumber);"
+            "$c=(Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty ProcessorId);"
+            "$d=(Get-CimInstance Win32_DiskDrive -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty SerialNumber);"
+            "\"$b`n$c`n$d\""
+        )
+        out = subprocess.check_output(
+            ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+            stderr=subprocess.DEVNULL,
+            timeout=8,
+            **_windows_hidden_popen_kwargs(),
+        )
+        lines = [ln.strip() for ln in out.decode(errors="ignore").splitlines()]
+        while len(lines) < 3:
+            lines.append("")
+        return lines[:3]
+    except Exception:
+        return ["", "", ""]
+
+
+def _read_windows_registry_guid():
+    """Identificador estable en Registro de Windows (no depende de adaptadores Wi-Fi/Ethernet ni MAC)."""
+    if platform.system() != "Windows":
+        return []
+    try:
+        import winreg
+        parts = []
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Cryptography") as k:
+                val, _ = winreg.QueryValueEx(k, "MachineGuid")
+                if val:
+                    parts.append(str(val).strip())
+        except Exception:
+            pass
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\BIOS") as k:
+                for name in ("BaseBoardProduct", "SystemProductName"):
+                    try:
+                        val, _ = winreg.QueryValueEx(k, name)
+                        if val:
+                            parts.append(str(val).strip())
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return [p for p in parts if p]
+    except Exception:
+        return []
 
 
 def get_machine_id():
@@ -98,6 +155,10 @@ def get_machine_id():
         parts.append(_run_wmic("baseboard get SerialNumber"))
         parts.append(_run_wmic("cpu get ProcessorId"))
         parts.append(_run_wmic("diskdrive get SerialNumber"))
+        if not any(parts):
+            parts = _read_windows_cim_parts()
+        if not any(parts):
+            parts = _read_windows_registry_guid()
     if not any(parts):
         parts.append(str(uuid.getnode()))
         parts.append(platform.node())
@@ -200,9 +261,10 @@ def _verify_online_license(license_key, machine_id, force_remote=False):
                     if expires_at:
                         if expires_at.tzinfo is None:
                             expires_at = expires_at.replace(tzinfo=timezone.utc)
-                        days_remaining = max(0, (expires_at - datetime.now(timezone.utc)).days)
-                        if days_remaining < 0:
+                        raw_days = (expires_at - datetime.now(timezone.utc)).days
+                        if raw_days < 0:
                             return LicenseInfo(LicenseStatus.EXPIRED, machine_id=machine_id)
+                        days_remaining = raw_days
                     return LicenseInfo(LicenseStatus.ACTIVE, machine_id=machine_id,
                                        doctor_name=cache.get("doctor_name", "Doctor"),
                                        plan=cache.get("plan", "Standard"),
@@ -279,9 +341,10 @@ def _verify_online_license(license_key, machine_id, force_remote=False):
                     if expires_at:
                         if expires_at.tzinfo is None:
                             expires_at = expires_at.replace(tzinfo=timezone.utc)
-                        days_remaining = max(0, (expires_at - datetime.now(timezone.utc)).days)
-                        if days_remaining < 0:
+                        raw_days = (expires_at - datetime.now(timezone.utc)).days
+                        if raw_days < 0:
                             return LicenseInfo(LicenseStatus.EXPIRED, machine_id=machine_id)
+                        days_remaining = raw_days
                     return LicenseInfo(LicenseStatus.ACTIVE, machine_id=machine_id,
                                        doctor_name=cache.get("doctor_name", "Doctor"),
                                        plan=cache.get("plan", "Standard"),
@@ -353,8 +416,6 @@ def check_license():
             if mode == "online":
                 return _verify_online_license(config.license_key, machine_id)
             info = _verify_offline_license(config.license_key, machine_id)
-            if info.status == LicenseStatus.ACTIVE:
-                _trigger_background_heartbeat(config.license_key, machine_id)
             return info
     except Exception:
         return LicenseInfo(LicenseStatus.UNLICENSED, machine_id=machine_id)
@@ -370,22 +431,70 @@ def activate(license_key, mode="offline"):
     else:
         info = _verify_offline_license(license_key, machine_id)
     if info.status == LicenseStatus.ACTIVE:
-        from app.database import SessionLocal
+        from sqlalchemy import text
+        from app.database import SessionLocal, engine, DB_PATH, repair_sqlite_if_malformed, _DB_RECOVERY_LOCK, Base
         from app.models.license_config import LicenseConfig
-        with SessionLocal() as db:
-            config = db.query(LicenseConfig).first()
-            if not config:
-                config = LicenseConfig()
-                db.add(config)
-            config.mode = mode
-            config.license_key = license_key
-            config.machine_id = machine_id
-            config.doctor_name = info.doctor_name
-            config.plan = info.plan
-            config.expires_at = info.expires_at
-            config.activated_at = datetime.now(timezone.utc)
-            config.last_verified_at = datetime.now(timezone.utc)
-            db.commit()
+
+        def _persist_license():
+            with SessionLocal() as db:
+                config = db.query(LicenseConfig).first()
+                if not config:
+                    config = LicenseConfig()
+                    db.add(config)
+                config.mode = mode
+                config.license_key = license_key
+                config.machine_id = machine_id
+                config.doctor_name = info.doctor_name
+                config.plan = info.plan
+                config.expires_at = info.expires_at
+                config.activated_at = datetime.now(timezone.utc)
+                config.last_verified_at = datetime.now(timezone.utc)
+                db.commit()
+                try:
+                    db.execute(text("PRAGMA wal_checkpoint(TRUNCATE)"))
+                except Exception:
+                    pass
+
+        try:
+            _persist_license()
+        except Exception as db_exc:
+            err_lower = str(db_exc).lower()
+            if "malformed" in err_lower or "databaseerror" in err_lower or "no such table" in err_lower or "disk i/o" in err_lower:
+                with _DB_RECOVERY_LOCK:
+                    try:
+                        engine.dispose()
+                    except Exception:
+                        pass
+                    repaired = repair_sqlite_if_malformed(DB_PATH, reset_if_unrecoverable=True)
+                    if not repaired:
+                        raise
+                    import app.models  # noqa: F401
+                    try:
+                        Base.metadata.create_all(bind=engine)
+                    except Exception as create_exc:
+                        if "malformed" in str(create_exc).lower() or "databaseerror" in str(create_exc).lower():
+                            try:
+                                engine.dispose()
+                            except Exception:
+                                pass
+                            repair_sqlite_if_malformed(DB_PATH, reset_if_unrecoverable=True)
+                            Base.metadata.create_all(bind=engine)
+                        else:
+                            raise
+                    # Asegurar permisos y migraciones minimas si la BD fue reconstruida limpia
+                    try:
+                        from app.core.permissions import seed_permissions_if_empty
+                        from app.core.initial_data import seed_initial_data_if_empty
+                        from app.data.services_catalog import seed_services_if_empty
+                        with SessionLocal() as seed_db:
+                            seed_permissions_if_empty(seed_db)
+                            seed_initial_data_if_empty(seed_db)
+                            seed_services_if_empty(seed_db)
+                    except Exception:
+                        pass
+                    _persist_license()
+            else:
+                raise
         # Disparar telemetría silenciosa inmediatamente en segundo plano
         _trigger_background_heartbeat(license_key, machine_id, force=True)
     return info

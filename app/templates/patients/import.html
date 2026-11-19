@@ -279,6 +279,7 @@
             document.getElementById('sourceTypeBadge').textContent = data.source_type;
 
             // Populate preview table
+            const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
             const tbody = document.getElementById('previewTableBody');
             tbody.innerHTML = '';
 
@@ -291,18 +292,18 @@
                     : 'bg-emerald-100 text-emerald-800 border-emerald-200';
 
                 tr.innerHTML = `
-                    <td class="py-2.5 px-3 font-semibold text-slate-800">${p.first_name} ${p.last_name}</td>
-                    <td class="py-2.5 px-3 text-slate-600 font-mono">${p.document_id || '<span class="text-slate-400 italic">S/D</span>'}</td>
-                    <td class="py-2.5 px-3 text-slate-600">${p.phone || '<span class="text-slate-400 italic">-</span>'}</td>
-                    <td class="py-2.5 px-3 text-slate-600">${p.gender || 'Otro'}</td>
+                    <td class="py-2.5 px-3 font-semibold text-slate-800">${esc(p.first_name)} ${esc(p.last_name)}</td>
+                    <td class="py-2.5 px-3 text-slate-600 font-mono">${p.document_id ? esc(p.document_id) : '<span class="text-slate-400 italic">S/D</span>'}</td>
+                    <td class="py-2.5 px-3 text-slate-600">${p.phone ? esc(p.phone) : '<span class="text-slate-400 italic">-</span>'}</td>
+                    <td class="py-2.5 px-3 text-slate-600">${esc(p.gender || 'Otro')}</td>
                     <td class="py-2.5 px-3 text-center">
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${p.consultations && p.consultations.length > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}">
-                            ${p.consultations ? p.consultations.length : 0}
+                            ${p.consultations ? Number(p.consultations.length) : 0}
                         </span>
                     </td>
                     <td class="py-2.5 px-3 text-center">
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${badgeClass}">
-                            ${p.status_label}
+                            ${esc(p.status_label)}
                         </span>
                     </td>
                 `;

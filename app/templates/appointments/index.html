@@ -36,17 +36,17 @@
                         <p class="text-xs text-slate-500 mt-0.5">Control de horarios, confirmación de asistencia, recordatorios WhatsApp y sala de espera.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <!-- Botón Masivo de WhatsApp -->
-                        <button type="button" onclick="openBulkWaModal()" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-md shadow-emerald-600/20 transition-all" title="Enviar recordatorios automáticos de WhatsApp para citas de mañana">
-                            <i class="fab fa-whatsapp mr-2 text-base"></i> Recordatorios WhatsApp
-                            {% if unsent_reminders_count > 0 %}
-                            <span class="ml-1.5 px-1.5 py-0.5 rounded-full bg-emerald-800 text-[10px] font-bold">{{ unsent_reminders_count }}</span>
+                        <!-- Botón Cola Interactiva WhatsApp 1-Clic -->
+                        <button type="button" onclick="openBulkWaModal()" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-md shadow-emerald-600/20 transition-all" title="Abrir Cola Interactiva de WhatsApp 1-Clic para citas de mañana">
+                            <i class="fab fa-whatsapp mr-2 text-base"></i> Cola WhatsApp
+                            {% if tomorrow_unsent_count > 0 %}
+                            <span id="header_queue_badge" class="ml-1.5 px-1.5 py-0.5 rounded-full bg-emerald-800 text-[10px] font-bold" title="Recordatorios pendientes para mañana">{{ tomorrow_unsent_count }}</span>
                             {% endif %}
                         </button>
 
-                        <!-- Botón Rápido de Vinculación de Celular / WhatsApp -->
-                        <button type="button" onclick="openWhatsAppModal()" class="inline-flex items-center justify-center px-3.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-sm font-semibold border border-emerald-300 shadow-sm transition-all active:scale-95" title="Vincular o verificar conexión del celular de la secretaría / consultorio">
-                            <i class="fab fa-whatsapp text-emerald-600 mr-2 text-base"></i> Vincular Celular / WS
+                        <!-- Botón Rápido Centro WhatsApp 1-Clic -->
+                        <button type="button" onclick="openWhatsAppModal()" class="inline-flex items-center justify-center px-3.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-sm font-semibold border border-emerald-300 shadow-sm transition-all active:scale-95" title="Configurar número de referencia y probar WhatsApp 1-Clic">
+                            <i class="fab fa-whatsapp text-emerald-600 mr-2 text-base"></i> WhatsApp 1-Clic
                         </button>
 
                         <button type="button" onclick="openCuadreModal()" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-md shadow-teal-500/20 transition-all" title="Vista previa del Cuadre de Caja con opciones de Imprimir o Descargar en PDF">
@@ -146,7 +146,7 @@
                                                 <!-- Badge Oficial de la ARS con Logo -->
                                                 <div class="mt-0.5 flex flex-wrap items-center gap-1">
                                                     {{ a.patient.insurance_name|ars_badge(a.patient.insurance_number)|safe }}
-                                                    <button type="button" onclick="openPatientHistoryModal({{ a.patient.id }}, '{{ a.patient.first_name }} {{ a.patient.last_name }}')"
+                                                    <button type="button" data-patient-id="{{ a.patient.id }}" data-patient-name="{{ a.patient.first_name }} {{ a.patient.last_name }}" onclick="openPatientHistoryModal(Number(this.dataset.patientId), this.dataset.patientName)"
                                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-900 text-[10px] font-bold border border-blue-200 transition-all shadow-2xs"
                                                         title="Ver historial de últimas consultas médicas de este paciente">
                                                         <i class="fas fa-notes-medical text-blue-600"></i> Últimas Consultas
@@ -199,18 +199,23 @@
 
                                     <!-- Columna WhatsApp -->
                                     <td class="py-4 px-5 whitespace-nowrap" id="wa_cell_{{ a.id }}">
+                                        {% set wa_entry = whatsapp_info.get(a.id, {}) %}
                                         {% if a.patient and a.patient.phone %}
                                             {% if a.whatsapp_reminder_sent %}
                                             <div class="inline-flex items-center space-x-1">
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200" title="Enviado: {{ a.whatsapp_reminder_sent_at.strftime('%d/%m %H:%M') if a.whatsapp_reminder_sent_at else '' }}">
                                                     <i class="fab fa-whatsapp text-emerald-600 mr-1 text-xs"></i> Enviado
                                                 </span>
-                                                <button type="button" onclick="openSingleWaModal({{ a.id }})" class="p-1 text-slate-400 hover:text-emerald-700 transition-colors" title="Reenviar o ver mensaje">
+                                                <button type="button" data-appt-id="{{ a.id }}" onclick="openSingleWaModal(Number(this.dataset.apptId))" class="p-1 text-slate-400 hover:text-emerald-700 transition-colors" title="Reenviar o ver mensaje">
                                                     <i class="fas fa-redo-alt text-[10px]"></i>
                                                 </button>
                                             </div>
+                                            {% elif wa_entry and not wa_entry.valid_phone %}
+                                            <button type="button" data-appt-id="{{ a.id }}" onclick="openSingleWaModal(Number(this.dataset.apptId))" class="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-300 transition-all shadow-sm" title="Número incompleto o inválido ({{ a.patient.phone }})">
+                                                <i class="fas fa-exclamation-triangle mr-1 text-amber-600 text-xs"></i> Tel. inválido
+                                            </button>
                                             {% else %}
-                                            <button type="button" onclick="openSingleWaModal({{ a.id }})" class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition-all shadow-sm" title="Enviar recordatorio de cita por WhatsApp">
+                                            <button type="button" data-appt-id="{{ a.id }}" onclick="openSingleWaModal(Number(this.dataset.apptId))" class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition-all shadow-sm" title="Enviar recordatorio de cita por WhatsApp (1-Clic)">
                                                 <i class="fab fa-whatsapp mr-1 text-emerald-600 text-sm"></i> Recordar
                                             </button>
                                             {% endif %}
@@ -233,12 +238,17 @@
                                                 <i class="fas fa-ticket-alt mr-1"></i> Turno #{{ a.queue_number or '1' }}
                                             </span>
                                             {% endif %}
+                                            {% if user.has_permission('consultations') %}
                                             <form method="post" action="/appointments/{{ a.id }}/status" class="inline">
                                                 <input type="hidden" name="new_status" value="Completada">
                                                 <button type="submit" class="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-semibold border border-emerald-200" title="Marcar cita como Completada">
                                                     <i class="fas fa-check mr-1 text-emerald-600"></i> Completar
                                                 </button>
                                             </form>
+                                            {% endif %}
+                                            <button type="button" data-appt-id="{{ a.id }}" data-patient-name="{{ (a.patient.first_name ~ ' ' ~ a.patient.last_name) if a.patient else 'Paciente' }}" onclick="openApptRemoveModal(Number(this.dataset.apptId), this.dataset.patientName)" class="px-2 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-semibold border border-rose-200" title="Sacar de la sala de espera o anular cita por error">
+                                                <i class="fas fa-user-minus mr-1"></i> Sacar de fila
+                                            </button>
                                         {% elif a.status != 'Completada' and a.status != 'Cancelada' %}
                                             <form method="post" action="/appointments/{{ a.id }}/check-in" class="inline">
                                                 <button type="submit" class="px-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-lg text-xs font-bold shadow-xs inline-flex items-center transition-transform active:scale-95" title="Marcar llegada del paciente y asignar Turno automático del día">
@@ -251,10 +261,18 @@
                                                     Confirmar
                                                 </button>
                                             </form>
+                                            {% if user.has_permission('consultations') %}
                                             <form method="post" action="/appointments/{{ a.id }}/status" class="inline">
                                                 <input type="hidden" name="new_status" value="Completada">
                                                 <button type="submit" class="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-semibold border border-emerald-200" title="Marcar cita como Completada">
                                                     <i class="fas fa-check mr-1 text-emerald-600"></i> Completar
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                            <form method="post" action="/appointments/{{ a.id }}/remove-from-queue" class="inline" onsubmit="return confirm('¿Anular esta cita creada por error?')">
+                                                <input type="hidden" name="mode" value="cancel">
+                                                <button type="submit" class="px-2 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-semibold border border-rose-200" title="Anular cita creada por error">
+                                                    <i class="fas fa-times mr-1"></i> Anular
                                                 </button>
                                             </form>
                                             {% if user.has_permission('consultations') %}
@@ -262,6 +280,8 @@
                                                 Atender
                                             </a>
                                             {% endif %}
+                                        {% elif a.status == 'Cancelada' %}
+                                            <span class="text-xs text-rose-500 font-semibold">Cancelada</span>
                                         {% else %}
                                             <span class="text-xs text-slate-400 font-medium">Completada</span>
                                             {% if user.has_permission('print_prescriptions') and a.consultation and a.consultation[0].prescription %}
@@ -291,6 +311,19 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                        {% if total_pages is defined and total_pages > 1 %}
+                        <div class="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                            <span>Mostrando página <strong>{{ page }}</strong> de <strong>{{ total_pages }}</strong> ({{ total_appointments }} citas)</span>
+                            <div class="flex items-center space-x-2">
+                                {% if page > 1 %}
+                                <a href="/appointments?view={{ view_mode }}&status={{ status_filter }}&filter_date={{ filter_date }}&page={{ page - 1 }}" class="px-3 py-1 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 font-semibold">Anterior</a>
+                                {% endif %}
+                                {% if page < total_pages %}
+                                <a href="/appointments?view={{ view_mode }}&status={{ status_filter }}&filter_date={{ filter_date }}&page={{ page + 1 }}" class="px-3 py-1 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 font-semibold">Siguiente</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -421,8 +454,8 @@
                                 Teléfono Destino
                             </label>
                             <div class="text-sm font-mono font-bold text-slate-900 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-                                <span id="single_wa_phone">+1...</span>
-                                <span class="text-[11px] text-emerald-600 font-sans font-semibold"><i class="fas fa-check-circle mr-1"></i>Verificado</span>
+                                <span id="single_wa_phone">—</span>
+                                <span id="single_wa_phone_badge" class="text-[11px] text-slate-500 font-sans font-semibold">Validando...</span>
                             </div>
                         </div>
 
@@ -435,72 +468,72 @@
                             </div>
                         </div>
 
-                        <!-- Estado del Gateway -->
+                        <!-- Canal Real 1-Clic -->
                         <div class="p-3 bg-emerald-50/50 border border-emerald-200/80 rounded-xl text-xs text-slate-600 flex items-center justify-between">
                             <div class="flex items-center space-x-2">
-                                <span class="w-2 h-2 rounded-full {% if gateway_status.is_connected %}bg-emerald-500 animate-pulse{% else %}bg-slate-400{% endif %}"></span>
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                                 <span class="text-[11px] font-semibold text-slate-700">
-                                    Gateway: {% if gateway_status.is_connected %}Conectado (+{{ gateway_status.connected_phone }}){% else %}Modo Enlace Directo (1-Clic){% endif %}
+                                    Modo 1-Clic Real: se abre WhatsApp del consultorio y luego confirmas el envío.
                                 </span>
                             </div>
                         </div>
 
+                        <div id="single_wa_feedback" class="hidden p-2.5 rounded-xl text-xs font-semibold"></div>
+
                         <div class="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100">
                             <button type="button" onclick="closeSingleWaModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
-                                Cancelar
+                                Cerrar
                             </button>
-                            <!-- Abrir en WhatsApp 1-Clic -->
-                            <a id="single_wa_open_link" href="#" target="_blank" onclick="markSentViaManual()" class="px-4 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl shadow-sm transition-all inline-flex items-center">
-                                <i class="fas fa-external-link-alt mr-1.5"></i> Abrir WhatsApp (1-Clic)
-                            </a>
-                            <!-- Enviar Directo con Gateway si está conectado -->
-                            {% if gateway_status.is_connected %}
-                            <button type="button" onclick="sendViaAutoGateway()" class="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition-all inline-flex items-center">
-                                <i class="fas fa-paper-plane mr-1.5"></i> Enviar Desatendido
+                            <button type="button" id="single_wa_open_btn" onclick="openSingleWaExternal()" class="px-4 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl shadow-sm transition-all inline-flex items-center">
+                                <i class="fas fa-external-link-alt mr-1.5"></i> Abrir WhatsApp
                             </button>
-                            {% endif %}
+                            <button type="button" id="single_wa_confirm_btn" onclick="confirmSingleWaSent()" class="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition-all inline-flex items-center">
+                                <i class="fas fa-check mr-1.5"></i> ✓ Confirmar Enviado
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- MODAL 3: Envío Masivo de Recordatorios (WhatsApp) -->
+            <!-- MODAL 3: Cola Interactiva de Recordatorios (WhatsApp 1-Clic) -->
             <div id="bulkWaModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-                <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-fade-in">
+                <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 animate-fade-in">
                     <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                         <div class="flex items-center space-x-2.5">
                             <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg">
-                                <i class="fas fa-paper-plane"></i>
+                                <i class="fab fa-whatsapp"></i>
                             </div>
                             <div>
-                                <h3 class="text-base font-bold text-slate-900">Despacho de Recordatorios WhatsApp</h3>
-                                <p class="text-xs text-slate-500">Recordatorios para citas de mañana</p>
+                                <h3 class="text-base font-bold text-slate-900">Cola Interactiva de Recordatorios WhatsApp</h3>
+                                <p class="text-xs text-slate-500">Abre cada chat desde tu WhatsApp y confirma los envíos reales uno a uno</p>
                             </div>
                         </div>
                         <button type="button" onclick="closeBulkWaModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
                     </div>
 
                     <div class="space-y-4">
-                        <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
-                            <p class="font-bold text-slate-800">
-                                <i class="far fa-calendar-check text-emerald-600 mr-1.5"></i> Resumen de Citas Pendientes:
-                            </p>
-                            <p class="text-slate-600 leading-relaxed">
-                                El sistema buscará todas las citas en estado <strong>Pendiente</strong> o <strong>Confirmada</strong> programadas para mañana que aún no hayan recibido recordatorio, y despachará el mensaje personalizado a cada paciente.
-                            </p>
-                            <div class="text-[11px] text-slate-500">
-                                Modo activo: <strong>{% if gateway_status.is_connected %}Gateway Autónomo (Desatendido){% else %}Generación de cola de enlaces (1-Clic){% endif %}</strong>
+                        <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                            <div class="flex items-center gap-2">
+                                <label for="queue_target_date" class="font-bold text-slate-700">Fecha de Citas:</label>
+                                <input type="date" id="queue_target_date" value="{{ tomorrow_str }}" onchange="loadDailyWaQueue()" class="text-xs border border-slate-300 bg-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500">
                             </div>
+                            <button type="button" onclick="loadDailyWaQueue()" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold border border-slate-300 rounded-lg text-xs inline-flex items-center gap-1.5">
+                                <i class="fas fa-sync-alt text-emerald-600"></i> Actualizar Cola
+                            </button>
                         </div>
 
-                        <div id="bulk_status_output" class="hidden p-3 rounded-xl text-xs"></div>
+                        <div id="queue_summary_bar" class="flex flex-wrap items-center gap-2 text-[11px] font-bold"></div>
 
-                        <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
+                        <div id="bulk_status_output" class="hidden p-3 rounded-xl text-xs font-semibold"></div>
+
+                        <div id="daily_wa_queue_list" class="max-h-80 overflow-y-auto space-y-2.5 pr-1">
+                            <p class="text-xs text-slate-400 italic text-center py-6">Cargando cola de recordatorios...</p>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                            <span class="text-[11px] text-slate-500">Modo activo: <strong>1-Clic Real (WhatsApp Web / App)</strong></span>
                             <button type="button" onclick="closeBulkWaModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
-                                Cancelar
-                            </button>
-                            <button type="button" id="btn_do_bulk" onclick="executeBulkReminders()" class="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow transition-all flex items-center">
-                                <i class="fas fa-play mr-1.5"></i> Despachar Recordatorios Ahora
+                                Cerrar
                             </button>
                         </div>
                     </div>
@@ -510,27 +543,70 @@
             <script>
                 let currentActiveApptId = null;
                 let currentWaLink = "";
+                let currentSingleValidPhone = false;
+                let currentQueueState = null;
+
+                function showSingleWaFeedback(msg, isError = false) {
+                    const box = document.getElementById('single_wa_feedback');
+                    if (!box) return;
+                    box.textContent = msg;
+                    box.className = isError
+                        ? 'p-2.5 rounded-xl text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-700'
+                        : 'p-2.5 rounded-xl text-xs font-semibold bg-emerald-50 border border-emerald-200 text-emerald-800';
+                    box.classList.remove('hidden');
+                }
 
                 // Modal 1-Clic Individual
                 async function openSingleWaModal(appointmentId) {
                     currentActiveApptId = appointmentId;
+                    currentWaLink = "";
+                    currentSingleValidPhone = false;
+
                     const modal = document.getElementById('singleWaModal');
+                    const openBtn = document.getElementById('single_wa_open_btn');
+                    const confirmBtn = document.getElementById('single_wa_confirm_btn');
+                    const phoneBadge = document.getElementById('single_wa_phone_badge');
+                    const feedback = document.getElementById('single_wa_feedback');
+                    if (feedback) feedback.classList.add('hidden');
                     modal.classList.remove('hidden');
 
                     document.getElementById('single_wa_patient').textContent = 'Cargando datos...';
                     document.getElementById('single_wa_phone').textContent = '...';
                     document.getElementById('single_wa_message').textContent = 'Cargando plantilla...';
+                    if (openBtn) openBtn.disabled = true;
+                    if (confirmBtn) confirmBtn.disabled = true;
 
                     try {
                         const res = await fetch(`/appointments/${appointmentId}/whatsapp-info`);
                         const data = await res.json();
-                        document.getElementById('single_wa_patient').textContent = data.patient_name;
-                        document.getElementById('single_wa_phone').textContent = data.clean_phone || 'Sin número registrado';
-                        document.getElementById('single_wa_message').textContent = data.message;
-                        currentWaLink = data.wa_link;
-                        document.getElementById('single_wa_open_link').href = data.wa_link || '#';
-                    } catch(e) {
-                        alert('Error al cargar datos del recordatorio.');
+                        if (!res.ok) {
+                            throw new Error(data.detail || 'Error al cargar datos del recordatorio.');
+                        }
+                        document.getElementById('single_wa_patient').textContent = data.patient_name || 'Paciente';
+                        currentSingleValidPhone = Boolean(data.valid_phone && data.clean_phone && data.wa_link);
+                        currentWaLink = data.wa_link || "";
+
+                        if (currentSingleValidPhone) {
+                            const formattedPhone = '+' + String(data.clean_phone).replace(/^\++/, '');
+                            document.getElementById('single_wa_phone').textContent = formattedPhone;
+                            if (phoneBadge) {
+                                phoneBadge.textContent = 'Verificado E.164';
+                                phoneBadge.className = 'text-[11px] text-emerald-600 font-sans font-semibold';
+                            }
+                            if (openBtn) openBtn.disabled = false;
+                            if (confirmBtn) confirmBtn.disabled = false;
+                        } else {
+                            document.getElementById('single_wa_phone').textContent = data.raw_phone ? `${data.raw_phone} (inválido)` : 'Sin número registrado';
+                            if (phoneBadge) {
+                                phoneBadge.textContent = 'Inválido / Mín. 10 dígitos';
+                                phoneBadge.className = 'text-[11px] text-amber-700 font-sans font-semibold';
+                            }
+                            showSingleWaFeedback('Actualiza el teléfono del paciente (mínimo 10 dígitos) antes de enviar por WhatsApp.', true);
+                        }
+
+                        document.getElementById('single_wa_message').textContent = data.message || '';
+                    } catch (e) {
+                        showSingleWaFeedback(e.message || 'Error al cargar datos del recordatorio.', true);
                     }
                 }
 
@@ -538,35 +614,26 @@
                     document.getElementById('singleWaModal').classList.add('hidden');
                 }
 
-                // Enviar via Gateway automático
-                async function sendViaAutoGateway() {
-                    if (!currentActiveApptId) return;
-                    const formData = new FormData();
-                    formData.append('send_mode', 'auto');
-
-                    try {
-                        const res = await fetch(`/appointments/${currentActiveApptId}/whatsapp-send`, {
-                            method: 'POST',
-                            body: formData
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            alert('¡Recordatorio enviado exitosamente por el Gateway de WhatsApp!');
-                            updateRowWaStatus(currentActiveApptId, data.sent_at);
-                            closeSingleWaModal();
-                        } else {
-                            alert('No se pudo enviar por el gateway: ' + (data.error || 'error desconocido'));
-                        }
-                    } catch(e) {
-                        alert('Error de conexión con el servidor.');
+                function openSingleWaExternal() {
+                    if (!currentSingleValidPhone || !currentWaLink) {
+                        showSingleWaFeedback('Este paciente no tiene un número telefónico válido para WhatsApp.', true);
+                        return;
                     }
+                    window.open(currentWaLink, '_blank', 'noopener,noreferrer');
+                    showSingleWaFeedback('WhatsApp abierto. Cuando envíes el mensaje, presiona "✓ Confirmar Enviado".', false);
+                    const confirmBtn = document.getElementById('single_wa_confirm_btn');
+                    if (confirmBtn) confirmBtn.focus();
                 }
 
-                // Marcar enviado tras abrir WhatsApp manual
-                async function markSentViaManual() {
-                    if (!currentActiveApptId) return;
+                // Confirmar envío real tras abrir WhatsApp
+                async function confirmSingleWaSent() {
+                    if (!currentActiveApptId || !currentSingleValidPhone) return;
+                    const confirmBtn = document.getElementById('single_wa_confirm_btn');
+                    if (confirmBtn) confirmBtn.disabled = true;
+
                     const formData = new FormData();
                     formData.append('send_mode', 'manual');
+                    formData.append('confirm_sent', 'true');
 
                     try {
                         const res = await fetch(`/appointments/${currentActiveApptId}/whatsapp-send`, {
@@ -574,25 +641,47 @@
                             body: formData
                         });
                         const data = await res.json();
+                        if (!res.ok || !data.success) {
+                            showSingleWaFeedback(data.error || data.detail || 'No se pudo confirmar el envío.', true);
+                            return;
+                        }
                         updateRowWaStatus(currentActiveApptId, data.sent_at);
                         closeSingleWaModal();
-                    } catch(e) {}
+                    } catch (e) {
+                        showSingleWaFeedback('Error de conexión con el servidor.', true);
+                    } finally {
+                        if (confirmBtn) confirmBtn.disabled = false;
+                    }
                 }
 
                 function updateRowWaStatus(apptId, sentAt) {
                     const cell = document.getElementById(`wa_cell_${apptId}`);
-                    if (cell) {
-                        cell.innerHTML = `
-                            <div class="inline-flex items-center space-x-1">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200" title="Enviado: ${sentAt || 'Hoy'}">
-                                    <i class="fab fa-whatsapp text-emerald-600 mr-1 text-xs"></i> Enviado
-                                </span>
-                                <button type="button" onclick="openSingleWaModal(${apptId})" class="p-1 text-slate-400 hover:text-emerald-700 transition-colors" title="Reenviar o ver mensaje">
-                                    <i class="fas fa-redo-alt text-[10px]"></i>
-                                </button>
-                            </div>
-                        `;
-                    }
+                    if (!cell) return;
+
+                    cell.textContent = '';
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'inline-flex items-center space-x-1';
+
+                    const badge = document.createElement('span');
+                    badge.className = 'inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200';
+                    badge.title = `Enviado: ${sentAt || 'Hoy'}`;
+                    const waIcon = document.createElement('i');
+                    waIcon.className = 'fab fa-whatsapp text-emerald-600 mr-1 text-xs';
+                    badge.appendChild(waIcon);
+                    badge.appendChild(document.createTextNode('Enviado'));
+
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'p-1 text-slate-400 hover:text-emerald-700 transition-colors';
+                    btn.title = 'Reenviar o ver mensaje';
+                    btn.addEventListener('click', () => openSingleWaModal(apptId));
+                    const redoIcon = document.createElement('i');
+                    redoIcon.className = 'fas fa-redo-alt text-[10px]';
+                    btn.appendChild(redoIcon);
+
+                    wrapper.appendChild(badge);
+                    wrapper.appendChild(btn);
+                    cell.appendChild(wrapper);
                 }
 
                 // Notificar al Doctor de llegada a sala de espera
@@ -601,50 +690,208 @@
                         const res = await fetch(`/appointments/${appointmentId}/waiting-alert-wa`);
                         const data = await res.json();
                         if (data.wa_link) {
-                            window.open(data.wa_link, '_blank');
+                            window.open(data.wa_link, '_blank', 'noopener,noreferrer');
                         } else {
-                            alert('No hay un número de teléfono configurado para el doctor en Configuración > WhatsApp.');
+                            alert('No hay un número de teléfono válido configurado para el doctor en Configuración > WhatsApp.');
                         }
-                    } catch(e) {
+                    } catch (e) {
                         alert('Error al generar alerta para el doctor.');
                     }
                 }
 
-                // Modal de Envío Masivo
+                // Cola Interactiva Diaria
                 function openBulkWaModal() {
                     document.getElementById('bulkWaModal').classList.remove('hidden');
-                    document.getElementById('bulk_status_output').classList.add('hidden');
+                    const out = document.getElementById('bulk_status_output');
+                    if (out) out.classList.add('hidden');
+                    loadDailyWaQueue();
                 }
 
                 function closeBulkWaModal() {
                     document.getElementById('bulkWaModal').classList.add('hidden');
                 }
 
-                async function executeBulkReminders() {
-                    const btn = document.getElementById('btn_do_bulk');
+                function renderQueueSummaryBar(summary) {
+                    const bar = document.getElementById('queue_summary_bar');
+                    if (!bar || !summary) return;
+                    bar.textContent = '';
+
+                    const pills = [
+                        { label: `Fecha: ${summary.target_date_display || ''}`, cls: 'bg-slate-100 text-slate-700 border-slate-200' },
+                        { label: `Total: ${summary.total || 0}`, cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+                        { label: `Pendientes: ${summary.pending_count || 0}`, cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+                        { label: `Enviados: ${summary.sent_count || 0}`, cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+                    ];
+                    if ((summary.invalid_phone_count || 0) > 0) {
+                        pills.push({ label: `Tel. inválidos: ${summary.invalid_phone_count}`, cls: 'bg-rose-50 text-rose-700 border-rose-200' });
+                    }
+                    pills.forEach((p) => {
+                        const span = document.createElement('span');
+                        span.className = `px-2.5 py-1 rounded-full border ${p.cls}`;
+                        span.textContent = p.label;
+                        bar.appendChild(span);
+                    });
+                }
+
+                async function loadDailyWaQueue() {
+                    const list = document.getElementById('daily_wa_queue_list');
+                    const dateInput = document.getElementById('queue_target_date');
                     const out = document.getElementById('bulk_status_output');
-                    btn.disabled = true;
-                    btn.innerHTML = `<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1.5"></div> Despachando...`;
+                    if (out) out.classList.add('hidden');
+                    if (!list) return;
+
+                    list.textContent = '';
+                    const loading = document.createElement('p');
+                    loading.className = 'text-xs text-slate-400 italic text-center py-6';
+                    loading.textContent = 'Cargando citas elegibles...';
+                    list.appendChild(loading);
+
+                    const targetDate = dateInput ? dateInput.value : '';
+                    const qs = new URLSearchParams({ include_sent: 'true' });
+                    if (targetDate) qs.set('target_date', targetDate);
 
                     try {
-                        const res = await fetch('/appointments/whatsapp/send-all-daily-reminders', { method: 'POST' });
+                        const res = await fetch(`/appointments/whatsapp/daily-queue?${qs.toString()}`);
                         const data = await res.json();
-                        out.classList.remove('hidden');
-                        if (data.success) {
-                            out.className = 'p-3 rounded-xl text-xs bg-emerald-50 border border-emerald-200 text-emerald-800';
-                            out.innerHTML = `<strong>¡Proceso completado!</strong><br>Recordatorios enviados para el día ${data.target_date}: <strong>${data.sent_count}</strong> de ${data.total_eligible} citas elegibles.`;
-                            setTimeout(() => { window.location.reload(); }, 2500);
-                        } else {
-                            out.className = 'p-3 rounded-xl text-xs bg-red-50 border border-red-200 text-red-800';
-                            out.innerHTML = `Ocurrió un problema: ${data.error || 'error'}`;
+                        if (!res.ok || !data.success) {
+                            throw new Error(data.error || data.detail || 'Error al cargar la cola.');
                         }
-                    } catch(e) {
-                        out.classList.remove('hidden');
-                        out.className = 'p-3 rounded-xl text-xs bg-red-50 border border-red-200 text-red-800';
-                        out.innerHTML = 'Error de conexión con el servidor.';
-                    } finally {
-                        btn.disabled = false;
-                        btn.innerHTML = `<i class="fas fa-play mr-1.5"></i> Despachar Recordatorios Ahora`;
+                        currentQueueState = data;
+                        renderQueueSummaryBar(data);
+                        renderQueueItems(data.items || []);
+                    } catch (e) {
+                        list.textContent = '';
+                        const errP = document.createElement('p');
+                        errP.className = 'text-xs text-rose-600 font-semibold text-center py-4';
+                        errP.textContent = e.message || 'Error de conexión al cargar la cola.';
+                        list.appendChild(errP);
+                    }
+                }
+
+                function renderQueueItems(items) {
+                    const list = document.getElementById('daily_wa_queue_list');
+                    if (!list) return;
+                    list.textContent = '';
+
+                    if (!items.length) {
+                        const empty = document.createElement('div');
+                        empty.className = 'p-6 text-center bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500';
+                        empty.textContent = 'No hay citas Pendientes o Confirmadas para esta fecha.';
+                        list.appendChild(empty);
+                        return;
+                    }
+
+                    items.forEach((item) => {
+                        const row = document.createElement('div');
+                        row.className = `p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${item.already_sent ? 'bg-emerald-50/40 border-emerald-200' : 'bg-white border-slate-200'}`;
+
+                        const infoCol = document.createElement('div');
+                        infoCol.className = 'min-w-0 space-y-1';
+
+                        const titleLine = document.createElement('div');
+                        titleLine.className = 'flex items-center gap-2 flex-wrap';
+
+                        const timeTag = document.createElement('span');
+                        timeTag.className = 'px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-mono font-bold text-[11px]';
+                        timeTag.textContent = item.time || 'Por definir';
+                        titleLine.appendChild(timeTag);
+
+                        const nameEl = document.createElement('span');
+                        nameEl.className = 'text-xs font-bold text-slate-900 truncate';
+                        nameEl.textContent = item.patient_name || 'Paciente';
+                        titleLine.appendChild(nameEl);
+
+                        const stateTag = document.createElement('span');
+                        stateTag.className = item.already_sent
+                            ? 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200';
+                        stateTag.textContent = item.already_sent ? `✓ Enviado${item.sent_at ? ' (' + item.sent_at + ')' : ''}` : 'Pendiente';
+                        titleLine.appendChild(stateTag);
+
+                        const phoneLine = document.createElement('div');
+                        phoneLine.className = 'text-[11px] font-mono text-slate-500';
+                        phoneLine.textContent = item.valid_phone
+                            ? `+${String(item.clean_phone).replace(/^\++/, '')}`
+                            : `Sin teléfono válido (${item.raw_phone || 'no registrado'})`;
+
+                        infoCol.appendChild(titleLine);
+                        infoCol.appendChild(phoneLine);
+                        row.appendChild(infoCol);
+
+                        const actionsCol = document.createElement('div');
+                        actionsCol.className = 'flex items-center gap-2 shrink-0';
+
+                        if (item.valid_phone && item.wa_link) {
+                            const openA = document.createElement('a');
+                            openA.href = item.wa_link;
+                            openA.target = '_blank';
+                            openA.rel = 'noopener noreferrer';
+                            openA.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1';
+                            const ic = document.createElement('i');
+                            ic.className = 'fab fa-whatsapp';
+                            openA.appendChild(ic);
+                            openA.appendChild(document.createTextNode('Abrir WhatsApp'));
+                            actionsCol.appendChild(openA);
+
+                            if (!item.already_sent) {
+                                const confirmBtn = document.createElement('button');
+                                confirmBtn.type = 'button';
+                                confirmBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs inline-flex items-center gap-1';
+                                confirmBtn.textContent = '✓ Confirmar';
+                                confirmBtn.addEventListener('click', () => confirmQueueItemSent(item, row, stateTag, confirmBtn));
+                                actionsCol.appendChild(confirmBtn);
+                            }
+                        } else {
+                            const warnBadge = document.createElement('span');
+                            warnBadge.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200';
+                            warnBadge.textContent = 'Tel. inválido';
+                            actionsCol.appendChild(warnBadge);
+                        }
+
+                        row.appendChild(actionsCol);
+                        list.appendChild(row);
+                    });
+                }
+
+                async function confirmQueueItemSent(item, rowEl, stateTagEl, btnEl) {
+                    const out = document.getElementById('bulk_status_output');
+                    btnEl.disabled = true;
+                    btnEl.textContent = 'Guardando...';
+
+                    const formData = new FormData();
+                    formData.append('send_mode', 'manual');
+                    formData.append('confirm_sent', 'true');
+
+                    try {
+                        const res = await fetch(`/appointments/${item.id}/whatsapp-send`, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const data = await res.json();
+                        if (!res.ok || !data.success) {
+                            throw new Error(data.error || data.detail || 'No se pudo confirmar.');
+                        }
+                        item.already_sent = true;
+                        item.sent_at = data.sent_at;
+                        rowEl.className = 'p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-emerald-50/40 border-emerald-200';
+                        stateTagEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200';
+                        stateTagEl.textContent = `✓ Enviado${data.sent_at ? ' (' + data.sent_at + ')' : ''}`;
+                        btnEl.remove();
+
+                        if (currentQueueState) {
+                            currentQueueState.sent_count = (currentQueueState.sent_count || 0) + 1;
+                            currentQueueState.pending_count = Math.max(0, (currentQueueState.pending_count || 1) - 1);
+                            renderQueueSummaryBar(currentQueueState);
+                        }
+                        updateRowWaStatus(item.id, data.sent_at);
+                    } catch (e) {
+                        btnEl.disabled = false;
+                        btnEl.textContent = '✓ Confirmar';
+                        if (out) {
+                            out.textContent = e.message || 'Error al confirmar envío.';
+                            out.className = 'p-3 rounded-xl text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-700';
+                            out.classList.remove('hidden');
+                        }
                     }
                 }
 
@@ -741,36 +988,99 @@
 
                 spinner.classList.add('hidden');
                 if (!data.consultations || data.consultations.length === 0) {
+                    emptyEl.textContent = 'No hay consultas médicas registradas para este paciente.';
                     emptyEl.classList.remove('hidden');
                 } else {
                     listEl.classList.remove('hidden');
-                    data.consultations.forEach((c, idx) => {
+                    data.consultations.forEach((c) => {
                         const card = document.createElement('div');
                         card.className = 'p-4 rounded-2xl border border-slate-200 bg-white shadow-2xs hover:border-blue-300 transition-colors space-y-2';
-                        card.innerHTML = `
-                            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
-                                <span class="font-extrabold text-blue-900 text-xs flex items-center gap-1.5">
-                                    <i class="far fa-calendar-check text-blue-600"></i> ${c.date}
-                                    <span class="text-[10px] font-normal text-slate-400">(${c.doctor})</span>
-                                </span>
-                                <a href="/consultations/${c.id}" target="_blank" class="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                                    Ver Ficha <i class="fas fa-external-link-alt text-[9px]"></i>
-                                </a>
-                            </div>
-                            <div class="text-xs space-y-1">
-                                <p><strong class="text-slate-700">Motivo:</strong> <span class="text-slate-900 font-medium">${c.reason}</span></p>
-                                ${c.diagnosis ? `<p><strong class="text-slate-700">Diagnóstico:</strong> <span class="font-bold text-violet-700">${c.diagnosis}</span></p>` : ''}
-                                ${c.clinical_history ? `<p class="text-slate-600 text-[11px] bg-slate-50 p-2 rounded-lg border border-slate-100 mt-1">${c.clinical_history}</p>` : ''}
-                                ${c.prescription ? `<p class="text-[11px] text-emerald-800 bg-emerald-50/70 p-2 rounded-lg border border-emerald-100 mt-1"><strong class="text-emerald-900"><i class="fas fa-prescription mr-1"></i>Tratamiento:</strong> ${c.prescription}</p>` : ''}
-                            </div>
-                        `;
+
+                        const header = document.createElement('div');
+                        header.className = 'flex items-center justify-between border-b border-slate-100 pb-2';
+
+                        const titleSpan = document.createElement('span');
+                        titleSpan.className = 'font-extrabold text-blue-900 text-xs flex items-center gap-1.5';
+                        const calIcon = document.createElement('i');
+                        calIcon.className = 'far fa-calendar-check text-blue-600';
+                        titleSpan.appendChild(calIcon);
+                        titleSpan.appendChild(document.createTextNode(` ${c.date || ''} `));
+                        const docSpan = document.createElement('span');
+                        docSpan.className = 'text-[10px] font-normal text-slate-400';
+                        docSpan.textContent = `(${c.doctor || ''})`;
+                        titleSpan.appendChild(docSpan);
+
+                        const linkA = document.createElement('a');
+                        linkA.href = `/consultations/${encodeURIComponent(c.id)}`;
+                        linkA.target = '_blank';
+                        linkA.rel = 'noopener noreferrer';
+                        linkA.className = 'text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1';
+                        linkA.textContent = 'Ver Ficha ';
+                        const extIcon = document.createElement('i');
+                        extIcon.className = 'fas fa-external-link-alt text-[9px]';
+                        linkA.appendChild(extIcon);
+
+                        header.appendChild(titleSpan);
+                        header.appendChild(linkA);
+                        card.appendChild(header);
+
+                        const bodyDiv = document.createElement('div');
+                        bodyDiv.className = 'text-xs space-y-1';
+
+                        const reasonP = document.createElement('p');
+                        const reasonStrong = document.createElement('strong');
+                        reasonStrong.className = 'text-slate-700';
+                        reasonStrong.textContent = 'Motivo: ';
+                        const reasonSpan = document.createElement('span');
+                        reasonSpan.className = 'text-slate-900 font-medium';
+                        reasonSpan.textContent = c.reason || '';
+                        reasonP.appendChild(reasonStrong);
+                        reasonP.appendChild(reasonSpan);
+                        bodyDiv.appendChild(reasonP);
+
+                        if (c.diagnosis) {
+                            const diagP = document.createElement('p');
+                            const diagStrong = document.createElement('strong');
+                            diagStrong.className = 'text-slate-700';
+                            diagStrong.textContent = 'Diagnóstico: ';
+                            const diagSpan = document.createElement('span');
+                            diagSpan.className = 'font-bold text-violet-700';
+                            diagSpan.textContent = c.diagnosis;
+                            diagP.appendChild(diagStrong);
+                            diagP.appendChild(diagSpan);
+                            bodyDiv.appendChild(diagP);
+                        }
+
+                        if (c.clinical_history) {
+                            const histP = document.createElement('p');
+                            histP.className = 'text-slate-600 text-[11px] bg-slate-50 p-2 rounded-lg border border-slate-100 mt-1';
+                            histP.textContent = c.clinical_history;
+                            bodyDiv.appendChild(histP);
+                        }
+
+                        if (c.prescription) {
+                            const rxP = document.createElement('p');
+                            rxP.className = 'text-[11px] text-emerald-800 bg-emerald-50/70 p-2 rounded-lg border border-emerald-100 mt-1';
+                            const rxStrong = document.createElement('strong');
+                            rxStrong.className = 'text-emerald-900';
+                            rxStrong.textContent = 'Tratamiento: ';
+                            rxP.appendChild(rxStrong);
+                            rxP.appendChild(document.createTextNode(c.prescription));
+                            bodyDiv.appendChild(rxP);
+                        }
+
+                        card.appendChild(bodyDiv);
                         listEl.appendChild(card);
                     });
                 }
             } catch (err) {
                 spinner.classList.add('hidden');
+                emptyEl.textContent = '';
+                const errP = document.createElement('p');
+                errP.className = 'text-red-600 font-bold text-xs';
+                errP.textContent = `No se pudo cargar el historial: ${err && err.message ? err.message : 'error'}`;
+                emptyEl.appendChild(errP);
                 emptyEl.classList.remove('hidden');
-                emptyEl.innerHTML = `<p class="text-red-600 font-bold text-xs"><i class="fas fa-exclamation-circle mr-1"></i> No se pudo cargar el historial: ${err.message}</p>`;
             }
         };
 
@@ -778,7 +1088,69 @@
             const modal = document.getElementById('patientHistoryModal');
             if (modal) modal.classList.add('hidden');
         };
+
+        let _apptRemoveId = null;
+        window.openApptRemoveModal = function(apptId, patientName) {
+            _apptRemoveId = apptId;
+            const el = document.getElementById('appt-remove-patient-name');
+            if (el) el.textContent = patientName || 'Paciente';
+            document.getElementById('apptRemoveQueueModal')?.classList.remove('hidden');
+        };
+        window.closeApptRemoveModal = function() {
+            _apptRemoveId = null;
+            document.getElementById('apptRemoveQueueModal')?.classList.add('hidden');
+        };
+        window.submitApptRemove = async function(mode) {
+            if (!_apptRemoveId) return;
+            const fd = new FormData();
+            fd.append('mode', mode);
+            try {
+                const resp = await fetch(`/appointments/${_apptRemoveId}/remove-from-queue`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json' },
+                    body: fd
+                });
+                const res = await resp.json();
+                closeApptRemoveModal();
+                if (resp.ok && res.success) {
+                    window.location.reload();
+                } else {
+                    alert('No se pudo actualizar: ' + (res.detail || res.message || 'Error'));
+                }
+            } catch (e) {
+                alert('Error de conexión: ' + e.message);
+            }
+        };
         </script>
+
+        <div id="apptRemoveQueueModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                            <i class="fas fa-user-minus text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">Sacar de Sala de Espera</h3>
+                            <p class="text-xs text-slate-500">Paciente: <strong id="appt-remove-patient-name" class="text-slate-800"></strong></p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeApptRemoveModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+                </div>
+                <p class="text-xs text-slate-600">Elige si solo deseas quitarle el turno de la fila manteniendo su cita para hoy, o anular completamente la cita si se creó por error.</p>
+                <div class="space-y-2">
+                    <button type="button" onclick="submitApptRemove('unqueue')" class="w-full py-2.5 px-4 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold rounded-xl text-xs transition flex items-center justify-center gap-2">
+                        <i class="fas fa-undo"></i> Solo sacar de la fila (Dejar Pendiente hoy)
+                    </button>
+                    <button type="button" onclick="submitApptRemove('cancel')" class="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-2">
+                        <i class="fas fa-ban"></i> Anular cita creada por error (Quitar de hoy)
+                    </button>
+                    <button type="button" onclick="closeApptRemoveModal()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
 
         </main>
     </div>

@@ -23,7 +23,7 @@ CONSUMERS = [
     WORKSPACE / "sscp" / "resources" / "views" / "welcome.blade.php",
     WORKSPACE / "sscp" / "resources" / "views" / "pwa" / "login.blade.php",
 ]
-LITERAL_VERSION = re.compile(r"(?<![\w.])v?\d+\.\d+\.\d+(?![\w.])")
+LITERAL_VERSION = re.compile(r"(?<![\w.])v?\d+\.\d+\.\d+(?:-[a-zA-Z0-9-]+)?(?![\w.])")
 COMMENT_PREFIXES = ("<!--", "{{--", "//", "#", "*")
 
 
@@ -77,6 +77,7 @@ def build_targets(v: dict):
 
     edits = [
         (DESKTOP / "electron" / "package.json", r'^(\s*"version":\s*")[^"]+(")', rf'\g<1>{v["suite"]}\g<2>'),
+        (DESKTOP / "electron" / "config" / "config.json", r'^(\s*"version":\s*")[^"]+(")', rf'\g<1>{v["suite"]}\g<2>'),
         (DESKTOP / "installer.nsi", r'(!define PRODUCT_VERSION ")[^"]+(")', rf'\g<1>{v["suite"]}\g<2>'),
         (WORKSPACE / "sscp-mobile" / "app" / "build.gradle", r'(versionCode\s+)\d+', rf'\g<1>{v["apk_code"]}'),
         (WORKSPACE / "sscp-mobile" / "app" / "build.gradle", r'(versionName\s+")[^"]+(")', rf'\g<1>{v["apk"]}\g<2>'),
@@ -91,18 +92,19 @@ def build_targets(v: dict):
             raise SystemExit(f"[ERROR] patron no encontrado en {path}: {pattern}")
     targets += [(path, originals[path], contents[path]) for path in originals]
 
-    # mobile/index.html: fuente única en sscp-mobile, reflejada en desktop y sscp
-    mobile_master = WORKSPACE / "sscp-mobile" / "app" / "src" / "main" / "assets" / "www" / "index.html"
+    # mobile/index.html: fuente única en sscp/public/mobile/index.html, reflejada en desktop, sscp-mobile y Laravel
+    mobile_master = WORKSPACE / "sscp" / "public" / "mobile" / "index.html"
     replicas = [
         DESKTOP / "app" / "templates" / "mobile" / "index.html",
-        WORKSPACE / "sscp" / "public" / "mobile" / "index.html",
+        WORKSPACE / "sscp-mobile" / "app" / "src" / "main" / "assets" / "www" / "index.html",
+        WORKSPACE / "sscp-mobile" / "index.html",
         WORKSPACE / "sscp" / "resources" / "views" / "pwa" / "index.blade.php",
         WORKSPACE / "sscp" / "resources" / "views" / "mobile" / "index.blade.php",
     ]
     if mobile_master.exists():
         mm_orig = read_raw(mobile_master)
         mm_new = re.sub(
-            r'(<span[^>]*class="[^"]*rounded-full[^"]*"[^>]*>)v\d+\.\d+\.\d+(</span>)',
+            r'(<span[^>]*class="[^"]*rounded-full[^"]*"[^>]*>)v\d+\.\d+\.\d+(?:-[a-zA-Z0-9._-]+)?(</span>)',
             rf'\g<1>v{v["apk"]}\g<2>',
             mm_orig
         )

@@ -29,7 +29,7 @@ class Payment(Base):
     sede_origen = Column(String, default="local")
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     patient = relationship("Patient", backref="payments")
     appointment = relationship("Appointment", backref="payments")

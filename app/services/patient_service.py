@@ -1,5 +1,6 @@
 import re
 from difflib import SequenceMatcher
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.models.patient import Patient
 
@@ -26,20 +27,37 @@ class PatientService:
         document_id: str = None,
         phone: str = None,
         exclude_id: int = None,
-        threshold: float = 0.75
+        threshold: float = 0.75,
+        doctor_id: int = None
     ) -> list:
         """
-        Detector Inteligente de Pacientes Duplicados (F9) mediante comparación difusa y verificación cruzada.
+        Detector Inteligente de Pacientes Duplicados (F9) mediante pre-filtrado SQL y comparación difusa.
         """
         target_name = f"{(first_name or '').strip()} {(last_name or '').strip()}".lower()
         clean_target_doc = PatientService.normalize_doc(document_id)
         clean_target_phone = PatientService.normalize_phone(phone)
 
-        query = db.query(Patient)
+        query = db.query(Patient).filter(Patient.is_active == True)
+        if doctor_id:
+            query = query.filter(or_(Patient.doctor_id == doctor_id, Patient.doctor_id == None))
         if exclude_id:
             query = query.filter(Patient.id != exclude_id)
-        
-        candidates = query.all()
+
+        sql_clauses = []
+        fn_tok = (first_name or "").strip()[:3]
+        ln_tok = (last_name or "").strip()[:3]
+        if fn_tok:
+            sql_clauses.append(Patient.first_name.ilike(f"%{fn_tok}%"))
+        if ln_tok:
+            sql_clauses.append(Patient.last_name.ilike(f"%{ln_tok}%"))
+        if clean_target_doc:
+            sql_clauses.append(Patient.document_id.ilike(f"%{clean_target_doc[-6:]}%"))
+        if clean_target_phone and len(clean_target_phone) >= 4:
+            sql_clauses.append(Patient.phone.ilike(f"%{clean_target_phone[-4:]}%"))
+        if sql_clauses:
+            query = query.filter(or_(*sql_clauses))
+
+        candidates = query.limit(250).all()
         matches = []
 
         for p in candidates:

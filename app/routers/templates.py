@@ -6,7 +6,7 @@ from pathlib import Path
 
 from app.database import get_db
 from app.models.template import ClinicalTemplate
-from app.core.deps import require_current_user
+from app.core.deps import require_permission
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 from app.core.templates import templates
@@ -16,7 +16,7 @@ def list_templates(
     request: Request,
     category: str = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('templates'))
 ):
     query = db.query(ClinicalTemplate)
     if category:
@@ -40,7 +40,7 @@ def create_template(
     category: str = Form(...), # "prescription", "consultation", "license", "reference"
     content: str = Form(...),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('templates'))
 ):
     new_tpl = ClinicalTemplate(
         doctor_id=current_user.id,
@@ -60,7 +60,7 @@ def edit_template(
     category: str = Form(...),
     content: str = Form(...),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('templates'))
 ):
     tpl = db.query(ClinicalTemplate).filter(ClinicalTemplate.id == template_id).first()
     if not tpl:
@@ -75,7 +75,7 @@ def edit_template(
 def delete_template(
     template_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('templates'))
 ):
     tpl = db.query(ClinicalTemplate).filter(ClinicalTemplate.id == template_id).first()
     if tpl:
@@ -87,7 +87,7 @@ def delete_template(
 def api_get_templates(
     category: str = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('templates'))
 ):
     query = db.query(ClinicalTemplate)
     if category:

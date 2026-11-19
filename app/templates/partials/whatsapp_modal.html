@@ -1,4 +1,4 @@
-<!-- MODAL GLOBAL: VINCULACIÓN DE WHATSAPP DEL CONSULTORIO (DOCTOR, SECRETARÍA Y ADMIN) -->
+<!-- MODAL GLOBAL: CENTRO DE WHATSAPP 1-CLIC DEL CONSULTORIO -->
 <div id="globalWhatsAppModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-fade-in text-slate-800">
         <!-- Header del Modal -->
@@ -8,36 +8,35 @@
                     <i class="fab fa-whatsapp"></i>
                 </div>
                 <div>
-                    <h3 class="text-base font-bold text-slate-900">WhatsApp del Consultorio</h3>
-                    <p class="text-xs text-slate-500">Recordatorios de citas y avisos directos</p>
+                    <h3 class="text-base font-bold text-slate-900">Centro de WhatsApp 1-Clic</h3>
+                    <p class="text-xs text-slate-500">WhatsApp Web / App directo desde tu consultorio</p>
                 </div>
             </div>
             <button type="button" onclick="closeWhatsAppModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none">&times;</button>
         </div>
 
-        <!-- Vista Conectada / Activa -->
-        <div id="wa-modal-connected-view" class="hidden space-y-4 text-left">
-            <!-- Tarjeta de Estado Activo y Número del Consultorio -->
+        <div class="space-y-4 text-left">
+            <!-- Tarjeta de Modo Activo y Número de Referencia -->
             <div class="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-3">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold shadow-xs">
-                            <i class="fas fa-check-circle"></i>
+                        <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold shadow-xs">
+                            <i class="fas fa-paper-plane"></i>
                         </div>
                         <div>
-                            <h4 class="text-xs font-bold text-emerald-950">WhatsApp Conectado y Activo</h4>
-                            <p class="text-[10px] text-emerald-700">Listo para enviar avisos y recordatorios</p>
+                            <h4 class="text-xs font-bold text-emerald-950">Modo 1-Clic Real</h4>
+                            <p class="text-[10px] text-emerald-700">Cada médico envía desde su propio WhatsApp</p>
                         </div>
                     </div>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1 animate-pulse"></span> Activo
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900">
+                        1-Clic Real
                     </span>
                 </div>
 
-                <!-- CAMPO PRINCIPAL: AQUÍ SE ESCRIBE / EDITA EL NÚMERO DEL CONSULTORIO -->
+                <!-- Número de Referencia de la Clínica -->
                 <div class="pt-2 border-t border-emerald-200/60">
                     <label for="wa_active_phone_input" class="block text-[11px] font-bold text-slate-800 uppercase tracking-wider mb-1">
-                        <i class="fab fa-whatsapp text-emerald-600 mr-1 text-xs"></i> Número de WhatsApp del Consultorio (Secretaría):
+                        <i class="fab fa-whatsapp text-emerald-600 mr-1 text-xs"></i> Teléfono de Referencia (Doctor / Clínica):
                     </label>
                     <div class="flex gap-2">
                         <div class="relative flex-1">
@@ -50,90 +49,49 @@
                                    style="pointer-events: auto !important; user-select: text !important;"
                                    class="w-full pl-8 pr-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900 shadow-xs">
                         </div>
-                        <button type="button" onclick="updateClinicWhatsAppPhone()" 
+                        <button type="button" onclick="updateClinicWhatsAppPhone()"
                                 id="btn-save-wa-phone"
                                 class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs active:scale-95 flex items-center gap-1.5 shrink-0">
                             <i class="fas fa-save"></i> Guardar
                         </button>
                     </div>
-                    <div id="wa_active_phone_feedback" class="text-xs mt-1.5"></div>
+                    <div id="wa_active_phone_feedback" class="text-xs mt-1.5 font-semibold"></div>
                     <p class="text-[10px] text-slate-500 mt-1">
-                        Escribe aquí el número de celular del consultorio con o sin guiones y presiona <strong>Guardar</strong>.
+                        Se usa para recibir alertas cuando un paciente pasa a sala de espera (mínimo 10 dígitos).
                     </p>
                 </div>
             </div>
 
-            <!-- Sección de Probar Envío -->
+            <!-- Sección de Prueba 1-Clic -->
             <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
                 <label for="wa_modal_test_phone" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                    <i class="fas fa-paper-plane text-slate-500 mr-1 text-xs"></i> Probar Envío de Mensaje de Prueba
+                    <i class="fas fa-external-link-alt text-slate-500 mr-1 text-xs"></i> Probar WhatsApp 1-Clic
                 </label>
                 <div class="flex gap-2">
-                    <input type="tel" id="wa_modal_test_phone" placeholder="Número de prueba (ej: 809-555-0199)" 
+                    <input type="tel" id="wa_modal_test_phone" placeholder="Número de prueba (ej: 809-555-0199)"
                            onclick="this.focus(); this.select();" onfocus="this.select();"
                            autocomplete="tel" tabindex="0"
                            style="pointer-events: auto !important; user-select: text !important;"
                            class="flex-1 px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800 shadow-xs">
-                    <button type="button" onclick="sendModalTestWhatsApp()" 
+                    <button type="button" onclick="sendModalTestWhatsApp()"
                             class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition shadow-xs active:scale-95 flex items-center gap-1 shrink-0">
-                        <i class="fas fa-paper-plane text-[10px]"></i> Enviar Prueba
+                        <i class="fas fa-paper-plane text-[10px]"></i> Probar 1-Clic
                     </button>
                 </div>
-                <div id="wa_modal_test_result" class="text-xs"></div>
+                <div id="wa_modal_test_result" class="text-xs font-semibold"></div>
                 <p class="text-[10px] text-slate-400">
-                    Se enviará un aviso de confirmación al número indicado para verificar la conexión.
+                    Genera el enlace real <code>wa.me</code> y abre tu aplicación o WhatsApp Web en una pestaña segura.
                 </p>
             </div>
 
-            <!-- Footer con Cerrar y Desvincular -->
+            <!-- Footer -->
             <div class="pt-2 flex justify-between items-center border-t border-slate-100">
                 <button type="button" onclick="closeWhatsAppModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
                     Cerrar
                 </button>
-                <button type="button" onclick="disconnectModalGateway()" 
+                <button type="button" onclick="disconnectModalGateway()"
                         class="px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-xl transition flex items-center gap-1.5">
-                    <i class="fas fa-unlink text-[10px]"></i> Desvincular Teléfono
-                </button>
-            </div>
-        </div>
-
-        <!-- Vista de Configuración Inicial (Cuando no hay número registrado) -->
-        <div id="wa-modal-disconnected-view" class="space-y-4 text-left">
-            <div class="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl text-left space-y-1.5">
-                <div class="flex items-center gap-2 text-emerald-900 font-bold text-xs">
-                    <i class="fas fa-shield-alt text-emerald-600 text-sm"></i>
-                    <span>Vinculación de WhatsApp del Consultorio</span>
-                </div>
-                <p class="text-xs text-slate-600 leading-relaxed">
-                    Ingresa el número de WhatsApp de la clínica o secretaría. No necesitas escanear códigos QR: el sistema redactará los recordatorios oficiales y los enviará al paciente con un solo toque.
-                </p>
-            </div>
-
-            <div class="space-y-1">
-                <label for="wa-pairing-phone-input" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                    Número de Celular con WhatsApp (Secretaría / Consultorio):
-                </label>
-                <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-emerald-600">
-                        <i class="fas fa-phone-alt text-xs"></i>
-                    </div>
-                    <input type="tel" id="wa-pairing-phone-input" placeholder="Ej: 809-555-0199 o 8295550199" 
-                           onclick="this.focus(); this.select();" onfocus="this.select();"
-                           autocomplete="tel" tabindex="0"
-                           style="pointer-events: auto !important; user-select: text !important;"
-                           class="w-full pl-8 pr-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900 shadow-xs">
-                </div>
-                <p class="text-[10px] text-slate-400">
-                    Introduce el número con o sin guiones (ej. 809-555-0199 o 8295550199).
-                </p>
-            </div>
-
-            <div class="flex items-center justify-between pt-2 border-t border-slate-100">
-                <button type="button" onclick="closeWhatsAppModal()" class="px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-xl transition">
-                    Cerrar
-                </button>
-                <button type="button" onclick="confirmGlobalPairing()" class="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/25 transition-all flex items-center active:scale-95">
-                    <i class="fas fa-check mr-1.5"></i> Vincular WhatsApp
+                    <i class="fas fa-eraser text-[10px]"></i> Limpiar Teléfono
                 </button>
             </div>
         </div>
@@ -141,38 +99,31 @@
 </div>
 
 <script>
+    function _setWaFeedback(el, text, cls) {
+        if (!el) return;
+        el.textContent = text;
+        el.className = `text-xs mt-1.5 font-semibold ${cls}`;
+    }
+
     async function checkWhatsAppGlobalStatus() {
         try {
             const res = await fetch('/settings/whatsapp/status');
             if (!res.ok) return;
             const data = await res.json();
-            
+
             const btnDot = document.getElementById('header-wa-status-dot');
             const btnText = document.getElementById('header-wa-status-text');
             const btn = document.getElementById('header-wa-btn');
 
-            if (data.is_connected) {
-                if (btnDot) {
-                    btnDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
-                }
-                if (btnText) {
-                    btnText.textContent = data.connected_phone ? `WS: ${data.connected_phone}` : 'WS Conectado';
-                }
-                if (btn) {
-                    btn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-all shadow-xs active:scale-95';
-                    btn.setAttribute('title', `WhatsApp Vinculado (${data.connected_phone || 'Activo'}). Clic para ver opciones o cambiar número.`);
-                }
-            } else {
-                if (btnDot) {
-                    btnDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
-                }
-                if (btnText) {
-                    btnText.textContent = 'Vincular WS';
-                }
-                if (btn) {
-                    btn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition-all shadow-xs active:scale-95';
-                    btn.setAttribute('title', 'WhatsApp no vinculado. Clic para registrar el número de teléfono para recordatorios.');
-                }
+            if (btnDot) {
+                btnDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+            }
+            if (btnText) {
+                btnText.textContent = data.connected_phone ? `WA 1-Clic: ${data.connected_phone}` : 'WhatsApp 1-Clic';
+            }
+            if (btn) {
+                btn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-all shadow-xs active:scale-95';
+                btn.setAttribute('title', 'Centro de WhatsApp 1-Clic (clic para configurar o probar enlace directo)');
             }
         } catch (e) {
             console.error('Error comprobando estado de WhatsApp:', e);
@@ -184,37 +135,23 @@
         if (!modal) return;
         modal.classList.remove('hidden');
 
+        const activePhoneInput = document.getElementById('wa_active_phone_input');
+        const testPhoneInput = document.getElementById('wa_modal_test_phone');
+        const feedback = document.getElementById('wa_active_phone_feedback');
+        const testResult = document.getElementById('wa_modal_test_result');
+
+        if (feedback) feedback.textContent = '';
+        if (testResult) testResult.textContent = '';
+
         try {
             const res = await fetch('/settings/whatsapp/status');
+            if (!res.ok) return;
             const data = await res.json();
-
-            const connView = document.getElementById('wa-modal-connected-view');
-            const discView = document.getElementById('wa-modal-disconnected-view');
-            const activePhoneInput = document.getElementById('wa_active_phone_input');
-            const testPhoneInput = document.getElementById('wa_modal_test_phone');
-            const pairingPhoneInput = document.getElementById('wa-pairing-phone-input');
-            const feedback = document.getElementById('wa_active_phone_feedback');
-            const testResult = document.getElementById('wa_modal_test_result');
-            
-            if (feedback) feedback.innerHTML = '';
-            if (testResult) testResult.innerHTML = '';
-
-            if (data.is_connected) {
-                connView.classList.remove('hidden');
-                discView.classList.add('hidden');
-                if (activePhoneInput) {
-                    activePhoneInput.value = data.connected_phone || '';
-                }
-                if (testPhoneInput) {
-                    testPhoneInput.value = data.connected_phone || '';
-                }
-            } else {
-                connView.classList.add('hidden');
-                discView.classList.remove('hidden');
-                if (pairingPhoneInput && data.connected_phone) {
-                    pairingPhoneInput.value = data.connected_phone;
-                }
-                setTimeout(() => { if (pairingPhoneInput) { pairingPhoneInput.focus(); pairingPhoneInput.select(); } }, 120);
+            if (activePhoneInput) {
+                activePhoneInput.value = data.connected_phone || '';
+            }
+            if (testPhoneInput && !testPhoneInput.value) {
+                testPhoneInput.value = data.connected_phone || '';
             }
         } catch (e) {
             console.error('Error al abrir modal de WhatsApp:', e);
@@ -233,12 +170,12 @@
         const phone = input ? input.value.trim() : '';
 
         if (!phone) {
-            if (feedback) feedback.innerHTML = '<span class="text-rose-600 font-bold text-xs"><i class="fas fa-exclamation-circle mr-1"></i>Por favor ingrese un número de teléfono.</span>';
+            _setWaFeedback(feedback, 'Por favor ingrese un número de teléfono válido.', 'text-rose-600');
             if (input) input.focus();
             return;
         }
 
-        if (feedback) feedback.innerHTML = '<span class="text-slate-500 text-xs"><i class="fas fa-spinner fa-spin mr-1"></i>Guardando número...</span>';
+        _setWaFeedback(feedback, 'Guardando número de referencia...', 'text-slate-500');
         if (btn) btn.disabled = true;
 
         const formData = new FormData();
@@ -246,63 +183,44 @@
 
         try {
             const res = await fetch('/settings/whatsapp/confirm-pairing', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.is_connected) {
-                if (feedback) feedback.innerHTML = '<span class="text-emerald-700 font-bold text-xs"><i class="fas fa-check-circle mr-1"></i>¡Número guardado exitosamente!</span>';
-                const testPhone = document.getElementById('wa_modal_test_phone');
-                if (testPhone) {
-                    testPhone.value = phone;
-                }
-                checkWhatsAppGlobalStatus();
-                setTimeout(() => {
-                    if (feedback) feedback.innerHTML = '';
-                }, 3500);
-            } else {
-                if (feedback) feedback.innerHTML = `<span class="text-rose-600 font-bold text-xs">${data.error || 'Error al guardar número'}</span>`;
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 403) {
+                _setWaFeedback(feedback, 'Solo usuarios con permiso de Configuración pueden modificar este número.', 'text-rose-600');
+                return;
             }
+            if (!res.ok || !data.success) {
+                _setWaFeedback(feedback, data.error || data.detail || 'Número inválido (mínimo 10 dígitos).', 'text-rose-600');
+                return;
+            }
+            _setWaFeedback(feedback, '¡Número de referencia guardado exitosamente!', 'text-emerald-700');
+            const testPhone = document.getElementById('wa_modal_test_phone');
+            if (testPhone) testPhone.value = phone;
+            checkWhatsAppGlobalStatus();
         } catch (e) {
-            if (feedback) feedback.innerHTML = '<span class="text-rose-600 font-bold text-xs">Error de comunicación con el servidor.</span>';
+            _setWaFeedback(feedback, 'Error de comunicación con el servidor.', 'text-rose-600');
         } finally {
             if (btn) btn.disabled = false;
         }
     }
 
-    async function confirmGlobalPairing() {
-        const phoneInput = document.getElementById('wa-pairing-phone-input');
-        const phone = phoneInput ? phoneInput.value.trim() : '';
-
-        if (!phone) {
-            alert('Por favor ingrese el número de teléfono del consultorio o secretaría.');
-            if (phoneInput) phoneInput.focus();
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('phone', phone);
-
-        try {
-            const res = await fetch('/settings/whatsapp/confirm-pairing', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.is_connected) {
-                checkWhatsAppGlobalStatus();
-                openWhatsAppModal(); // Cambiará inmediatamente a la vista conectada con el número cargado
-            }
-        } catch (e) {
-            alert('Error al confirmar vinculación de WhatsApp.');
-        }
-    }
-
     async function disconnectModalGateway() {
-        if (!confirm('¿Desea desvincular este número de WhatsApp?')) return;
+        if (!confirm('¿Desea limpiar el número de referencia de WhatsApp?')) return;
+        const feedback = document.getElementById('wa_active_phone_feedback');
         try {
             const res = await fetch('/settings/whatsapp/disconnect', { method: 'POST' });
-            const data = await res.json();
-            if (!data.is_connected) {
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 403) {
+                _setWaFeedback(feedback, 'Solo usuarios con permiso de Configuración pueden limpiar este número.', 'text-rose-600');
+                return;
+            }
+            if (res.ok && data.success) {
+                const activePhoneInput = document.getElementById('wa_active_phone_input');
+                if (activePhoneInput) activePhoneInput.value = '';
+                _setWaFeedback(feedback, 'Número de referencia limpiado.', 'text-slate-600');
                 checkWhatsAppGlobalStatus();
-                openWhatsAppModal(); // Cambiará a la vista inicial para ingresar número
             }
         } catch (e) {
-            alert('Error al desconectar WhatsApp.');
+            _setWaFeedback(feedback, 'Error de conexión con el servidor.', 'text-rose-600');
         }
     }
 
@@ -312,35 +230,45 @@
         const phone = phoneInput ? phoneInput.value.trim() : '';
 
         if (!phone) {
-            resElem.innerHTML = '<span class="text-rose-600 font-bold text-xs"><i class="fas fa-exclamation-circle mr-1"></i>Ingrese un número de teléfono de prueba</span>';
+            _setWaFeedback(resElem, 'Ingrese un número de teléfono de prueba.', 'text-rose-600');
             if (phoneInput) phoneInput.focus();
             return;
         }
 
-        resElem.innerHTML = '<span class="text-slate-500 text-xs"><i class="fas fa-spinner fa-spin mr-1"></i>Enviando prueba...</span>';
+        _setWaFeedback(resElem, 'Generando enlace WhatsApp 1-Clic...', 'text-slate-500');
         const formData = new FormData();
         formData.append('phone', phone);
-        formData.append('message', 'Prueba de conexión: WhatsApp de SSCP Desktop está vinculado y listo para enviar recordatorios a pacientes.');
+        formData.append('message', 'Prueba de WhatsApp 1-Clic desde SSCP Desktop: enlace verificado correctamente.');
 
         try {
             const res = await fetch('/settings/whatsapp/send-test', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) {
-                if (data.wa_link) {
-                    resElem.innerHTML = `<a href="${data.wa_link}" target="_blank" class="text-emerald-700 font-bold text-xs underline flex items-center gap-1 mt-1"><i class="fas fa-external-link-alt"></i>Abrir WhatsApp (1-Clic)</a>`;
-                    window.open(data.wa_link, '_blank');
-                } else {
-                    resElem.innerHTML = `<span class="text-emerald-600 font-bold text-xs"><i class="fas fa-check-circle mr-1"></i>¡Mensaje enviado con éxito!</span>`;
-                }
-            } else {
-                resElem.innerHTML = `<span class="text-rose-600 font-bold text-xs">${data.error || 'Error en el envío'}</span>`;
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 403) {
+                _setWaFeedback(resElem, 'Permiso de Configuración requerido para ejecutar la prueba.', 'text-rose-600');
+                return;
             }
+            if (!res.ok || !data.success || !data.wa_link) {
+                _setWaFeedback(resElem, data.error || data.detail || 'Número inválido (mínimo 10 dígitos).', 'text-rose-600');
+                return;
+            }
+
+            if (resElem) {
+                resElem.textContent = '';
+                resElem.className = 'text-xs mt-1.5 font-semibold';
+                const link = document.createElement('a');
+                link.href = data.wa_link;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.className = 'text-emerald-700 font-bold underline inline-flex items-center gap-1';
+                link.textContent = 'Abrir WhatsApp (1-Clic)';
+                resElem.appendChild(link);
+            }
+            window.open(data.wa_link, '_blank', 'noopener,noreferrer');
         } catch (e) {
-            resElem.innerHTML = '<span class="text-rose-600 font-bold text-xs">Error de comunicación con el servidor.</span>';
+            _setWaFeedback(resElem, 'Error de comunicación con el servidor.', 'text-rose-600');
         }
     }
 
-    // Comprobar estado de WhatsApp al cargar cualquier página
     document.addEventListener('DOMContentLoaded', () => {
         checkWhatsAppGlobalStatus();
     });

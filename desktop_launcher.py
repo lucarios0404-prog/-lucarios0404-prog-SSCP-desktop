@@ -84,6 +84,48 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+if "--provision-supabase-file" in sys.argv:
+    import json as _json
+    cfg_path = None
+    status_path = None
+    try:
+        idx = sys.argv.index("--provision-supabase-file")
+        cfg_path = Path(sys.argv[idx + 1]) if idx + 1 < len(sys.argv) else None
+        status_path = Path(str(cfg_path) + ".status.txt") if cfg_path else None
+        payload = {}
+        if cfg_path and cfg_path.exists():
+            raw_txt = cfg_path.read_text(encoding="utf-8", errors="replace").replace("\x00", "").strip()
+            if raw_txt.startswith("{"):
+                payload = _json.loads(raw_txt)
+            else:
+                for line in raw_txt.splitlines():
+                    if "=" in line:
+                        k, v = line.split("=", 1)
+                        payload[k.strip()] = v.strip()
+        from app.services.supabase_sync_service import SupabaseSyncService
+        res = SupabaseSyncService.provision_from_installer_payload(payload)
+        print("SUPA_INSTALLER_RESULT:", _json.dumps(res, ensure_ascii=False))
+        if status_path:
+            if res.get("ok"):
+                ka = "Activado" if res.get("keepalive_ok") else "Pendiente"
+                lines = [
+                    f"Canal del Doctor: {res.get('clinic_id', '-')}",
+                    f"Proyecto Supabase: {res.get('supabase_url', '-')}",
+                    f"Tablas RLS y RPCs: Creadas y verificadas | Keep-Alive: {ka}",
+                ]
+            else:
+                lines = [str(res.get("error") or "Error desconocido conectando con Supabase.")]
+            status_path.write_text("\n".join(lines) + "\n", encoding="cp1252", errors="replace")
+        sys.exit(0 if res.get("ok") else 1)
+    except Exception as _exc:
+        print("SUPA_INSTALLER_ERROR:", str(_exc))
+        if status_path:
+            try:
+                status_path.write_text(str(_exc).replace("\r", " ").replace("\n", " ") + "\r\n", encoding="cp1252", errors="replace")
+            except Exception:
+                pass
+        sys.exit(1)
+
 SERVER_HOST = os.environ.get("SSCP_HOST", "0.0.0.0")
 CLIENT_HOST = "127.0.0.1"
 
@@ -129,6 +171,7 @@ def run():
         server_port = int(env_port)
     else:
         server_port = find_available_port(SERVER_HOST, 8080)
+    os.environ["SSCP_ACTIVE_PORT"] = str(server_port)
     server_url = f"http://{CLIENT_HOST}:{server_port}"
 
     config = uvicorn.Config(
@@ -158,6 +201,7 @@ def run():
         except (KeyboardInterrupt, SystemExit):
             pass
         server.should_exit = True
+        server_thread.join(timeout=3.0)
         sys.exit(0)
 
     # Intentar abrir con ventana nativa de escritorio (PyWebView)
@@ -208,6 +252,7 @@ def run():
             pass
 
     server.should_exit = True
+    server_thread.join(timeout=3.0)
     sys.exit(0)
 
 if __name__ == "__main__":

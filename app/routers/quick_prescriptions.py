@@ -63,7 +63,7 @@ def check_allergy_api(
     patient_id: int = Form(...),
     prescription_text: str = Form(...),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('prescriptions'))
 ):
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
@@ -134,6 +134,7 @@ def submit_quick_prescription(
 def print_talonario(
     patient_id: int = Form(...),
     prescription: str = Form(...),
+    force_override: bool = Form(False),
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('prescriptions'))
 ):
@@ -146,12 +147,34 @@ def print_talonario(
     if not patient:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
 
+    conflicts = check_allergy_conflict(patient.allergies, prescription)
+    if conflicts and not force_override:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Bloqueo de Seguridad por Alergias (F6): El paciente es alérgico a {', '.join(conflicts)}. Active 'Confirmar prescripción bajo criterio médico' para continuar."
+        )
+
     setting = db.query(Setting).first()
     pdf_buffer = generate_talonario_overlay_pdf(
         patient=patient,
         prescription_text=prescription,
         setting=setting,
     )
+
+    try:
+        from app.services.audit_service import AuditService
+        AuditService.log_change(
+            db=db,
+            entity_type="prescription",
+            entity_id=patient.id,
+            action="create",
+            summary=f"Talonario impreso para paciente #{patient.id}",
+            patient_id=patient.id,
+            user_id=current_user.id,
+            new_data={"prescription_preview": prescription[:120], "force_override": force_override},
+        )
+    except Exception:
+        pass
 
     filename = f"Talonario_{patient.document_id or patient.id}.pdf"
     return StreamingResponse(

@@ -8,11 +8,12 @@ from app.database import get_db
 from app.services.relay_service import RelayService
 from app.models.setting import Setting
 from app.services.qr_service import generate_qr_code_image_bytes
+from app.core.deps import require_current_user, require_permission
 
 router = APIRouter(prefix="/api/relay", tags=["relay"])
 
 @router.get("/status")
-def global_relay_status(db: Session = Depends(get_db)):
+def global_relay_status(db: Session = Depends(get_db), current_user = Depends(require_current_user)):
     """Estado global del buzón relay local."""
     clinic_id = RelayService.get_clinic_id(db)
     setting = db.query(Setting).first()
@@ -73,7 +74,7 @@ def get_link_info(db: Session = Depends(get_db)):
     }
 
 @router.get("/{clinic_id}/status")
-def clinic_relay_status(clinic_id: str, db: Session = Depends(get_db)):
+def clinic_relay_status(clinic_id: str, db: Session = Depends(get_db), current_user = Depends(require_current_user)):
     """Estado del buzón para una clínica específica."""
     setting = db.query(Setting).first()
     messages = RelayService.pull_messages(db, clinic_id=clinic_id, limit=100)
@@ -104,7 +105,8 @@ def clinic_relay_status(clinic_id: str, db: Session = Depends(get_db)):
 def push_to_relay(
     clinic_id: str,
     payload: Dict[str, Any] = Body(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
 ):
     """
     Deposita un lote de cambios en el buzón relay.
@@ -135,7 +137,8 @@ def pull_from_relay(
     clinic_id: str,
     since: Optional[str] = Query(None),
     device_id: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
 ):
     """
     Recupera los deltas pendientes del buzón.
@@ -161,17 +164,19 @@ def pull_from_relay(
 @router.post("/sync-local")
 def sync_local_default(
     since: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
 ):
     """Sincroniza directamente usando el clinic_id configurado en la clínica."""
     clinic_id = RelayService.get_clinic_id(db)
-    return sync_local_from_relay(clinic_id=clinic_id, since=since, db=db)
+    return sync_local_from_relay(clinic_id=clinic_id, since=since, db=db, current_user=current_user)
 
 @router.post("/{clinic_id}/sync-local")
 def sync_local_from_relay(
     clinic_id: str,
     since: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_current_user)
 ):
     """
     Descarga del buzón (tanto del Cloud Relay por Internet como local)
@@ -216,37 +221,24 @@ def sync_local_from_relay(
 
 
 @router.get("/qr-link")
-def get_relay_qr_image(request: Request, db: Session = Depends(get_db)):
-    """Genera la imagen PNG del Código QR para conectar la tablet en 2 segundos."""
+def get_relay_qr_image(request: Request, db: Session = Depends(get_db), current_user = Depends(require_permission("settings"))):
+    """Genera la imagen PNG del Código QR universal 100% Nube (Supabase) desde Python sin internet ni :8080."""
     import urllib.parse
-    import socket
-    clinic_id = RelayService.get_clinic_id(db)
-    setting = db.query(Setting).first()
-    doc_name = setting.doctor_name if setting and setting.doctor_name else ""
-    spec = setting.specialty if setting and setting.specialty else ""
-    clinic_name = setting.clinic_name if setting and setting.clinic_name else ""
+    from app.services.supabase_sync_service import SupabaseSyncService
 
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))
-        local_ip = s.getsockname()[0]
-    except Exception:
-        local_ip = "127.0.0.1"
-    finally:
-        s.close()
+    cfg = SupabaseSyncService.get_bridge_config(db)
+    clinic_id = (cfg.get("clinic_id") or RelayService.get_clinic_id(db) or "consultorio_principal").strip()
+    bkey = (cfg.get("secret_hash") or "").strip()
+    supa_url = (cfg.get("supabase_url") or "").strip()
+    supa_key = (cfg.get("supabase_anon_key") or "").strip()
 
-    local_url = f"http://{local_ip}:8080"
-
-    params = urllib.parse.urlencode({
-        "clinic_id": clinic_id,
-        "local_url": local_url,
-        "server": local_url,
-        "cloud_server": "https://sscp.laxarusdevs.com",
-        "doctor": doc_name,
-        "specialty": spec,
-        "clinic": clinic_name
-    })
-    # Genera enlace universal compatible tanto con red local Wi-Fi como por Cloud Relay 4G
+    query_payload = {
+        "channel": clinic_id,
+        "bkey": bkey,
+        "supabase_url": supa_url,
+        "supabase_key": supa_key,
+    }
+    params = urllib.parse.urlencode(query_payload)
     connection_data = f"https://sscp.laxarusdevs.com/mobile/?{params}"
 
     qr_bytes = generate_qr_code_image_bytes(connection_data)

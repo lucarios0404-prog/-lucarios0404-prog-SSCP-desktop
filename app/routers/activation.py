@@ -1,18 +1,31 @@
 """app/routers/activation.py — Pantalla de activacion de licencia."""
 from typing import Optional
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
-import sys
-from pathlib import Path
+from sqlalchemy.orm import Session
 
 from app.core.templates import templates
+from app.core.deps import get_current_user
+from app.database import get_db
 router = APIRouter()
 
 
+def _can_manage_active_license(current_user) -> bool:
+    return bool(
+        current_user
+        and current_user.is_active
+        and current_user.role in ("admin", "doctor")
+        and current_user.has_permission("settings")
+    )
+
+
 @router.get("/activate", response_class=HTMLResponse)
-async def activation_page(request: Request):
-    from app.services.license_service import get_machine_id, get_license_mode
+async def activation_page(request: Request, db: Session = Depends(get_db)):
+    from app.services.license_service import get_machine_id, get_license_mode, check_license, LicenseStatus
+    if check_license().status == LicenseStatus.ACTIVE:
+        current_user = get_current_user(request, db)
+        if not _can_manage_active_license(current_user):
+            return RedirectResponse(url="/", status_code=303)
     machine_id = get_machine_id()
     mode = get_license_mode()
     return templates.TemplateResponse(
@@ -32,8 +45,17 @@ async def activate_license(
     request: Request,
     license_key: Optional[str] = Form(None),
     mode: str = Form("offline"),
+    db: Session = Depends(get_db),
 ):
-    from app.services.license_service import activate, get_machine_id, LicenseStatus
+    from app.services.license_service import activate, get_machine_id, check_license, LicenseStatus
+
+    if check_license().status == LicenseStatus.ACTIVE:
+        current_user = get_current_user(request, db)
+        if not _can_manage_active_license(current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo un administrador autenticado puede reemplazar una licencia activa.",
+            )
 
     machine_id = get_machine_id()
 

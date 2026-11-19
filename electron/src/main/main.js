@@ -85,11 +85,15 @@ function fetchBackendJson(urlPath, method = 'GET', data = null) {
       const url = new URL(urlPath, baseUrl);
       const postData = data ? JSON.stringify(data) : null;
 
+      const headers = {
+        'Accept': 'application/json'
+      };
+      if (serverManager && serverManager.ipcSecret) {
+        headers['X-SSCP-IPC-Secret'] = serverManager.ipcSecret;
+      }
       const options = {
         method: method,
-        headers: {
-          'Accept': 'application/json'
-        }
+        headers: headers
       };
       if (postData) {
         options.headers['Content-Type'] = 'application/json';

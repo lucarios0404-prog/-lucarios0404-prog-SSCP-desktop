@@ -9,6 +9,7 @@ added_files = [
     ('static', 'static'),
     ('alembic', 'alembic'),
     ('alembic.ini', '.'),
+    ('scripts/supabase_schema.sql', 'scripts'),
 ]
 
 hidden_imports = [
@@ -36,7 +37,7 @@ hidden_imports = [
     'pydantic',
     'pydantic_settings',
     'jinja2',
-    'passlib.handlers.bcrypt',
+    'bcrypt',
     'jose',
     'httpx',
     'app.routers.auth',
@@ -57,11 +58,16 @@ hidden_imports = [
     'app.routers.medical_references',
     'app.routers.mobile_api',
     'app.routers.services',
+    'app.routers.reception',
+    'app.routers.insurance_preauthorizations',
     'app.routers.relay',
     'app.models.service',
+    'app.models.insurance_preauthorization',
     'app.models.lab_order',
     'app.models.relay_message',
+    'app.services.appointment_reconciliation',
     'app.services.relay_service',
+    'app.services.supabase_sync_service',
     'app.services.ars_service',
     'app.core.templates',
     'app.data.services_catalog',
@@ -108,13 +114,13 @@ hidden_imports = [
 import os
 use_obfuscated = os.path.exists("app_obfuscated")
 if use_obfuscated:
-    pathex_dirs = ['app_obfuscated', '.']
+    pathex_dirs = ['app_obfuscated', '.', 'venv/Lib/site-packages']
     for item in os.listdir('app_obfuscated'):
         if item.startswith('pyarmor_runtime'):
             hidden_imports.append(item)
             added_files.append((os.path.join('app_obfuscated', item), item))
 else:
-    pathex_dirs = ['.']
+    pathex_dirs = ['.', 'venv/Lib/site-packages']
 
 a = Analysis(
     ['desktop_launcher.py'],

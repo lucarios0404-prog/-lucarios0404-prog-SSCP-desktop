@@ -12,7 +12,7 @@ from app.models.lab_order import LabOrder
 from app.models.patient import Patient
 from app.models.setting import Setting
 from app.models.consultation import Consultation
-from app.core.deps import require_current_user
+from app.core.deps import require_permission
 from app.services.pdf_service import generate_lab_order_pdf, generate_lab_order_talonario_pdf
 
 router = APIRouter(prefix="/lab-results", tags=["lab_results"])
@@ -37,7 +37,7 @@ def lab_checklist_main(
     patient_id: int = Query(None),
     consultation_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('labs'))
 ):
     """
     Vista principal del Módulo de Laboratorio:
@@ -74,7 +74,7 @@ def list_lab_results_history(
     request: Request,
     patient_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('labs'))
 ):
     """Historial y registro analítico de resultados de laboratorio."""
     query = db.query(LabResult).order_by(LabResult.result_date.desc())
@@ -100,7 +100,7 @@ def create_lab_result_form(
     request: Request,
     patient_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('labs'))
 ):
     patients = db.query(Patient).order_by(Patient.last_name).all()
     selected_patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
@@ -127,7 +127,7 @@ def create_lab_result(
     summary_findings: str = Form(...),
     is_abnormal: bool = Form(False),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('labs'))
 ):
     res_date = datetime.strptime(result_date_str, "%Y-%m-%d").date()
 
@@ -328,7 +328,7 @@ def list_lab_orders(
     request: Request,
     patient_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('labs'))
 ):
     """Listado general de solicitudes / órdenes de laboratorio emitidas."""
     query = db.query(LabOrder).order_by(LabOrder.order_date.desc(), LabOrder.id.desc())
@@ -354,7 +354,7 @@ def new_lab_order_form(
     patient_id: int = Query(None),
     consultation_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('labs'))
 ):
     """Redirige o procesa la emisión de órdenes al checklist principal."""
     return lab_checklist_main(
@@ -376,7 +376,7 @@ def create_lab_order(
     notes: str = Form(None),
     print_format: str = Form("talonario"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('labs'))
 ):
     """Guarda la orden de laboratorio en la base de datos y redirige a la vista."""
     all_tests = list(tests)
@@ -415,7 +415,7 @@ def quick_talonario_lab_order(
     notes: str = Form(None),
     order_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('labs'))
 ):
     """
     Guarda la orden e inmediatamente retorna el PDF del talonario preimpreso (21.7 × 13.6 cm).
@@ -496,7 +496,7 @@ def view_lab_order(
     order_id: int,
     autoprint: str = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('labs'))
 ):
     """Muestra el detalle de una orden de laboratorio emitida."""
     order = db.query(LabOrder).filter(LabOrder.id == order_id).first()
@@ -527,7 +527,7 @@ def view_lab_order(
 def download_lab_order_talonario_pdf(
     order_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('labs'))
 ):
     """Genera y descarga la orden de laboratorio en formato Talonario Físico (21.7 × 13.6 cm)."""
     order = db.query(LabOrder).filter(LabOrder.id == order_id).first()
@@ -551,7 +551,7 @@ def download_lab_order_talonario_pdf(
 def download_lab_order_pdf(
     order_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('labs'))
 ):
     """Genera y descarga el volante oficial de orden de laboratorio en PDF con membrete digital (Carta/A4)."""
     order = db.query(LabOrder).filter(LabOrder.id == order_id).first()

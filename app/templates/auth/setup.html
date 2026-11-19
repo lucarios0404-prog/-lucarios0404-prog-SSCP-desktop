@@ -142,11 +142,64 @@
 
                 <div class="pt-1">
                     <label class="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700 hover:text-slate-900">
-                        <input id="remember_credentials" name="remember_credentials" type="checkbox" checked
+                        <input id="remember_credentials" name="remember_credentials" type="checkbox"
                             class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer">
-                        <span class="font-medium">Recordar mis credenciales en este equipo (inicio automático)</span>
+                        <span class="font-medium">Mantener sesión abierta por 30 días en este equipo</span>
                     </label>
                 </div>
+            </div>
+
+            <!-- Paso 3: Puente Nube Propio del Doctor (Supabase) -->
+            <div class="space-y-3 pt-3 border-t border-slate-100">
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-bold text-sky-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fas fa-cloud text-sky-600"></i>
+                        <span>3. Nube Supabase del Doctor</span>
+                    </label>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">100% Nube</span>
+                </div>
+
+                {% if supabase_preset %}
+                <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2.5">
+                    <i class="fas fa-check-circle text-emerald-600 mt-0.5"></i>
+                    <div class="text-xs text-emerald-900">
+                        <strong class="block">¡Nube Supabase pre-configurada durante la instalación!</strong>
+                        <span class="text-[11px] text-emerald-700 font-mono">Canal: {{ supabase_preset.clinic_id }} &bull; {{ supabase_preset.supabase_url }}</span>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-[11px] text-slate-500 leading-relaxed">
+                    Pega únicamente tu Key de Supabase (<code>sbp_...</code>) para crear proyecto, tablas, seguridad RLS y Keep-Alive en la nube automáticamente (el token no se guarda).
+                </p>
+
+                <div class="p-3.5 rounded-xl bg-sky-50/60 border border-sky-200 space-y-2.5">
+                    <div>
+                        <label for="supabase_token" class="block text-[11px] font-bold text-sky-900 mb-1">
+                            Key de tu cuenta Supabase (<code class="bg-white px-1 rounded">sbp_...</code>)
+                        </label>
+                        <input id="supabase_token" name="supabase_token" type="password"
+                            class="block w-full px-3 py-2 border border-sky-200 rounded-lg text-xs font-mono bg-white text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-sky-500"
+                            placeholder="sbp_... (configura todo en la nube solo; no se guarda)">
+                        <input id="supabase_project_ref" name="supabase_project_ref" type="text"
+                            class="mt-1.5 block w-full px-3 py-1.5 border border-sky-200 rounded-lg text-[11px] font-mono bg-white text-slate-700 placeholder-slate-400"
+                            placeholder="Project Ref (solo si la cuenta tiene más de 1 proyecto)">
+                    </div>
+
+                    <details class="pt-1">
+                        <summary class="text-[11px] font-bold text-slate-600 cursor-pointer select-none hover:text-slate-900">
+                            Configuración manual (si ya ejecutaste el SQL en Supabase)
+                        </summary>
+                        <div class="space-y-2 mt-2">
+                            <input id="supabase_url" name="supabase_url" type="text"
+                                class="block w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono bg-white"
+                                placeholder="https://xxxxxxxx.supabase.co">
+                            <input id="supabase_anon_key" name="supabase_anon_key" type="text"
+                                class="block w-full px-3 py-1.5 border border-slate-200 rounded-lg text-[11px] font-mono bg-white"
+                                placeholder="Anon Key (eyJ...)">
+                        </div>
+                    </details>
+                </div>
+                {% endif %}
             </div>
 
             <div>
@@ -203,29 +256,22 @@ function togglePasswordVisibility(inputId, iconId) {
     }
 }
 
-// UTF-8 safe Base64 encoder for localStorage
-function encodeCred(str) {
-    try {
-        return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
-            return String.fromCharCode('0x' + p1);
-        }));
-    } catch (e) {
-        return '';
-    }
-}
-
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('setupForm');
     const emailInp = document.getElementById('email');
-    const passInp = document.getElementById('password');
     const remChk = document.getElementById('remember_credentials');
+
+    try { localStorage.removeItem('sscp_saved_pass'); } catch (e) {}
 
     if (form) {
         form.addEventListener('submit', function() {
+            try { localStorage.removeItem('sscp_saved_pass'); } catch (e) {}
             if (remChk && remChk.checked) {
                 localStorage.setItem('sscp_remember_credentials', 'true');
                 localStorage.setItem('sscp_saved_user', emailInp.value.trim().toLowerCase());
-                localStorage.setItem('sscp_saved_pass', encodeCred(passInp.value));
+            } else {
+                localStorage.removeItem('sscp_remember_credentials');
+                localStorage.removeItem('sscp_saved_user');
             }
         });
     }

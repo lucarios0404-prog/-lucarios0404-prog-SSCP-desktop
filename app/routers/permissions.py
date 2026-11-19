@@ -11,7 +11,7 @@ from fastapi import status
 from app.database import get_db
 from app.models.user import User
 from app.models.permission_catalog import PermissionCatalog
-from app.core.deps import require_admin, require_permission
+from app.core.deps import require_strict_admin, require_permission
 from app.core.permissions import (
     get_all_permissions,
     get_permissions_by_category,
@@ -22,6 +22,16 @@ from app.core.permissions import (
 from app.core.templates import templates
 
 router = APIRouter(prefix="/permissions", tags=["permissions"])
+
+
+def _safe_parse_perms(raw: Optional[str]) -> list[str]:
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, list) else []
+    except Exception:
+        return []
 
 
 @router.get("/")
@@ -65,7 +75,7 @@ def list_permissions(
 def create_permission_form(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("users")),
+    current_user: User = Depends(require_strict_admin),
 ):
     """Formulario para crear un nuevo permiso."""
     existing_categories = sorted(
@@ -91,7 +101,7 @@ def create_permission_submit(
     category: str = Form(...),
     new_category: Optional[str] = Form(""),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("users")),
+    current_user: User = Depends(require_strict_admin),
 ):
     """Guardar nuevo permiso en la BD."""
     # Usar categoría nueva si se especificó
@@ -155,7 +165,7 @@ def edit_permission_form(
     perm_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("users")),
+    current_user: User = Depends(require_strict_admin),
 ):
     """Formulario de edición de un permiso."""
     record = db.query(PermissionCatalog).filter(PermissionCatalog.id == perm_id).first()
@@ -169,7 +179,7 @@ def edit_permission_form(
     usage = sum(
         1 for u in all_users
         if u.role == "admin"
-        or (u.permissions and record.key in (json.loads(u.permissions) if u.permissions else []))
+        or (u.permissions and record.key in _safe_parse_perms(u.permissions))
     )
 
     return templates.TemplateResponse(
@@ -194,7 +204,7 @@ def edit_permission_submit(
     category: str = Form(...),
     new_category: Optional[str] = Form(""),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("users")),
+    current_user: User = Depends(require_strict_admin),
 ):
     """Guardar cambios del permiso."""
     record = db.query(PermissionCatalog).filter(PermissionCatalog.id == perm_id).first()
@@ -216,7 +226,7 @@ def edit_permission_submit(
 def toggle_permission(
     perm_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("users")),
+    current_user: User = Depends(require_strict_admin),
 ):
     """Activar o desactivar un permiso sin eliminarlo."""
     record = db.query(PermissionCatalog).filter(PermissionCatalog.id == perm_id).first()
@@ -235,7 +245,7 @@ def toggle_permission(
 def delete_permission(
     perm_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("users")),
+    current_user: User = Depends(require_strict_admin),
 ):
     """Eliminar permiso si no está en uso por ningún usuario personalizado."""
     record = db.query(PermissionCatalog).filter(PermissionCatalog.id == perm_id).first()
@@ -245,7 +255,7 @@ def delete_permission(
     # Verificar si algún usuario no-admin tiene este permiso personalizado
     users_with_perm = db.query(User).filter(User.permissions.isnot(None)).all()
     in_use = any(
-        record.key in (json.loads(u.permissions) if u.permissions else [])
+        record.key in _safe_parse_perms(u.permissions)
         for u in users_with_perm
     )
 

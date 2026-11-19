@@ -293,10 +293,13 @@ class SyncService:
                     ).first()
 
                 if not existing_c:
+                    from app.models.user import User
+                    default_doc = db.query(User).filter(User.role == "doctor", User.is_active == True).first()
+                    resolved_doc_id = c_data.get("doctor_id") or (default_doc.id if default_doc else 1)
                     # Consulta nueva: agregar al historial médico
                     new_c = Consultation(
                         patient_id=patient.id,
-                        doctor_id=1,
+                        doctor_id=resolved_doc_id,
                         reason=reason,
                         symptoms=c_data.get("symptoms"),
                         physical_exam=c_data.get("physical_exam"),
@@ -330,10 +333,25 @@ class SyncService:
                 patient = patient_map.get(str(v_data.get("patient_id")))
 
             if patient:
-                existing_v = db.query(VitalSign).filter(
-                    VitalSign.patient_id == patient.id,
-                    VitalSign.weight_kg == v_data.get("weight_kg")
-                ).first()
+                v_dt = None
+                if v_data.get("recorded_at"):
+                    try:
+                        v_dt = datetime.fromisoformat(str(v_data["recorded_at"]).replace("Z", "+00:00")).replace(tzinfo=None)
+                    except Exception:
+                        v_dt = None
+                q_v = db.query(VitalSign).filter(VitalSign.patient_id == patient.id)
+                if v_dt:
+                    from datetime import timedelta
+                    existing_v = q_v.filter(
+                        VitalSign.recorded_at >= v_dt - timedelta(seconds=5),
+                        VitalSign.recorded_at <= v_dt + timedelta(seconds=5),
+                    ).first()
+                else:
+                    existing_v = q_v.filter(
+                        VitalSign.weight_kg == v_data.get("weight_kg"),
+                        VitalSign.systolic_bp == v_data.get("systolic_bp"),
+                        VitalSign.heart_rate == v_data.get("heart_rate"),
+                    ).first()
                 if not existing_v:
                     new_v = VitalSign(
                         patient_id=patient.id,
@@ -347,7 +365,8 @@ class SyncService:
                         oxygen_saturation=v_data.get("oxygen_saturation"),
                         glucose_mg_dl=v_data.get("glucose_mg_dl"),
                         bmi=v_data.get("bmi"),
-                        notes=v_data.get("notes")
+                        notes=v_data.get("notes"),
+                        recorded_at=v_dt or datetime.utcnow()
                     )
                     db.add(new_v)
                     created_counts["vital_signs"] += 1
@@ -838,9 +857,12 @@ class SyncService:
                     ).first()
 
                 if not existing_c:
+                    from app.models.user import User
+                    default_doc = db.query(User).filter(User.role == "doctor", User.is_active == True).first()
+                    resolved_doc_id = c_data.get("doctor_id") or (default_doc.id if default_doc else 1)
                     new_c = Consultation(
                         patient_id=patient.id,
-                        doctor_id=1,
+                        doctor_id=resolved_doc_id,
                         reason=reason,
                         clinical_history=c_data.get("clinical_history"),
                         is_first_visit=bool(c_data.get("is_first_visit", False)),
@@ -897,9 +919,12 @@ class SyncService:
                 ).first()
 
                 if not existing_lo:
+                    from app.models.user import User
+                    default_doc = db.query(User).filter(User.role == "doctor", User.is_active == True).first()
+                    resolved_lo_doc = lo_data.get("doctor_id") or (default_doc.id if default_doc else 1)
                     new_lo = LabOrder(
                         patient_id=patient.id,
-                        doctor_id=1,
+                        doctor_id=resolved_lo_doc,
                         order_date=o_date or datetime.utcnow().date(),
                         clinical_indication=lo_data.get("clinical_indication"),
                         tests_requested=lo_data.get("tests_requested") or "[]",
@@ -943,9 +968,12 @@ class SyncService:
                             pass
 
                 if not existing_appt:
+                    from app.models.user import User
+                    default_doc = db.query(User).filter(User.role == "doctor", User.is_active == True).first()
+                    resolved_appt_doc = a_data.get("doctor_id") or (default_doc.id if default_doc else 1)
                     new_appt = Appointment(
                         patient_id=patient.id,
-                        doctor_id=1,
+                        doctor_id=resolved_appt_doc,
                         date=appt_date,
                         start_time=start_t,
                         reason=a_data.get("reason", "Consulta médica"),
@@ -958,9 +986,11 @@ class SyncService:
                     db.add(new_appt)
                     created_counts["appointments"] += 1
                 else:
-                    if a_data.get("status"):
+                    terminal_states = {"completada", "atendida", "cancelada", "anulada", "no asistió", "no_show"}
+                    loc_st = (existing_appt.status or "").strip().lower()
+                    if a_data.get("status") and loc_st not in terminal_states:
                         existing_appt.status = a_data.get("status")
-                    if a_data.get("queue_number"):
+                    if a_data.get("queue_number") and loc_st not in terminal_states:
                         existing_appt.queue_number = a_data.get("queue_number")
 
         # 5. Reconciliar Pagos
@@ -1003,10 +1033,25 @@ class SyncService:
                 patient = db.query(Patient).filter(Patient.document_id == doc_id).first()
 
             if patient:
-                existing_v = db.query(VitalSign).filter(
-                    VitalSign.patient_id == patient.id,
-                    VitalSign.weight_kg == v_data.get("weight_kg")
-                ).first()
+                v_dt = None
+                if v_data.get("recorded_at"):
+                    try:
+                        v_dt = datetime.fromisoformat(str(v_data["recorded_at"]).replace("Z", "+00:00")).replace(tzinfo=None)
+                    except Exception:
+                        v_dt = None
+                q_v = db.query(VitalSign).filter(VitalSign.patient_id == patient.id)
+                if v_dt:
+                    from datetime import timedelta
+                    existing_v = q_v.filter(
+                        VitalSign.recorded_at >= v_dt - timedelta(seconds=5),
+                        VitalSign.recorded_at <= v_dt + timedelta(seconds=5),
+                    ).first()
+                else:
+                    existing_v = q_v.filter(
+                        VitalSign.weight_kg == v_data.get("weight_kg"),
+                        VitalSign.systolic_bp == v_data.get("systolic_bp"),
+                        VitalSign.heart_rate == v_data.get("heart_rate"),
+                    ).first()
                 if not existing_v:
                     new_v = VitalSign(
                         patient_id=patient.id,
@@ -1020,7 +1065,8 @@ class SyncService:
                         oxygen_saturation=v_data.get("oxygen_saturation"),
                         glucose_mg_dl=v_data.get("glucose_mg_dl"),
                         bmi=v_data.get("bmi"),
-                        notes=v_data.get("notes")
+                        notes=v_data.get("notes"),
+                        recorded_at=v_dt or datetime.utcnow()
                     )
                     db.add(new_v)
                     created_counts["vital_signs"] += 1
@@ -1071,12 +1117,22 @@ class SyncService:
 
         # 2. Push local delta al par
         setting = db.query(Setting).first()
-        local_delta = SyncService.export_delta(db, since_iso=None)
+        peer_headers = {}
+        if setting and getattr(setting, "station_secret", None):
+            peer_headers["X-Peer-Key"] = setting.station_secret
+        last_log = (
+            db.query(SyncLog)
+            .filter(SyncLog.sync_type == "peer_sync", SyncLog.status == "success")
+            .order_by(SyncLog.id.desc())
+            .first()
+        )
+        since_cursor = last_log.created_at.isoformat() if (last_log and last_log.created_at) else None
+        local_delta = SyncService.export_delta(db, since_iso=since_cursor)
         sent_count = sum(local_delta.get("counts", {}).values())
 
         try:
             async with httpx.AsyncClient(timeout=30.0, verify=verify_ssl) as client:
-                push_resp = await client.post(f"{clean_url}/sync/peer/import", json=local_delta)
+                push_resp = await client.post(f"{clean_url}/sync/peer/import", json=local_delta, headers=peer_headers)
         except Exception as e:
             print(f"[Peer Sync] Error enviando delta a par: {e}")
 
@@ -1084,7 +1140,7 @@ class SyncService:
         pulled_counts = {}
         try:
             async with httpx.AsyncClient(timeout=30.0, verify=verify_ssl) as client:
-                pull_resp = await client.get(f"{clean_url}/sync/peer/delta")
+                pull_resp = await client.get(f"{clean_url}/sync/peer/delta", headers=peer_headers)
                 if pull_resp.status_code == 200:
                     peer_delta = pull_resp.json()
                     import_res = SyncService.import_delta(db, peer_delta)

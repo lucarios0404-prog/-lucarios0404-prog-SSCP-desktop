@@ -393,18 +393,19 @@ async function checkDuplicates() {
         const listDiv = document.getElementById('duplicate-list');
 
         if (data.has_duplicates && data.matches.length > 0) {
+            const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
             listDiv.innerHTML = '';
             data.matches.slice(0, 3).forEach(m => {
                 const item = document.createElement('div');
                 item.className = 'p-2 bg-white/80 rounded-lg border border-amber-200 flex items-center justify-between text-xs';
                 item.innerHTML = `
                     <div>
-                        <strong>${m.name}</strong> (DNI: ${m.document_id})
-                        <span class="text-amber-700 text-[11px] block">Motivo: ${m.reason_text}</span>
+                        <strong>${esc(m.name)}</strong> (DNI: ${esc(m.document_id)})
+                        <span class="text-amber-700 text-[11px] block">Motivo: ${esc(m.reason_text)}</span>
                     </div>
                     <div class="flex items-center space-x-2 shrink-0">
-                        <span class="px-2 py-0.5 rounded bg-amber-200/80 text-amber-900 font-bold text-[10px]">${m.score}% coincidencia</span>
-                        <a href="/patients/${m.id}" target="_blank" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-bold">Ver &rarr;</a>
+                        <span class="px-2 py-0.5 rounded bg-amber-200/80 text-amber-900 font-bold text-[10px]">${Number(m.score) || 0}% coincidencia</span>
+                        <a href="/patients/${encodeURIComponent(m.id)}" target="_blank" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-bold">Ver &rarr;</a>
                     </div>
                 `;
                 listDiv.appendChild(item);

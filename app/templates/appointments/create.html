@@ -23,8 +23,20 @@
                     </a>
                 </div>
 
+                {% if error_msg %}
+                <div class="p-4 bg-rose-50 border border-rose-300 text-rose-900 rounded-2xl shadow-sm flex items-start gap-3">
+                    <i class="fas fa-exclamation-triangle text-rose-600 text-lg mt-0.5"></i>
+                    <div class="text-xs font-semibold leading-relaxed">{{ error_msg }}</div>
+                </div>
+                {% endif %}
+
+                <div id="live-duplicate-warning" class="hidden p-3.5 bg-rose-50 border border-rose-300 text-rose-900 rounded-xl shadow-xs flex items-start gap-2.5 text-xs font-semibold">
+                    <i class="fas fa-ban text-rose-600 text-base mt-0.5"></i>
+                    <span id="live-duplicate-text"></span>
+                </div>
+
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
-                    <form method="post" action="/appointments/create" class="space-y-6">
+                    <form method="post" action="/appointments/create" class="space-y-6" id="desktop-create-appt-form">
                         <!-- Paciente Select & Live Autocomplete -->
                         <div class="space-y-2">
                             <div class="flex items-center justify-between">
@@ -410,6 +422,45 @@ function selectPatientFromLiveSearch(p) {
     }
     if (clearPatientBtn) clearPatientBtn.classList.remove('hidden');
     if (patientSearchDropdown) patientSearchDropdown.classList.add('hidden');
+    checkSameDayDuplicate();
 }
+
+async function checkSameDayDuplicate() {
+    const pidEl = document.getElementById('patient_select');
+    const dateEl = document.getElementById('appointment_date');
+    const warnBox = document.getElementById('live-duplicate-warning');
+    const warnText = document.getElementById('live-duplicate-text');
+    if (!pidEl || !dateEl || !warnBox || !warnText) return;
+
+    const pid = pidEl.value;
+    const dVal = dateEl.value;
+    if (!pid || !dVal) {
+        warnBox.classList.add('hidden');
+        return;
+    }
+    try {
+        const res = await fetch(`/appointments/check-duplicate?patient_id=${encodeURIComponent(pid)}&target_date=${encodeURIComponent(dVal)}`);
+        if (res.ok) {
+            const info = await res.json();
+            if (info.has_duplicate) {
+                warnText.textContent = info.message + ' No se podrá guardar otra cita en la misma fecha.';
+                warnBox.classList.remove('hidden');
+            } else {
+                warnBox.classList.add('hidden');
+            }
+        }
+    } catch (_) {}
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const pidEl = document.getElementById('patient_select');
+    const dateEl = document.getElementById('appointment_date');
+    if (pidEl) pidEl.addEventListener('change', checkSameDayDuplicate);
+    if (dateEl) dateEl.addEventListener('change', checkSameDayDuplicate);
+    document.querySelectorAll('button[onclick*="appointment_date"]').forEach(btn => {
+        btn.addEventListener('click', () => setTimeout(checkSameDayDuplicate, 50));
+    });
+    if (pidEl && pidEl.value) checkSameDayDuplicate();
+});
 </script>
 {% endblock %}

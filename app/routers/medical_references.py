@@ -98,7 +98,7 @@ def download_reference_pdf(
     reference_id: int,
     download: bool = Query(False),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('references'))
 ):
     ref_obj = db.query(MedicalReference).filter(MedicalReference.id == reference_id).first()
     if not ref_obj:
@@ -119,7 +119,7 @@ def download_reference_pdf(
 def download_reference_talonario_pdf(
     reference_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('references'))
 ):
     ref_obj = db.query(MedicalReference).filter(MedicalReference.id == reference_id).first()
     if not ref_obj:

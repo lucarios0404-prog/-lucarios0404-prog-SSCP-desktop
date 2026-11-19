@@ -9,12 +9,38 @@ function hasContent(dir) {
   return fs.existsSync(dir) && fs.readdirSync(dir).some((name) => name !== VERSION_FILE);
 }
 
-// Verifica si un archivo es una BD válida con tamaño mayor a 0 bytes
+// Verifica si un archivo es una BD válida con tamaño mayor a 0 bytes y excluye sidecars WAL/SHM/Journal o cuarentenas
 function isValidFileToCopy(filePath, fileName) {
   try {
+    const lower = String(fileName || '').toLowerCase();
+    if (
+      lower.endsWith('-wal') ||
+      lower.endsWith('-shm') ||
+      lower.endsWith('-journal') ||
+      lower.includes('.corrupt') ||
+      lower.includes('.orphan') ||
+      lower.includes('.repaired') ||
+      lower.includes('.pre_restore')
+    ) {
+      return false; // Nunca mezclar sidecars WAL/SHM/Journal ni copias corruptas o en cuarentena
+    }
     const stat = fs.statSync(filePath);
-    if (fileName.endsWith('.db') && stat.size === 0) {
-      return false; // Previene copiar DBs vacías de 0 bytes o placeholders
+    if (lower.endsWith('.db')) {
+      if (stat.size === 0) {
+        return false; // Previene copiar DBs vacías de 0 bytes o placeholders
+      }
+      if (stat.size >= 1024) {
+        const fd = fs.openSync(filePath, 'r');
+        try {
+          const buf = Buffer.alloc(16);
+          const readBytes = fs.readSync(fd, buf, 0, 16, 0);
+          if (readBytes < 16 || buf.toString('utf8') !== 'SQLite format 3\0') {
+            return false; // Rechaza archivos .db con encabezado SQLite corrupto
+          }
+        } finally {
+          fs.closeSync(fd);
+        }
+      }
     }
     return true;
   } catch {
@@ -146,10 +172,23 @@ function protectDataOnUpgrade(dataDir, currentVersion, options = {}) {
   }
 
   // Si a la carpeta actual le falta información previa, restaurar desde los backups disponibles
+  // (Nunca restaurar sobre una BD previamente puesta en cuarentena por corrupción)
+  const hasCorruptQuarantine = fs.existsSync(dataDir) && fs.readdirSync(dataDir).some((n) => n.includes('.corrupt'));
   const backupsToScan = existingBackups.length > 0 ? existingBackups : listBackups(backupsDir);
   for (const bName of backupsToScan) {
     const bPath = path.join(backupsDir, bName);
-    result.restored += copyMissing(bPath, dataDir);
+    if (hasCorruptQuarantine && fs.existsSync(bPath)) {
+      for (const entry of fs.readdirSync(bPath, { withFileTypes: true })) {
+        if (entry.name.toLowerCase().endsWith('.db')) continue;
+        const from = path.join(bPath, entry.name);
+        const to = path.join(dataDir, entry.name);
+        if (!entry.isDirectory() && !fs.existsSync(to) && isValidFileToCopy(from, entry.name)) {
+          try { fs.copyFileSync(from, to); result.restored++; } catch {}
+        }
+      }
+    } else {
+      result.restored += copyMissing(bPath, dataDir);
+    }
   }
 
   fs.mkdirSync(dataDir, { recursive: true });

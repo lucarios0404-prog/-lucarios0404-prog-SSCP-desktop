@@ -9,7 +9,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import (
     SimpleDocTemplate,
-    Paragraph,
+    Paragraph as _RLParagraph,
     Spacer,
     Table,
     TableStyle,
@@ -20,6 +20,36 @@ from reportlab.platypus import (
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch, mm
 from reportlab.pdfgen import canvas as rl_canvas
+
+_ALLOWED_RL_TAG_RE = re.compile(
+    r"</?(?:b|i|u|strong|em|br\s*/?|font(?:\s+[^>]*)?|para(?:\s+[^>]*)?|sup|sub)>",
+    re.IGNORECASE,
+)
+_XML_ENTITY_RE = re.compile(r"&(?:#\d+|#x[0-9a-fA-F]+|amp|lt|gt|quot|apos|nbsp|bull);")
+
+def _escape_xml_preserving_rl_markup(text: str) -> str:
+    tokens: list[str] = []
+    def _stash(m):
+        tokens.append(m.group(0))
+        return f"\x00RLTOK{len(tokens) - 1}\x00"
+    stashed = _ALLOWED_RL_TAG_RE.sub(_stash, str(text))
+    stashed = _XML_ENTITY_RE.sub(_stash, stashed)
+    escaped = stashed.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    for idx, tok in enumerate(tokens):
+        escaped = escaped.replace(f"\x00RLTOK{idx}\x00", tok)
+    return escaped
+
+def Paragraph(text, style, *args, **kwargs):
+    """Wrapper seguro que evita fallos XML 500 en ReportLab ante '<', '>' o '&' en notas clínicas."""
+    s = "" if text is None else str(text)
+    try:
+        return _RLParagraph(s, style, *args, **kwargs)
+    except Exception:
+        try:
+            return _RLParagraph(_escape_xml_preserving_rl_markup(s), style, *args, **kwargs)
+        except Exception:
+            plain = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            return _RLParagraph(plain, style, *args, **kwargs)
 
 PRIMARY_COLOR = colors.HexColor("#0f766e") # Teal 700
 SECONDARY_COLOR = colors.HexColor("#0d9488") # Teal 600
@@ -344,7 +374,7 @@ def _build_letterhead(story: list, styles: dict, setting=None, subtitle_text: st
     # Columna izquierda: logo (si existe) + nombre de clínica
     if logo_path and os.path.isfile(logo_path):
         try:
-            logo_img = Image(logo_path, width=1.1 * inch, height=1.1 * inch)
+            logo_img = Image(logo_path, width=1.1 * inch, height=1.1 * inch, kind='proportional')
             logo_img.hAlign = 'LEFT'
             left_content = [
                 [logo_img, Paragraph(f"<b>{clinic_name}</b>", styles["title"])]
@@ -793,12 +823,21 @@ def generate_medical_license_pdf(license, setting=None) -> io.BytesIO:
     # 3. DATOS DEL DOCTOR Y DEL PACIENTE
     patient = getattr(license, "patient", None)
     p_info = _extract_patient_display_data(patient)
-    doctor_name = getattr(setting, "doctor_name", "Dr. Carlos Miguel Heredia Jorge") if setting else "Dr. Carlos Miguel Heredia Jorge"
-    specialty = getattr(setting, "specialty", "Ginecólogo Obstetra") if setting else "Ginecólogo Obstetra"
-    exequatur = getattr(setting, "doctor_exequatur", "165-10") if setting else "165-10"
-    cedula = getattr(setting, "doctor_cedula", "001-1418378-3") if setting else "001-1418378-3"
+    doc_rel = getattr(license, "doctor", None)
+    doctor_name = (
+        getattr(doc_rel, "name", None)
+        or (getattr(setting, "doctor_name", None) if setting else None)
+        or "Médico Tratante"
+    )
+    specialty = (
+        getattr(doc_rel, "specialty", None)
+        or (getattr(setting, "specialty", None) if setting else None)
+        or "Medicina General"
+    )
+    exequatur = (getattr(setting, "doctor_exequatur", None) if setting else None) or "N/D"
+    cedula = (getattr(setting, "doctor_cedula", None) if setting else None) or "N/D"
 
-    prefix = "la Sra." if p_info.get("gender", "").lower() in ["f", "femenino"] else "el Sr./la Sra."
+    prefix = "la Sra." if p_info.get("gender", "").lower() in ["f", "femenino"] else "el/la paciente"
     patient_name = p_info["name"]
     doc_id = p_info["doc_id"]
     doc_part = f"ced {doc_id}" if doc_id and doc_id != "Sin documento" else ""
@@ -823,13 +862,10 @@ def generate_medical_license_pdf(license, setting=None) -> io.BytesIO:
         if notes_text:
             narrative = notes_text
         else:
+            days_rest = getattr(license, "days_rest", 1) or 1
             narrative = (
-                f"la cual cursando con un embarazo pre-término, paciente refiere sentirse imposibilitada "
-                f"para realizar su jornada actual, con dicho químico y soldadura ya que estas liberan partículas "
-                f"al inhalar los gases metales calentados (como el oro, la plata o las aleaciones con níquel) "
-                f"liberan partículas microscópicas. La inhalación constante de vapores metálicos puede ser perjudicial "
-                f"para el desarrollo fetal, por lo que consideramos que la misma sea colocada en otro lugar dentro "
-                f"de la empresa donde pueda desarrollar dichas labores."
+                f"quien tras evaluación clínica presenta condición médica que amerita "
+                f"reposo médico relativo por {days_rest} día(s) a partir de la fecha indicada."
             )
         
         full_cert = (
@@ -842,7 +878,7 @@ def generate_medical_license_pdf(license, setting=None) -> io.BytesIO:
     story.append(Spacer(1, 10))
 
     # 5. DIAGNÓSTICO (Dx)
-    diagnosis_val = (getattr(license, "diagnosis", None) or "Embarazo de 28 sem/usl").strip()
+    diagnosis_val = (getattr(license, "diagnosis", None) or "Evaluación clínica general").strip()
     dx_style = ParagraphStyle(
         "CertDx",
         parent=styles["body"],
@@ -980,19 +1016,21 @@ def generate_medical_reference_pdf(reference, setting=None) -> io.BytesIO:
 
     # 3. DATOS DEL DOCTOR Y DEL PACIENTE
     patient = getattr(reference, "patient", None)
+    ref_doc = getattr(reference, "doctor", None)
     p_info = _extract_patient_display_data(patient)
-    doctor_name = getattr(setting, "doctor_name", "Dr. Carlos Miguel Heredia Jorge") if setting else "Dr. Carlos Miguel Heredia Jorge"
-    specialty = getattr(setting, "specialty", "Ginecólogo Obstetra") if setting else "Ginecólogo Obstetra"
-    exequatur = getattr(setting, "doctor_exequatur", "165-10") if setting else "165-10"
-    cedula = getattr(setting, "doctor_cedula", "001-1418378-3") if setting else "001-1418378-3"
+    doctor_name = (getattr(ref_doc, "name", None) if ref_doc else None) or (getattr(setting, "doctor_name", None) if setting else None) or "Médico Tratante"
+    specialty = (getattr(setting, "specialty", None) if setting else None) or "Medicina General"
+    exequatur = (getattr(setting, "doctor_exequatur", None) if setting else None) or "N/D"
+    cedula = (getattr(setting, "doctor_cedula", None) if setting else None) or "N/D"
 
     prefix = "a la paciente" if p_info.get("gender", "").lower() in ["f", "femenino"] else "al paciente"
     patient_name = p_info["name"]
     doc_id = p_info["doc_id"]
-    doc_part = f"Cédula # <b>{doc_id}</b>" if doc_id and doc_id != "Sin documento" else ""
-    age_str = f"edad: <b>{p_info['age']}</b>" if p_info.get("age") and p_info['age'] != 'N/D' else ""
+    doc_part = f"Cédula # <b>{doc_id}</b>" if p_info.get("has_doc") else ""
+    age_val = p_info.get("age_str", "")
+    age_str = f"edad: <b>{age_val}</b>" if age_val else ""
     allergies_val = p_info.get("allergies", "")
-    allergies_note = f" &bull; Alergias: <b>{allergies_val}</b>" if allergies_val and allergies_val != "Negadas" else ""
+    allergies_note = f" &bull; Alergias: <b>{allergies_val}</b>" if allergies_val and allergies_val not in ("Negadas", "Ninguna registrada") else ""
 
     patient_details = ", ".join(filter(bool, [doc_part, age_str]))
     if patient_details:
@@ -1900,7 +1938,7 @@ def generate_lab_order_pdf(order, setting=None) -> io.BytesIO:
             p2 = Paragraph(f"<font color='#0f766e'><b>{idx2}.</b></font>&nbsp; <font color='#0f172a'><b>{t2}</b></font>", styles["body"]) if t2 else ""
             test_rows.append([p1, p2])
 
-        t_table = Table(test_rows, colWidths=[3.5 * inch, 3.5 * inch])
+        t_table = Table(test_rows, colWidths=[usable_w * 0.5, usable_w * 0.5])
         t_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('TOPPADDING', (0, 0), (-1, -1), 4),
@@ -2560,9 +2598,14 @@ def generate_insurance_preauthorization_pdf(auth_obj, setting=None) -> io.BytesI
 
     # ── BLOQUE 7: FIRMA Y SELLO DEL MÉDICO TRATANTE ────────────────────────────
     doc_user = getattr(auth_obj, "doctor", None)
-    doc_name = _s_esc(getattr(doc_user, "name", None) or (getattr(setting, "doctor_name", "Dr. Carlos M. Heredia") if setting else "Dr. Carlos M. Heredia"))
-    doc_spec = _s_esc(getattr(doc_user, "specialty", None) or (getattr(setting, "specialty", "Ginecología y Obstetricia") if setting else "Ginecología y Obstetricia"))
-    doc_code = _s_esc(getattr(auth_obj, "doctor_code", None) or (getattr(setting, "exequatur", "24241") if setting else "24241"))
+    doc_name = _s_esc(getattr(doc_user, "name", None) or (getattr(setting, "doctor_name", None) if setting else None) or "Médico Tratante")
+    doc_spec = _s_esc(getattr(doc_user, "specialty", None) or (getattr(setting, "specialty", None) if setting else None) or "Medicina General")
+    doc_code = _s_esc(
+        getattr(auth_obj, "doctor_code", None)
+        or (getattr(setting, "doctor_exequatur", None) if setting else None)
+        or (getattr(setting, "exequatur", None) if setting else None)
+        or "N/D"
+    )
 
     sig_data = [
         [

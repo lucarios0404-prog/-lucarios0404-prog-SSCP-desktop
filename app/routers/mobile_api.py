@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, func, desc
+from sqlalchemy import or_, func, desc, text
 from datetime import datetime, date, time
 from typing import Optional, List, Union, Any
 from pydantic import BaseModel, EmailStr
@@ -17,8 +17,49 @@ from app.models.service import Service
 from app.models.setting import Setting
 from app.core import security
 from app.core.deps import require_current_user, require_permission
+from app.routers.patients import resolve_current_doctor_id
 
 router = APIRouter(prefix="/api/mobile", tags=["mobile"])
+
+
+def _ensure_mobile_sync_keys_table(db: Session) -> None:
+    """Crea de forma idempotente la tabla ligera para evitar duplicados por reintentos móviles."""
+    from app.services.supabase_sync_service import SupabaseSyncService
+    SupabaseSyncService.ensure_sync_tables(db)
+
+
+def _notify_supabase() -> None:
+    """Despierta el puente incremental con Supabase tras cambios locales."""
+    try:
+        from app.services.supabase_sync_service import signal_supabase_sync
+        signal_supabase_sync()
+    except Exception:
+        pass
+
+
+def _lookup_mobile_sync_key(db: Session, client_uuid: Optional[str], entity_type: str) -> Optional[int]:
+    if not client_uuid or not str(client_uuid).strip():
+        return None
+    _ensure_mobile_sync_keys_table(db)
+    row = db.execute(
+        text("SELECT entity_id FROM mobile_sync_keys WHERE client_uuid = :cu AND entity_type = :et"),
+        {"cu": str(client_uuid).strip(), "et": entity_type},
+    ).fetchone()
+    return int(row[0]) if row else None
+
+
+def _record_mobile_sync_key(db: Session, client_uuid: Optional[str], entity_type: str, entity_id: int) -> None:
+    if not client_uuid or not str(client_uuid).strip() or not entity_id:
+        return
+    _ensure_mobile_sync_keys_table(db)
+    db.execute(
+        text("""
+            INSERT OR REPLACE INTO mobile_sync_keys (client_uuid, entity_type, entity_id, created_at)
+            VALUES (:cu, :et, :eid, :ca)
+        """),
+        {"cu": str(client_uuid).strip(), "et": entity_type, "eid": int(entity_id), "ca": datetime.utcnow().isoformat()},
+    )
+    db.commit()
 
 # --- Pydantic Schemas for Mobile ---
 class MobileLoginRequest(BaseModel):
@@ -29,7 +70,8 @@ class StatusUpdateRequest(BaseModel):
     status: str  # Pendiente, En Espera, En Consulta, Atendida, Cancelada
 
 class QuickAppointmentRequest(BaseModel):
-    patient_id: Optional[int] = None
+    client_uuid: Optional[str] = None
+    patient_id: Optional[Union[int, str]] = None
     patient_name: Optional[str] = None
     patient_last_name: Optional[str] = None
     patient_document_id: Optional[str] = None
@@ -38,11 +80,11 @@ class QuickAppointmentRequest(BaseModel):
     date: Optional[str] = None  # YYYY-MM-DD
     start_time: Optional[str] = None  # HH:MM
     reason: str
-    service_id: Optional[int] = None
+    service_id: Optional[Union[int, str]] = None
     price: Optional[float] = None
     insurance_name: Optional[str] = None
     insurance_number: Optional[str] = None
-    status: Optional[str] = "En Espera"
+    status: Optional[str] = None
     # Lógica de Cobro Inmediato vs Cobrar Más Tarde
     collect_now: Optional[bool] = False
     payment_amount: Optional[float] = None
@@ -50,6 +92,7 @@ class QuickAppointmentRequest(BaseModel):
     payment_notes: Optional[str] = None
 
 class MobilePatientCreateRequest(BaseModel):
+    client_uuid: Optional[str] = None
     first_name: str
     last_name: str
     document_id: Optional[str] = None
@@ -66,20 +109,42 @@ class MobilePatientCreateRequest(BaseModel):
     insurance_number: Optional[str] = None
 
 class QuickConsultationRequest(BaseModel):
-    patient_id: int
-    appointment_id: Optional[int] = None
+    client_uuid: Optional[str] = None
+    patient_id: Union[int, str]
+    appointment_id: Optional[Union[int, str]] = None
     reason: Optional[str] = "Consulta General"
+    clinical_history: Optional[str] = ""
     symptoms: Optional[str] = ""
     diagnosis: str
     treatment: Optional[str] = ""
+    prescription: Optional[str] = ""
     notes: Optional[str] = ""
+    weight_kg: Optional[float] = None
+    systolic_bp: Optional[int] = None
+    diastolic_bp: Optional[int] = None
+    heart_rate: Optional[int] = None
+    temperature_c: Optional[float] = None
+    oxygen_saturation: Optional[int] = None
+    force_allergy_override: bool = False
+
+class MobilePreauthCreateRequest(BaseModel):
+    patient_id: Optional[Union[int, str]] = None
+    patient_name: Optional[str] = None
+    patient_doc: Optional[str] = None
+    patient_phone: Optional[str] = None
+    ars_name: str
+    card_number: Optional[str] = None
+    service_type: str
+    cie10_code: Optional[str] = None
+    clinical_indication: Optional[str] = None
 
 class QuickPaymentRequest(BaseModel):
-    patient_id: int
+    client_uuid: Optional[str] = None
+    patient_id: Union[int, str]
     amount: float
     payment_method: str = "Efectivo"
-    appointment_id: Optional[int] = None
-    service_id: Optional[int] = None
+    appointment_id: Optional[Union[int, str]] = None
+    service_id: Optional[Union[int, str]] = None
     service_name: Optional[str] = "Consulta Médica General"
     insurance_name: Optional[str] = None
     item_type: Optional[str] = "servicio"  # "servicio" o "articulo"
@@ -197,10 +262,12 @@ class MobileBatchSyncRequest(BaseModel):
 # --- Public Ping Endpoint for Connection Testing ---
 @router.get("/ping")
 def ping_server(db: Session = Depends(get_db)):
+    from app.version import SUITE_VERSION
     setting = db.query(Setting).first()
     return {
         "status": "online",
         "app": "SSCP Desktop & Mobile Gateway",
+        "version": SUITE_VERSION,
         "clinic_name": setting.clinic_name if setting else "Centro Médico SSCP",
         "doctor_name": setting.doctor_name if setting else "Dr. Especialista",
         "timestamp": datetime.now().isoformat()
@@ -208,7 +275,14 @@ def ping_server(db: Session = Depends(get_db)):
 
 # --- Mobile Login ---
 @router.post("/login")
-def mobile_login(payload: MobileLoginRequest, db: Session = Depends(get_db)):
+def mobile_login(request: Request, payload: MobileLoginRequest, db: Session = Depends(get_db)):
+    from app.routers.auth import _check_and_record_attempt, _clear_attempts, _LOCKOUT_SECONDS
+    client_ip = request.client.host if request.client else "unknown"
+    if not _check_and_record_attempt(client_ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Demasiados intentos fallidos. Espera {_LOCKOUT_SECONDS} segundos."
+        )
     user = db.query(User).filter(User.email == payload.email.strip().lower()).first()
     if not user or not security.verify_password(payload.password, user.hashed_password):
         raise HTTPException(
@@ -220,9 +294,22 @@ def mobile_login(payload: MobileLoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuario inactivo. Contacte al administrador."
         )
+    _clear_attempts(client_ip)
 
     token = security.create_access_token(data={"email": user.email, "role": user.role})
     setting = db.query(Setting).first()
+
+    from app.services.supabase_sync_service import SupabaseSyncService
+    bridge_cfg = SupabaseSyncService.get_bridge_config(db)
+    bridge_payload = {
+        "enabled": bool(bridge_cfg.get("enabled")),
+        "clinic_id": bridge_cfg.get("clinic_id"),
+        "secret_hash": bridge_cfg.get("secret_hash"),
+        "supabase_url": bridge_cfg.get("supabase_url"),
+        "supabase_anon_key": bridge_cfg.get("supabase_anon_key"),
+        "doctor_name": bridge_cfg.get("doctor_name"),
+        "clinic_name": bridge_cfg.get("clinic_name"),
+    } if bridge_cfg.get("enabled") else {"enabled": False}
 
     return {
         "access_token": token,
@@ -239,8 +326,40 @@ def mobile_login(payload: MobileLoginRequest, db: Session = Depends(get_db)):
             "specialty": setting.specialty if setting else "Medicina General",
             "currency": setting.currency if setting else "RD$",
             "phone": setting.phone if setting else "",
-        }
+        },
+        "supabase_bridge": bridge_payload,
     }
+
+
+@router.get("/supabase-bridge")
+def get_mobile_supabase_bridge(
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """Entrega al dispositivo movil autenticado las credenciales aisladas del puente Supabase del doctor."""
+    from app.services.supabase_sync_service import SupabaseSyncService
+    cfg = SupabaseSyncService.get_bridge_config(db)
+    if not cfg.get("enabled"):
+        return {"enabled": False}
+    return {
+        "enabled": True,
+        "clinic_id": cfg["clinic_id"],
+        "secret_hash": cfg["secret_hash"],
+        "supabase_url": cfg["supabase_url"],
+        "supabase_anon_key": cfg["supabase_anon_key"],
+        "doctor_name": cfg["doctor_name"],
+        "clinic_name": cfg["clinic_name"],
+        "specialty": cfg["specialty"],
+    }
+
+
+@router.post("/supabase-sync-now")
+def trigger_supabase_sync_now(
+    current_user: User = Depends(require_permission("sync")),
+):
+    """Ejecuta un ciclo incremental inmediato contra Supabase."""
+    from app.services.supabase_sync_service import SupabaseSyncService
+    return SupabaseSyncService.run_incremental_cycle()
 
 # --- Mobile Dashboard ---
 @router.get("/dashboard")
@@ -256,10 +375,22 @@ def mobile_dashboard(
         except ValueError:
             pass
 
-    # Query today's appointments (aislado estrictamente por médico)
+    # Conciliar citas activas ya atendidas en consulta antes de armar agenda móvil
+    try:
+        from app.services.appointment_reconciliation import reconcile_completed_appointments
+        if reconcile_completed_appointments(db) > 0:
+            db.commit()
+    except Exception:
+        pass
+
+    # Query today's appointments (aislado estrictamente por médico y excluyendo citas canceladas)
     from app.routers.patients import resolve_current_doctor_id
+    from app.routers.appointments import INACTIVE_APPT_STATUSES
     doc_id = resolve_current_doctor_id(db, current_user)
-    appts_q = db.query(Appointment).filter(Appointment.date == target_date)
+    appts_q = db.query(Appointment).filter(
+        Appointment.date == target_date,
+        or_(Appointment.status == None, Appointment.status.notin_(INACTIVE_APPT_STATUSES))
+    )
     if doc_id:
         appts_q = appts_q.filter(Appointment.doctor_id == doc_id)
     appointments = appts_q.order_by(Appointment.start_time.asc()).all()
@@ -374,14 +505,27 @@ def update_appointment_status(
     if not appt:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
 
+    doc_id = resolve_current_doctor_id(db, current_user)
+    if doc_id and appt.doctor_id and int(appt.doctor_id) != int(doc_id):
+        raise HTTPException(status_code=403, detail="No autorizado para modificar citas de otro médico.")
+
+    if payload.status in ("Completada", "Atendida") and not current_user.has_permission("consultations"):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo el médico tratante puede finalizar o completar una consulta."
+        )
+
     old_status = appt.status
     if payload.status == "En Espera" and not appt.queue_number:
         from app.routers.appointments import assign_next_queue_number
         appt.queue_number = assign_next_queue_number(db, appt.date)
+    elif payload.status in ["Pendiente", "Cancelada", "cancelada", "canceled", "cancelled"]:
+        appt.queue_number = None
 
     appt.status = payload.status
     appt.updated_at = datetime.utcnow()
     db.commit()
+    _notify_supabase()
 
     return {
         "success": True,
@@ -390,6 +534,33 @@ def update_appointment_status(
         "old_status": old_status,
         "new_status": appt.status,
         "message": f"Estado actualizado a '{appt.status}' por {current_user.name}"
+    }
+
+@router.post("/appointments/{appointment_id}/remove-from-queue")
+def mobile_remove_from_queue(
+    appointment_id: int,
+    payload: dict = Body(default={}),
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    """Permite sacar a una paciente de la fila/sala de espera (volver a Pendiente o anular cita por error)."""
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+
+    mode = str((payload or {}).get("mode") or "cancel").strip().lower()
+    if mode not in ("unqueue", "cancel"):
+        mode = "cancel"
+
+    from app.routers.appointments import remove_appointment_from_queue
+    msg = remove_appointment_from_queue(db, appt, mode=mode)
+    _notify_supabase()
+    return {
+        "success": True,
+        "appointment_id": appt.id,
+        "status": appt.status,
+        "queue_number": appt.queue_number,
+        "message": msg
     }
 
 # --- Check-in Móvil con Asignación Inmediata de Turno ---
@@ -409,6 +580,7 @@ def mobile_check_in_appointment(
         appt.queue_number = assign_next_queue_number(db, appt.date)
     appt.updated_at = datetime.utcnow()
     db.commit()
+    _notify_supabase()
 
     p_name = f"{appt.patient.first_name} {appt.patient.last_name}" if appt.patient else "Paciente"
     return {
@@ -422,7 +594,7 @@ def mobile_check_in_appointment(
 # --- Próximas Citas para Seguimiento de Secretaría ---
 @router.get("/appointments/upcoming")
 def get_upcoming_appointments(
-    range: str = Query("all", description="tomorrow, this_week, next_15_days, all"),
+    range: str = Query("all", description="today, tomorrow, this_week, next_15_days, all"),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     current_user: User = Depends(require_current_user),
@@ -432,17 +604,24 @@ def get_upcoming_appointments(
     today = date.today()
     tomorrow = today + timedelta(days=1)
 
-    from app.routers.patients import resolve_current_doctor_id
     doc_id = resolve_current_doctor_id(db, current_user)
 
-    query = db.query(Appointment).filter(
-        Appointment.date >= tomorrow,
-        Appointment.status.notin_(["Cancelada", "Atendida", "Completada"])
+    base_query = db.query(Appointment).filter(
+        Appointment.date >= today,
+        Appointment.status.notin_(["Cancelada", "cancelada", "Anulada", "anulada", "Atendida", "Completada"])
     )
     if doc_id:
-        query = query.filter(Appointment.doctor_id == doc_id)
+        base_query = base_query.filter(Appointment.doctor_id == doc_id)
 
-    if range == "tomorrow":
+    tomorrow_count = base_query.filter(Appointment.date == tomorrow).count()
+    unconfirmed_count = base_query.filter(
+        or_(Appointment.status.in_(["Pendiente", "Sin Confirmar"]), Appointment.status == None)
+    ).count()
+
+    query = base_query
+    if range == "today":
+        query = query.filter(Appointment.date == today)
+    elif range == "tomorrow":
         query = query.filter(Appointment.date == tomorrow)
     elif range == "this_week":
         end_week = today + timedelta(days=7)
@@ -453,7 +632,7 @@ def get_upcoming_appointments(
 
     if status and status != "all":
         if status == "unconfirmed":
-            query = query.filter(Appointment.status.in_(["Pendiente", "Sin Confirmar", None]))
+            query = query.filter(or_(Appointment.status.in_(["Pendiente", "Sin Confirmar"]), Appointment.status == None))
         elif status == "confirmed":
             query = query.filter(Appointment.status == "Confirmada")
         else:
@@ -462,9 +641,6 @@ def get_upcoming_appointments(
     appts = query.order_by(Appointment.date.asc(), Appointment.start_time.asc()).all()
 
     items = []
-    tomorrow_count = 0
-    unconfirmed_count = 0
-
     for a in appts:
         p = a.patient
         p_name = f"{p.first_name} {p.last_name}" if p else "Paciente"
@@ -476,11 +652,6 @@ def get_upcoming_appointments(
             s = search.lower().strip()
             if s not in p_name.lower() and s not in (p_doc or "").lower() and s not in (p_phone or "").lower():
                 continue
-
-        if a.date == tomorrow:
-            tomorrow_count += 1
-        if a.status in ["Pendiente", "Sin Confirmar", None]:
-            unconfirmed_count += 1
 
         items.append({
             "id": a.id,
@@ -500,6 +671,7 @@ def get_upcoming_appointments(
 
     return {
         "success": True,
+        "range": range,
         "count": len(items),
         "tomorrow_count": tomorrow_count,
         "unconfirmed_count": unconfirmed_count,
@@ -509,16 +681,32 @@ def get_upcoming_appointments(
 @router.post("/appointments/{appointment_id}/whatsapp-sent")
 def mark_appointment_whatsapp_sent(
     appointment_id: int,
-    current_user: User = Depends(require_current_user),
+    current_user: User = Depends(require_permission("appointments")),
     db: Session = Depends(get_db)
 ):
+    from app.routers.patients import resolve_current_doctor_id
+
     appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appt:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
+
+    doc_id = resolve_current_doctor_id(db, current_user)
+    if doc_id and appt.doctor_id is not None and appt.doctor_id != doc_id:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+
+    now = datetime.utcnow()
     appt.whatsapp_reminder_sent = True
-    appt.whatsapp_reminder_sent_at = datetime.utcnow()
+    appt.whatsapp_reminder_sent_at = now
+    appt.updated_at = now
     db.commit()
-    return {"success": True, "appointment_id": appt.id, "whatsapp_reminder_sent": True}
+    _notify_supabase()
+    return {
+        "success": True,
+        "id": appt.id,
+        "appointment_id": appt.id,
+        "whatsapp_reminder_sent": True,
+        "whatsapp_reminder_sent_at": now.isoformat(),
+    }
 
 @router.post("/appointments/{appointment_id}/reschedule")
 def reschedule_appointment(
@@ -537,7 +725,18 @@ def reschedule_appointment(
         raise HTTPException(status_code=422, detail="Debe especificar la nueva fecha")
 
     from datetime import datetime as dt
-    appt.date = dt.strptime(new_date_str, "%Y-%m-%d").date()
+    from app.routers.appointments import find_same_day_appointment
+    target_new_date = dt.strptime(new_date_str, "%Y-%m-%d").date()
+
+    existing_same_day = find_same_day_appointment(db, appt.patient_id, target_new_date, exclude_appt_id=appt.id)
+    if existing_same_day:
+        time_disp = existing_same_day.start_time.strftime("%I:%M %p") if existing_same_day.start_time else ""
+        raise HTTPException(
+            status_code=409,
+            detail=f"El paciente ya tiene otra cita activa para el {target_new_date.strftime('%d/%m/%Y')}{(' a las ' + time_disp) if time_disp else ''}. No se permiten duplicados el mismo día."
+        )
+
+    appt.date = target_new_date
     if new_time_str:
         try:
             appt.start_time = dt.strptime(new_time_str, "%H:%M").time()
@@ -555,7 +754,34 @@ def quick_create_appointment(
     current_user: User = Depends(require_current_user),
     db: Session = Depends(get_db)
 ):
-    patient_id = payload.patient_id
+    prev_appt_id = _lookup_mobile_sync_key(db, payload.client_uuid, "appointment")
+    if prev_appt_id:
+        prev_appt = db.query(Appointment).filter(Appointment.id == prev_appt_id).first()
+        if prev_appt:
+            return {
+                "success": True,
+                "deduplicated": True,
+                "appointment_id": prev_appt.id,
+                "patient_id": prev_appt.patient_id,
+                "date": str(prev_appt.date),
+                "start_time": prev_appt.start_time.strftime("%H:%M") if prev_appt.start_time else "",
+                "status": prev_appt.status,
+                "payment": None,
+                "message": "Cita ya sincronizada previamente."
+            }
+
+    def _resolve_id(entity_type: str, raw_val: Any) -> Optional[int]:
+        if raw_val is None or isinstance(raw_val, bool):
+            return None
+        s = str(raw_val).strip()
+        if not s:
+            return None
+        if s.isdigit():
+            return int(s)
+        return _lookup_mobile_sync_key(db, s, entity_type)
+
+    patient_id = _resolve_id("patient", payload.patient_id)
+    resolved_service_id = _resolve_id("service", payload.service_id)
 
     # Si no se pasó patient_id explícito, buscar primero si ya existe para evitar duplicados
     if not patient_id and payload.patient_name:
@@ -625,7 +851,7 @@ def quick_create_appointment(
         raise HTTPException(status_code=400, detail="Debe especificar o registrar un paciente válido")
 
     from app.routers.patients import resolve_current_doctor_id
-    from app.routers.appointments import assign_next_queue_number
+    from app.routers.appointments import assign_next_queue_number, find_same_day_appointment
     from datetime import timedelta
     doc_id = resolve_current_doctor_id(db, current_user)
 
@@ -635,6 +861,15 @@ def quick_create_appointment(
             appt_date = datetime.strptime(payload.date.strip()[:10], "%Y-%m-%d").date()
         except Exception:
             appt_date = date.today()
+
+    # Filtro anti-duplicidad: no crear otra cita si el paciente ya tiene una activa ese día
+    existing_same_day = find_same_day_appointment(db, patient_id, appt_date)
+    if existing_same_day:
+        time_disp = existing_same_day.start_time.strftime("%I:%M %p") if existing_same_day.start_time else ""
+        raise HTTPException(
+            status_code=409,
+            detail=f"Este paciente ya tiene una cita activa para el {appt_date.strftime('%d/%m/%Y')}{(' a las ' + time_disp) if time_disp else ''} ({existing_same_day.status}). Si se creó por error, sácala de la fila o anúlala primero."
+        )
 
     now_dt = datetime.now()
     start_t = now_dt.time().replace(microsecond=0)
@@ -658,7 +893,7 @@ def quick_create_appointment(
         start_time=start_t,
         end_time=end_t,
         reason=payload.reason or "Consulta General",
-        service_id=payload.service_id,
+        service_id=resolved_service_id,
         price=payload.price or 0.0,
         status=target_status,
         queue_number=queue_num
@@ -666,12 +901,13 @@ def quick_create_appointment(
     db.add(new_appt)
     db.commit()
     db.refresh(new_appt)
+    _record_mobile_sync_key(db, payload.client_uuid, "appointment", new_appt.id)
 
     payment_record = None
     if payload.collect_now and payload.payment_amount and payload.payment_amount > 0:
         svc_name = payload.reason or "Consulta Médica General"
-        if payload.service_id:
-            svc = db.query(Service).filter(Service.id == payload.service_id).first()
+        if resolved_service_id:
+            svc = db.query(Service).filter(Service.id == resolved_service_id).first()
             if svc:
                 svc_name = svc.name
         
@@ -683,7 +919,7 @@ def quick_create_appointment(
         payment_record = Payment(
             patient_id=patient_id,
             appointment_id=new_appt.id,
-            service_id=payload.service_id,
+            service_id=resolved_service_id,
             service_name=svc_name,
             insurance_name=ins_name or "Privado / Particular",
             amount=payload.payment_amount,
@@ -693,12 +929,13 @@ def quick_create_appointment(
             receipt_number=receipt_no,
             created_by_id=current_user.id,
             status="paid",
-            created_at=datetime.utcnow()
+            created_at=datetime.now()
         )
         db.add(payment_record)
         db.commit()
         db.refresh(payment_record)
 
+    _notify_supabase()
     return {
         "success": True,
         "appointment_id": new_appt.id,
@@ -725,12 +962,7 @@ def get_patient_options(
 
     query = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None))
     if doc_id:
-        has_doc_patients = db.query(Patient.id).filter(
-            or_(Patient.is_active == True, Patient.is_active == None),
-            Patient.doctor_id == doc_id
-        ).first() is not None
-        if has_doc_patients:
-            query = query.filter(Patient.doctor_id == doc_id)
+        query = query.filter(or_(Patient.doctor_id == doc_id, Patient.doctor_id == None))
 
     patients = (
         query
@@ -756,6 +988,11 @@ def get_patient_options(
             "document_id": doc,
             "phone": phone,
             "email": p.email or "",
+            "date_of_birth": str(p.date_of_birth) if p.date_of_birth else "",
+            "gender": p.gender or "",
+            "address": p.address or "",
+            "emergency_contact_name": p.emergency_contact_name or "",
+            "emergency_contact_phone": p.emergency_contact_phone or "",
             "allergies": p.allergies or "",
             "blood_type": p.blood_type or "",
             "insurance_name": p.insurance_name or "Privado / Particular",
@@ -768,12 +1005,7 @@ def _filter_active_patients(db: Session, q: Optional[str] = None, doc_id: Option
     """Helper unificado para filtrado y búsqueda de pacientes activos en la API móvil con soporte completo de acentos, cédula y teléfono."""
     query = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None))
     if doc_id:
-        has_doc_patients = db.query(Patient.id).filter(
-            or_(Patient.is_active == True, Patient.is_active == None),
-            Patient.doctor_id == doc_id
-        ).first() is not None
-        if has_doc_patients:
-            query = query.filter(Patient.doctor_id == doc_id)
+        query = query.filter(or_(Patient.doctor_id == doc_id, Patient.doctor_id == None))
     if not q or not q.strip():
         return query
 
@@ -933,6 +1165,23 @@ def check_patient_duplicate(
     return {"is_duplicate": False, "message": "No se encontraron duplicados"}
 
 # --- Registro de Nuevo Paciente desde Móvil (Secretaria) con Anti-Duplicados ---
+def _format_mobile_patient_dict(p: Patient) -> dict:
+    return {
+        "id": p.id,
+        "name": f"{p.first_name} {p.last_name}",
+        "first_name": p.first_name,
+        "last_name": p.last_name,
+        "document_id": p.document_id or "",
+        "phone": p.phone or "",
+        "email": p.email or "",
+        "date_of_birth": str(p.date_of_birth) if p.date_of_birth else "",
+        "gender": p.gender or "",
+        "address": p.address or "",
+        "insurance_name": p.insurance_name or "Privado / Particular",
+        "insurance_number": p.insurance_number or ""
+    }
+
+
 @router.post("/patients")
 def create_mobile_patient(
     payload: MobilePatientCreateRequest,
@@ -940,6 +1189,17 @@ def create_mobile_patient(
     db: Session = Depends(get_db)
 ):
     """Alta oficial de paciente desde la aplicación móvil de secretaría."""
+    prev_patient_id = _lookup_mobile_sync_key(db, payload.client_uuid, "patient")
+    if prev_patient_id:
+        prev_p = db.query(Patient).filter(Patient.id == prev_patient_id, Patient.is_active == True).first()
+        if prev_p:
+            return {
+                "success": True,
+                "deduplicated": True,
+                "patient": _format_mobile_patient_dict(prev_p),
+                "message": f"Paciente {prev_p.first_name} {prev_p.last_name} ya estaba sincronizado."
+            }
+
     fn = payload.first_name.strip()
     ln = payload.last_name.strip()
     patient_document_id = payload.document_id.strip() if payload.document_id and payload.document_id.strip() else None
@@ -952,10 +1212,35 @@ def create_mobile_patient(
     if patient_document_id:
         dup_doc = db.query(Patient).filter(Patient.document_id == patient_document_id, Patient.is_active == True).first()
         if dup_doc:
+            if payload.client_uuid:
+                _record_mobile_sync_key(db, payload.client_uuid, "patient", dup_doc.id)
+                return {
+                    "success": True,
+                    "deduplicated": True,
+                    "patient": _format_mobile_patient_dict(dup_doc),
+                    "message": f"Paciente {dup_doc.first_name} {dup_doc.last_name} conciliado con registro existente."
+                }
             raise HTTPException(
                 status_code=400,
                 detail=f"Ya existe un paciente con la cédula '{patient_document_id}': {dup_doc.first_name} {dup_doc.last_name}. Utilice el paciente existente para evitar duplicidad."
             )
+
+    # En reintentos offline (client_uuid presente) sin cédula, evitar duplicar por nombre+apellido+teléfono
+    if payload.client_uuid and phone:
+        dup_offline = db.query(Patient).filter(
+            Patient.first_name.ilike(fn),
+            Patient.last_name.ilike(ln),
+            Patient.phone == phone,
+            Patient.is_active == True
+        ).first()
+        if dup_offline:
+            _record_mobile_sync_key(db, payload.client_uuid, "patient", dup_offline.id)
+            return {
+                "success": True,
+                "deduplicated": True,
+                "patient": _format_mobile_patient_dict(dup_offline),
+                "message": f"Paciente {dup_offline.first_name} {dup_offline.last_name} conciliado sin duplicar."
+            }
 
     dob = None
     if payload.date_of_birth:
@@ -988,23 +1273,12 @@ def create_mobile_patient(
     db.add(new_patient)
     db.commit()
     db.refresh(new_patient)
+    _record_mobile_sync_key(db, payload.client_uuid, "patient", new_patient.id)
+    _notify_supabase()
 
     return {
         "success": True,
-        "patient": {
-            "id": new_patient.id,
-            "name": f"{new_patient.first_name} {new_patient.last_name}",
-            "first_name": new_patient.first_name,
-            "last_name": new_patient.last_name,
-            "document_id": new_patient.document_id or "",
-            "phone": new_patient.phone or "",
-            "email": new_patient.email or "",
-            "date_of_birth": str(new_patient.date_of_birth) if new_patient.date_of_birth else "",
-            "gender": new_patient.gender or "",
-            "address": new_patient.address or "",
-            "insurance_name": new_patient.insurance_name or "Privado / Particular",
-            "insurance_number": new_patient.insurance_number or ""
-        },
+        "patient": _format_mobile_patient_dict(new_patient),
         "message": f"Paciente {new_patient.first_name} {new_patient.last_name} registrado exitosamente en la base de datos central."
     }
 
@@ -1120,6 +1394,9 @@ def get_mobile_patient_details(
         pass
 
     query = db.query(Patient).filter(Patient.is_active == True)
+    doc_id = resolve_current_doctor_id(db, current_user)
+    if doc_id:
+        query = query.filter(or_(Patient.doctor_id == doc_id, Patient.doctor_id.is_(None)))
     if pid_int is not None:
         patient = query.filter(Patient.id == pid_int).first()
     else:
@@ -1157,25 +1434,30 @@ def get_mobile_patient_details(
             "receipt": py.receipt_number or f"REC-{py.id:04d}"
         })
 
-    # Consultas clínicas / Historia del paciente realizada por el doctor
-    consultations = db.query(Consultation).filter(
+    # Consultas clínicas / Historia del paciente realizada por el doctor (solo rol con permiso consultations)
+    can_view_clinical = current_user.has_permission("consultations")
+    consultations_q = db.query(Consultation).filter(
         Consultation.patient_id == resolved_patient_id
-    ).order_by(Consultation.created_at.desc()).limit(20).all()
+    )
+    if doc_id:
+        consultations_q = consultations_q.filter(or_(Consultation.doctor_id == doc_id, Consultation.doctor_id.is_(None)))
+    consultations = consultations_q.order_by(Consultation.created_at.desc()).limit(20).all()
     consultations_data = []
-    for c in consultations:
-        c_dt = c.created_at or c.updated_at
-        c_date_str = c_dt.strftime("%d/%m/%Y %H:%M") if c_dt else "Fecha no registrada"
-        c_hist = getattr(c, 'display_clinical_history', '') or c.clinical_history or ""
-        consultations_data.append({
-            "id": c.id,
-            "date": c_date_str,
-            "reason": c.reason or "Consulta Médica",
-            "diagnosis": c.diagnosis or "Sin diagnóstico",
-            "treatment": c.treatment or "",
-            "prescription": c.prescription or "",
-            "clinical_history": c_hist,
-            "notes": c.notes or ""
-        })
+    if can_view_clinical:
+        for c in consultations:
+            c_dt = c.created_at or c.updated_at
+            c_date_str = c_dt.strftime("%d/%m/%Y %H:%M") if c_dt else "Fecha no registrada"
+            c_hist = getattr(c, 'display_clinical_history', '') or c.clinical_history or ""
+            consultations_data.append({
+                "id": c.id,
+                "date": c_date_str,
+                "reason": c.reason or "Consulta Médica",
+                "diagnosis": c.diagnosis or "Sin diagnóstico",
+                "treatment": c.treatment or "",
+                "prescription": c.prescription or "",
+                "clinical_history": c_hist,
+                "notes": c.notes or ""
+            })
 
     return {
         "patient": {
@@ -1191,11 +1473,13 @@ def get_mobile_patient_details(
             "address": patient.address or "No especificada",
             "blood_type": patient.blood_type or "No especificado",
             "allergies": patient.allergies or "Ninguna conocida",
+            "emergency_contact_name": patient.emergency_contact_name or "",
+            "emergency_contact_phone": patient.emergency_contact_phone or "",
             "emergency_contact": f"{patient.emergency_contact_name or ''} {patient.emergency_contact_phone or ''}".strip() or "No registrado",
             "insurance_name": patient.insurance_name or "Privado / Particular",
             "insurance_number": patient.insurance_number or "",
             "created_at": patient.created_at.strftime("%d/%m/%Y") if patient.created_at else "",
-            "visit_count": max(len(consultations_data), len([a for a in appts_data if a.get("status") in ("Atendida", "Completada")]))
+            "visit_count": max(len(consultations), len([a for a in appts_data if a.get("status") in ("Atendida", "Completada")]))
         },
         "appointments": appts_data,
         "consultations": consultations_data,
@@ -1212,7 +1496,8 @@ def search_patients(
     current_user: User = Depends(require_current_user),
     db: Session = Depends(get_db)
 ):
-    patients = _filter_active_patients(db, q).limit(20).all()
+    doc_id = resolve_current_doctor_id(db, current_user)
+    patients = _filter_active_patients(db, q, doc_id=doc_id).limit(20).all()
 
     results = []
     for p in patients:
@@ -1236,28 +1521,31 @@ def get_patient_quick_card(
     current_user: User = Depends(require_current_user),
     db: Session = Depends(get_db)
 ):
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    doc_id = resolve_current_doctor_id(db, current_user)
+    patient_q = db.query(Patient).filter(Patient.id == patient_id)
+    if doc_id:
+        patient_q = patient_q.filter(or_(Patient.doctor_id == doc_id, Patient.doctor_id.is_(None)))
+    patient = patient_q.first()
     if not patient:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
 
-    # Recent consultations
-    consultations = (
-        db.query(Consultation)
-        .filter(Consultation.patient_id == patient_id)
-        .order_by(desc(Consultation.created_at))
-        .limit(3)
-        .all()
-    )
-
     past_records = []
-    for c in consultations:
-        past_records.append({
-            "id": c.id,
-            "date": c.created_at.strftime("%d/%m/%Y") if c.created_at else "",
-            "diagnosis": c.diagnosis or "Sin diagnóstico",
-            "treatment": c.treatment or "",
-            "notes": c.notes or ""
-        })
+    if current_user.has_permission("consultations"):
+        consultations = (
+            db.query(Consultation)
+            .filter(Consultation.patient_id == patient_id)
+            .order_by(desc(Consultation.created_at))
+            .limit(3)
+            .all()
+        )
+        for c in consultations:
+            past_records.append({
+                "id": c.id,
+                "date": c.created_at.strftime("%d/%m/%Y") if c.created_at else "",
+                "diagnosis": c.diagnosis or "Sin diagnóstico",
+                "treatment": c.treatment or "",
+                "notes": c.notes or ""
+            })
 
     return {
         "id": patient.id,
@@ -1282,26 +1570,103 @@ def quick_save_consultation(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acceso restringido: Solo el personal médico o administradores pueden diagnosticar y registrar consultas."
         )
+    if payload.client_uuid:
+        prev_cid = _lookup_mobile_sync_key(db, payload.client_uuid, "consultation")
+        if prev_cid:
+            prev_c = db.query(Consultation).filter(Consultation.id == prev_cid).first()
+            if prev_c:
+                return {
+                    "success": True,
+                    "deduplicated": True,
+                    "consultation_id": prev_c.id,
+                    "patient_id": prev_c.patient_id,
+                    "message": "Consulta médica ya sincronizada previamente"
+                }
+    resolved_pat_id = int(payload.patient_id) if str(payload.patient_id).strip().isdigit() else _lookup_mobile_sync_key(db, str(payload.patient_id).strip(), "patient")
+    patient_obj = db.query(Patient).filter(Patient.id == resolved_pat_id).first() if resolved_pat_id else None
+    if not patient_obj:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado para registrar consulta.")
+
+    rx_text = (payload.prescription or payload.treatment or "").strip()
+    if rx_text and not payload.force_allergy_override:
+        from app.routers.quick_prescriptions import check_allergy_conflict
+        conflicts = check_allergy_conflict(patient_obj.allergies, rx_text)
+        if conflicts:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Alerta de Alergia (F6): Paciente alérgico a {', '.join(conflicts)}. Confirme anulación bajo criterio médico para continuar."
+            )
+
+    resolved_appt_id = None
+    if payload.appointment_id is not None and str(payload.appointment_id).strip():
+        s_aid = str(payload.appointment_id).strip()
+        resolved_appt_id = int(s_aid) if s_aid.isdigit() else _lookup_mobile_sync_key(db, s_aid, "appointment")
+
     new_cons = Consultation(
-        patient_id=payload.patient_id,
+        patient_id=resolved_pat_id,
         doctor_id=current_user.id,
+        appointment_id=resolved_appt_id,
         reason=payload.reason or "Consulta médica",
+        clinical_history=(payload.clinical_history or "").strip() or None,
         symptoms=payload.symptoms or "",
         diagnosis=payload.diagnosis,
         treatment=payload.treatment or "",
+        prescription=(payload.prescription or "").strip() or None,
         notes=payload.notes or "",
         created_at=datetime.utcnow()
     )
     db.add(new_cons)
 
-    # If associated appointment, mark as Completada
-    if payload.appointment_id:
-        appt = db.query(Appointment).filter(Appointment.id == payload.appointment_id).first()
-        if appt:
-            appt.status = "Completada"
+    # Marcar como Completada la cita vinculada y cualquier cita activa del paciente en el día
+    from app.services.appointment_reconciliation import reconcile_completed_appointments
+    reconcile_completed_appointments(
+        db,
+        patient_id=resolved_pat_id,
+        appointment_id=resolved_appt_id,
+        consultation=new_cons,
+    )
 
     db.commit()
     db.refresh(new_cons)
+
+    if any(
+        getattr(payload, fld, None) is not None
+        for fld in ("weight_kg", "systolic_bp", "diastolic_bp", "heart_rate", "temperature_c", "oxygen_saturation")
+    ):
+        from app.models.vital_sign import VitalSign
+        vital = VitalSign(
+            patient_id=resolved_pat_id,
+            consultation_id=new_cons.id,
+            recorded_by_id=current_user.id,
+            weight_kg=payload.weight_kg,
+            systolic_bp=payload.systolic_bp,
+            diastolic_bp=payload.diastolic_bp,
+            heart_rate=payload.heart_rate,
+            temperature_c=payload.temperature_c,
+            oxygen_saturation=payload.oxygen_saturation,
+            recorded_at=datetime.now(),
+        )
+        db.add(vital)
+        db.commit()
+
+    _record_mobile_sync_key(db, payload.client_uuid, "consultation", new_cons.id)
+
+    try:
+        from app.services.audit_service import AuditService
+        AuditService.log_change(
+            db=db,
+            entity_type="consultation",
+            entity_id=new_cons.id,
+            action="create",
+            summary=f"Consulta rápida registrada desde móvil por {current_user.name}",
+            patient_id=new_cons.patient_id,
+            user_id=current_user.id,
+            new_data={"reason": new_cons.reason, "diagnosis": new_cons.diagnosis},
+        )
+    except Exception:
+        pass
+
+    _notify_supabase()
 
     return {
         "success": True,
@@ -1318,9 +1683,37 @@ def generate_mobile_receipt_number():
 @router.post("/payments/quick")
 def quick_register_payment(
     payload: QuickPaymentRequest,
-    current_user: User = Depends(require_current_user),
+    current_user: User = Depends(require_permission("payments")),
     db: Session = Depends(get_db)
 ):
+    if payload.amount is None or payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="El monto del cobro debe ser mayor a 0.")
+    prev_payment_id = _lookup_mobile_sync_key(db, payload.client_uuid, "payment")
+    if prev_payment_id:
+        prev_pay = db.query(Payment).filter(Payment.id == prev_payment_id).first()
+        if prev_pay:
+            return {
+                "success": True,
+                "deduplicated": True,
+                "payment_id": prev_pay.id,
+                "receipt_number": prev_pay.receipt_number,
+                "service_name": prev_pay.service_name,
+                "insurance_name": prev_pay.insurance_name,
+                "amount": prev_pay.amount,
+                "total": prev_pay.total,
+                "payment_method": prev_pay.payment_method,
+                "message": f"Pago ya sincronizado previamente ({prev_pay.receipt_number})"
+            }
+
+    resolved_pat_id = int(payload.patient_id) if str(payload.patient_id).strip().isdigit() else _lookup_mobile_sync_key(db, str(payload.patient_id).strip(), "patient")
+    if not resolved_pat_id:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado para registrar el cobro.")
+
+    resolved_svc_id = None
+    if payload.service_id is not None and str(payload.service_id).strip():
+        s_sid = str(payload.service_id).strip()
+        resolved_svc_id = int(s_sid) if s_sid.isdigit() else _lookup_mobile_sync_key(db, s_sid, "service")
+
     service_name = payload.service_name or "Consulta Médica General"
     if payload.item_type == "articulo" and payload.service_name:
         clean_item = payload.service_name.strip()
@@ -1328,34 +1721,37 @@ def quick_register_payment(
             service_name = f"[Artículo] {clean_item}"
         else:
             service_name = clean_item
-    elif payload.service_id:
-        svc = db.query(Service).filter(Service.id == payload.service_id).first()
+    elif resolved_svc_id:
+        svc = db.query(Service).filter(Service.id == resolved_svc_id).first()
         if svc and (not payload.service_name or payload.service_name == "Consulta Médica General"):
             service_name = svc.name
 
     ins_name = payload.insurance_name
     if not ins_name:
-        p = db.query(Patient).filter(Patient.id == payload.patient_id).first()
+        p = db.query(Patient).filter(Patient.id == resolved_pat_id).first()
         if p and p.insurance_name:
             ins_name = p.insurance_name
 
     notes_clean = f"{payload.notes} (por {current_user.name})" if payload.notes else f"Cobro registrado por {current_user.name}"
     receipt_no = generate_mobile_receipt_number()
 
-    appt_id = payload.appointment_id if payload.appointment_id and payload.appointment_id > 0 else None
+    appt_id = None
+    if payload.appointment_id is not None and str(payload.appointment_id).strip():
+        s_aid = str(payload.appointment_id).strip()
+        appt_id = int(s_aid) if s_aid.isdigit() else _lookup_mobile_sync_key(db, s_aid, "appointment")
     if not appt_id:
         today = date.today()
         today_appt = db.query(Appointment).filter(
-            Appointment.patient_id == payload.patient_id,
+            Appointment.patient_id == resolved_pat_id,
             Appointment.date == today
         ).first()
         if today_appt:
             appt_id = today_appt.id
 
     payment = Payment(
-        patient_id=payload.patient_id,
+        patient_id=resolved_pat_id,
         appointment_id=appt_id,
-        service_id=payload.service_id if payload.item_type != "articulo" else None,
+        service_id=resolved_svc_id if payload.item_type != "articulo" else None,
         service_name=service_name,
         insurance_name=ins_name or "Privado / Particular",
         amount=payload.amount,
@@ -1368,8 +1764,29 @@ def quick_register_payment(
         created_at=datetime.now()
     )
     db.add(payment)
+    if payload.item_type == "articulo":
+        try:
+            from app.models.inventory import InventoryItem, InventoryMovement
+            inv_item = None
+            if resolved_svc_id:
+                inv_item = db.query(InventoryItem).filter(InventoryItem.id == resolved_svc_id).first()
+            if not inv_item and service_name:
+                inv_item = db.query(InventoryItem).filter(InventoryItem.name.ilike(service_name.strip())).first()
+            if inv_item and inv_item.stock and inv_item.stock > 0:
+                inv_item.stock -= 1
+                db.add(InventoryMovement(
+                    inventory_item_id=inv_item.id,
+                    user_id=current_user.id,
+                    type="out",
+                    quantity=1,
+                    notes=f"Cobro móvil {receipt_no}"
+                ))
+        except Exception:
+            pass
     db.commit()
     db.refresh(payment)
+    _record_mobile_sync_key(db, payload.client_uuid, "payment", payment.id)
+    _notify_supabase()
 
     return {
         "success": True,
@@ -1390,7 +1807,7 @@ def quick_register_payment(
 def update_payment_details(
     payment_id: int,
     payload: MobilePaymentUpdateRequest,
-    current_user: User = Depends(require_current_user),
+    current_user: User = Depends(require_permission("payments")),
     db: Session = Depends(get_db)
 ):
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
@@ -1399,7 +1816,9 @@ def update_payment_details(
 
     clean_method = payload.payment_method.strip()
     pm_lower = clean_method.lower()
-    if "trans" in pm_lower:
+    if "copago" in pm_lower or "copay" in pm_lower:
+        canonical_method = "Copago ARS"
+    elif "trans" in pm_lower:
         canonical_method = "Transferencia"
     elif "tarjeta" in pm_lower or "card" in pm_lower:
         canonical_method = "Tarjeta"
@@ -1410,7 +1829,9 @@ def update_payment_details(
 
     old_method = payment.payment_method
     payment.payment_method = canonical_method
-    if payload.amount is not None and payload.amount >= 0:
+    if payload.amount is not None:
+        if payload.amount <= 0:
+            raise HTTPException(status_code=400, detail="El monto modificado debe ser mayor a 0.")
         payment.amount = payload.amount
         payment.total = payload.amount
 
@@ -1423,6 +1844,7 @@ def update_payment_details(
     payment.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(payment)
+    _notify_supabase()
 
     return {
         "success": True,
@@ -1465,7 +1887,9 @@ def update_appointment_payment(
     else:
         clean_method = payload.payment_method.strip()
         pm_lower = clean_method.lower()
-        if "trans" in pm_lower:
+        if "copago" in pm_lower or "copay" in pm_lower:
+            canonical_method = "Copago ARS"
+        elif "trans" in pm_lower:
             canonical_method = "Transferencia"
         elif "tarjeta" in pm_lower or "card" in pm_lower:
             canonical_method = "Tarjeta"
@@ -1474,7 +1898,7 @@ def update_appointment_payment(
         else:
             canonical_method = "Efectivo"
 
-        amt = payload.amount if payload.amount is not None and payload.amount >= 0 else (appt.price or 0.0)
+        amt = payload.amount if payload.amount is not None and payload.amount > 0 else (appt.price or 0.0)
         new_pay = Payment(
             patient_id=appt.patient_id,
             appointment_id=appt.id,
@@ -1488,11 +1912,12 @@ def update_appointment_payment(
             receipt_number=generate_mobile_receipt_number(),
             created_by_id=current_user.id,
             status="paid",
-            created_at=datetime.utcnow()
+            created_at=datetime.now()
         )
         db.add(new_pay)
         db.commit()
         db.refresh(new_pay)
+        _notify_supabase()
         return {
             "success": True,
             "payment_id": new_pay.id,
@@ -1508,7 +1933,7 @@ def get_mobile_services(
     db: Session = Depends(get_db)
 ):
     """Retorna la lista completa de servicios activos del talonario para citas y cobros."""
-    services = db.query(Service).filter(Service.is_active == True).order_by(Service.category, Service.name).all()
+    services = db.query(Service).filter(Service.is_active == True).order_by(Service.name.asc()).all()
     return {
         "services": [
             {
@@ -1735,13 +2160,16 @@ def get_mobile_reports_summary(
             "notes": p.notes or ""
         })
 
-    # 2. Pacientes Vistos / Consultas Realizadas
-    consultations = (
-        db.query(Consultation)
-        .filter(Consultation.created_at >= start_dt, Consultation.created_at <= end_dt)
-        .order_by(Consultation.created_at.desc())
-        .all()
+    # 2. Pacientes Vistos / Consultas Realizadas (diagnóstico y notas protegidos para secretaría)
+    doc_id = resolve_current_doctor_id(db, current_user)
+    can_view_clinical = current_user.has_permission("consultations")
+    c_q = db.query(Consultation).filter(
+        Consultation.created_at >= start_dt,
+        Consultation.created_at <= end_dt
     )
+    if doc_id:
+        c_q = c_q.filter(or_(Consultation.doctor_id == doc_id, Consultation.doctor_id.is_(None)))
+    consultations = c_q.order_by(Consultation.created_at.desc()).all()
 
     attended_list = []
     for c in consultations:
@@ -1754,9 +2182,9 @@ def get_mobile_reports_summary(
             "doctor_name": doc_name,
             "time": c.created_at.strftime("%H:%M") if c.created_at else "",
             "reason": c.reason or "Consulta Médica",
-            "diagnosis": c.diagnosis or "Sin diagnóstico",
-            "treatment": c.treatment or "",
-            "notes": c.notes or ""
+            "diagnosis": (c.diagnosis or "Sin diagnóstico") if can_view_clinical else "Atendido en consulta (protegido)",
+            "treatment": (c.treatment or "") if can_view_clinical else "",
+            "notes": (c.notes or "") if can_view_clinical else ""
         })
 
     # 3. Citas del día (Histórico / Citas previas)
@@ -2037,37 +2465,6 @@ def get_mobile_reports_monthly(
     }
 
 
-# --- Catálogo de Servicios para la App Móvil (Talonario 1-Clic) ---
-@router.get("/services")
-def list_mobile_services(
-    db: Session = Depends(get_db)
-):
-    from app.models.service import Service
-    services = db.query(Service).filter(Service.is_active == True).order_by(Service.category.asc(), Service.name.asc()).all()
-    return {
-        "services": [
-            {
-                "id": s.id,
-                "name": s.name,
-                "price": s.price,
-                "color": s.color,
-                "category": s.category,
-                "is_active": s.is_active
-            }
-            for s in services
-        ],
-        "total": len(services)
-    }
-
-# --- Catálogo de ARS con Logos para la App Móvil ---
-@router.get("/ars")
-def list_mobile_ars():
-    from app.services.ars_service import get_all_ars
-    return {
-        "ars": get_all_ars()
-    }
-
-
 # ==============================================================================
 # MOTOR DE SINCRONIZACIÓN OFFLINE-FIRST (ALMACENAR EN MÓVIL Y TRANSFERIR A PC)
 # ==============================================================================
@@ -2087,6 +2484,7 @@ def mobile_sync_batch(
     processed_patients = 0
     processed_appointments = 0
     processed_updates = 0
+    doc_id = resolve_current_doctor_id(db, current_user)
 
     # 1. Procesar Pacientes Offline
     for p_item in payload.patients:
@@ -2104,19 +2502,24 @@ def mobile_sync_batch(
             ln = "S/A"
 
         existing = None
-        if doc_clean:
-            existing = db.query(Patient).filter(Patient.document_id == doc_clean, Patient.is_active == True).first()
+        if p_item.client_uuid:
+            prev_pid = _lookup_mobile_sync_key(db, p_item.client_uuid, "patient")
+            if prev_pid:
+                existing = db.query(Patient).filter(Patient.id == prev_pid, Patient.is_active == True).first()
+        pat_base = db.query(Patient).filter(Patient.is_active == True)
+        if doc_id:
+            pat_base = pat_base.filter(Patient.doctor_id == doc_id)
+        if not existing and doc_clean:
+            existing = pat_base.filter(Patient.document_id == doc_clean).first()
         if not existing and phone_clean:
-            existing = db.query(Patient).filter(Patient.phone == phone_clean, Patient.is_active == True).first()
+            existing = pat_base.filter(Patient.phone == phone_clean).first()
         if not existing and fn and ln:
-            existing = db.query(Patient).filter(
+            existing = pat_base.filter(
                 Patient.first_name.ilike(fn),
-                Patient.last_name.ilike(ln),
-                Patient.is_active == True
+                Patient.last_name.ilike(ln)
             ).first()
 
         if existing:
-            # Actualizar datos complementarios si faltaban
             if not existing.phone and phone_clean:
                 existing.phone = phone_clean
             if not existing.allergies and p_item.allergies:
@@ -2135,6 +2538,7 @@ def mobile_sync_batch(
                     pass
 
             new_p = Patient(
+                doctor_id=doc_id,
                 first_name=fn,
                 last_name=ln,
                 document_id=doc_clean,
@@ -2158,6 +2562,7 @@ def mobile_sync_batch(
             processed_patients += 1
 
         if p_item.client_uuid:
+            _record_mobile_sync_key(db, p_item.client_uuid, "patient", assigned_id)
             patient_id_map[p_item.client_uuid] = assigned_id
 
     # 2. Procesar Citas Offline
@@ -2204,6 +2609,7 @@ def mobile_sync_batch(
                         db.commit()
             else:
                 p_new = Patient(
+                    doctor_id=doc_id,
                     first_name=fn_c,
                     last_name=ln_c or "S/A",
                     document_id=doc_c,
@@ -2221,10 +2627,8 @@ def mobile_sync_batch(
         if not target_pid:
             continue
 
-        from app.routers.patients import resolve_current_doctor_id
         from app.routers.appointments import assign_next_queue_number
         from datetime import timedelta
-        doc_id = resolve_current_doctor_id(db, current_user)
 
         # Manejo seguro y flexible de fecha y hora
         appt_date = date.today()
@@ -2249,12 +2653,9 @@ def mobile_sync_batch(
         target_status = a_item.status if getattr(a_item, "status", None) else ("En Espera" if appt_date == date.today() else "Pendiente")
         queue_num = assign_next_queue_number(db, appt_date) if target_status == "En Espera" else None
 
-        # Idempotencia: Verificar si ya existe cita para este paciente en misma fecha y hora
-        existing_appt = db.query(Appointment).filter(
-            Appointment.patient_id == target_pid,
-            Appointment.date == appt_date,
-            Appointment.start_time == start_t
-        ).first()
+        # Idempotencia y anti-duplicidad: Verificar si ya existe cita activa para este paciente en la misma fecha
+        from app.routers.appointments import find_same_day_appointment
+        existing_appt = find_same_day_appointment(db, target_pid, appt_date)
 
         if existing_appt:
             if doc_id and not existing_appt.doctor_id:
@@ -2297,6 +2698,7 @@ def mobile_sync_batch(
         processed_appointments += 1
 
         if a_item.client_uuid:
+            _record_mobile_sync_key(db, a_item.client_uuid, "appointment", new_appt.id)
             appointment_id_map[a_item.client_uuid] = new_appt.id
 
         # Procesar cobro si se recolectó en la tablet offline
@@ -2433,13 +2835,12 @@ def mobile_sync_delta(
     """
     Retorna la lista completa de datos actualizados para hidratar el almacenamiento local de la APK.
     """
-    # Pacientes
-    patients = (
-        db.query(Patient)
-        .filter(or_(Patient.is_active == True, Patient.is_active == None))
-        .order_by(func.coalesce(Patient.last_name, ''), Patient.first_name)
-        .all()
-    )
+    # Pacientes aislados por médico
+    doc_id = resolve_current_doctor_id(db, current_user)
+    pat_q = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None))
+    if doc_id:
+        pat_q = pat_q.filter(or_(Patient.doctor_id == doc_id, Patient.doctor_id.is_(None)))
+    patients = pat_q.order_by(func.coalesce(Patient.last_name, ''), Patient.first_name).all()
     patients_list = []
     for p in patients:
         ln = (p.last_name or "").strip()
@@ -2454,6 +2855,11 @@ def mobile_sync_delta(
             "document_id": doc,
             "phone": phone,
             "email": p.email or "",
+            "date_of_birth": str(p.date_of_birth) if p.date_of_birth else "",
+            "gender": p.gender or "",
+            "address": p.address or "",
+            "emergency_contact_name": p.emergency_contact_name or "",
+            "emergency_contact_phone": p.emergency_contact_phone or "",
             "allergies": p.allergies or "",
             "blood_type": p.blood_type or "",
             "insurance_name": p.insurance_name or "Privado / Particular",
@@ -2469,13 +2875,10 @@ def mobile_sync_delta(
         except Exception:
             pass
 
-    appts = (
-        db.query(Appointment)
-        .filter(Appointment.date >= appt_date)
-        .order_by(Appointment.date.asc(), Appointment.start_time.asc())
-        .limit(150)
-        .all()
-    )
+    appt_q = db.query(Appointment).filter(Appointment.date >= appt_date)
+    if doc_id:
+        appt_q = appt_q.filter(or_(Appointment.doctor_id == doc_id, Appointment.doctor_id.is_(None)))
+    appts = appt_q.order_by(Appointment.date.asc(), Appointment.start_time.asc()).limit(150).all()
     appts_list = []
     for a in appts:
         p_name = "Paciente no encontrado"
@@ -2500,7 +2903,7 @@ def mobile_sync_delta(
         })
 
     from app.models.service import Service
-    services = db.query(Service).filter(Service.is_active == True).order_by(Service.category.asc(), Service.name.asc()).all()
+    services = db.query(Service).filter(Service.is_active == True).order_by(Service.name.asc()).all()
     from app.services.ars_service import get_all_ars
 
     return {
@@ -2521,27 +2924,36 @@ def mobile_sync_delta(
 @router.post("/close-day")
 def mobile_close_day(
     request: Request,
+    current_user: User = Depends(require_permission("appointments")),
     db: Session = Depends(get_db)
 ):
     """
     Cierre de jornada desde la aplicación móvil/tablet:
-    Marca todas las citas en espera, pendientes o confirmadas de hoy y días anteriores como 'Completada',
+    Marca todas las citas en espera, pendientes o confirmadas de hoy y días anteriores del doctor actual como 'Completada',
     libera la sala de espera para reiniciar turnos y sincroniza de inmediato al Cloud Relay.
     """
     from app.services.relay_service import RelayService
+    from app.routers.patients import resolve_current_doctor_id
+
+    doc_id = resolve_current_doctor_id(db, current_user)
     today = date.today()
-    pending_appts = db.query(Appointment).filter(
+    q = db.query(Appointment).filter(
         Appointment.date <= today,
         Appointment.status.notin_(["Completada", "Cancelada", "Atendida"])
-    ).all()
+    )
+    if doc_id:
+        q = q.filter(Appointment.doctor_id == doc_id)
+    pending_appts = q.all()
 
     closed_count = 0
     for a in pending_appts:
         a.status = "Completada"
+        a.queue_number = None
         a.updated_at = datetime.utcnow()
         closed_count += 1
 
     db.commit()
+    _notify_supabase()
 
     # Publicar inmediatamente el snapshot actualizado a la nube
     try:
@@ -2554,6 +2966,101 @@ def mobile_close_day(
         "closed_count": closed_count,
         "message": f"Jornada cerrada correctamente. Se completaron {closed_count} turnos pendientes."
     }
+
+
+@router.get("/cie10/search")
+def mobile_search_cie10(
+    q: str = Query("", min_length=0),
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    from app.models.cie10 import Cie10Code
+    from app.data.cie10_catalog import OFFICIAL_CIE10_CATALOG
+
+    term = (q or "").strip()
+    query = db.query(Cie10Code)
+    if term:
+        query = query.filter(
+            or_(
+                Cie10Code.code.ilike(f"%{term}%"),
+                Cie10Code.description.ilike(f"%{term}%"),
+            )
+        )
+    rows = query.order_by(Cie10Code.code.asc()).limit(25).all()
+    if rows:
+        return {"items": [{"code": r.code, "description": r.description} for r in rows]}
+    fallback = OFFICIAL_CIE10_CATALOG
+    if term:
+        tl = term.lower()
+        fallback = [c for c in OFFICIAL_CIE10_CATALOG if tl in c["code"].lower() or tl in c["description"].lower()]
+    return {"items": [{"code": c["code"], "description": c["description"]} for c in fallback[:25]]}
+
+
+@router.post("/preauthorizations")
+def mobile_create_preauthorization(
+    payload: MobilePreauthCreateRequest,
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db)
+):
+    import json
+    from app.models.insurance_preauthorization import InsurancePreauthorization
+
+    doc_id = resolve_current_doctor_id(db, current_user) or current_user.id
+    resolved_pat_id = None
+    if payload.patient_id is not None and str(payload.patient_id).strip():
+        s_pid = str(payload.patient_id).strip()
+        resolved_pat_id = int(s_pid) if s_pid.isdigit() else _lookup_mobile_sync_key(db, s_pid, "patient")
+    if not resolved_pat_id and payload.patient_doc:
+        pat = db.query(Patient).filter(Patient.document_id == payload.patient_doc.strip(), Patient.is_active == True).first()
+        if pat:
+            resolved_pat_id = pat.id
+    if not resolved_pat_id and payload.patient_name:
+        parts = payload.patient_name.strip().split(" ", 1)
+        fn = parts[0]
+        ln = parts[1] if len(parts) > 1 else ""
+        pat_q = db.query(Patient).filter(Patient.first_name.ilike(fn), Patient.is_active == True)
+        if ln:
+            pat_q = pat_q.filter(Patient.last_name.ilike(ln))
+        pat = pat_q.first()
+        if pat:
+            resolved_pat_id = pat.id
+    if not resolved_pat_id:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado para guardar pre-autorización.")
+
+    preauth = InsurancePreauthorization(
+        patient_id=resolved_pat_id,
+        doctor_id=doc_id,
+        ars_name=payload.ars_name.strip() or "SeNaSa",
+        request_type=payload.service_type.strip(),
+        request_date=date.today(),
+        affiliate_card_number=(payload.card_number or "").strip() or None,
+        presumptive_diagnosis=(payload.cie10_code or "").strip() or None,
+        definitive_diagnosis=(payload.cie10_code or "").strip() or None,
+        procedures_json=json.dumps([{"code": "", "procedure": payload.service_type.strip()}], ensure_ascii=False),
+        treatment_plan=(payload.clinical_indication or "").strip() or None,
+        notes=f"Pre-autorización registrada desde móvil por {current_user.name}",
+        sede_origen="mobile_apk",
+    )
+    db.add(preauth)
+    db.commit()
+    db.refresh(preauth)
+
+    try:
+        from app.services.audit_service import AuditService
+        AuditService.log_change(
+            db=db,
+            entity_type="insurance_preauthorization",
+            entity_id=preauth.id,
+            action="create",
+            summary=f"Pre-autorización ARS ({preauth.ars_name}) creada desde móvil",
+            patient_id=resolved_pat_id,
+            user_id=current_user.id,
+            new_data={"ars_name": preauth.ars_name, "service": preauth.request_type},
+        )
+    except Exception:
+        pass
+
+    return {"success": True, "preauthorization_id": preauth.id}
 
 
 

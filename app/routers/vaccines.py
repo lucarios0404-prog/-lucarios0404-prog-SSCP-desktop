@@ -8,7 +8,7 @@ from datetime import datetime, date, timedelta
 from app.database import get_db
 from app.models.vaccine import VaccineRecord
 from app.models.patient import Patient
-from app.core.deps import require_current_user
+from app.core.deps import require_permission
 
 router = APIRouter(prefix="/vaccines", tags=["vaccines"])
 from app.core.templates import templates
@@ -29,7 +29,7 @@ def list_vaccines(
     request: Request,
     patient_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('vaccines'))
 ):
     query = db.query(VaccineRecord).order_by(VaccineRecord.application_date.desc())
     if patient_id:
@@ -54,7 +54,7 @@ def create_vaccine_form(
     request: Request,
     patient_id: int = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('vaccines'))
 ):
     patients = db.query(Patient).order_by(Patient.last_name).all()
     selected_patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
@@ -85,7 +85,7 @@ def create_vaccine(
     administered_by: str = Form(None),
     notes: str = Form(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('vaccines'))
 ):
     app_date = datetime.strptime(application_date_str, "%Y-%m-%d").date()
     due_date = datetime.strptime(next_due_date_str, "%Y-%m-%d").date() if next_due_date_str else None

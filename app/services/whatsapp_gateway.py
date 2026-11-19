@@ -1,173 +1,168 @@
 """
-Módulo de Gestión de Gateway Autónomo de WhatsApp para SSCP Desktop.
-Maneja el estado de conexión, generación de código QR para emparejamiento,
-sesión persistente y envío de mensajes en segundo plano.
+WhatsApp Manager for SSCP Desktop (Honest Option 1: 1-Clic Real Mode).
+Stores the clinic's reference phone without faking background socket connections
+or unattended message delivery.
 """
-import io
-import os
 import json
-import base64
-import qrcode
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, date
 from typing import Dict, Any, Optional
 
 from app.database import DATA_DIR
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
 SESSION_FILE = DATA_DIR / "whatsapp_session.json"
 
+
 class WhatsAppGatewayManager:
-    """Administrador local del Gateway de WhatsApp."""
-    
+    """Manages local WhatsApp 1-Clic reference configuration and telemetry."""
+
     _instance = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(WhatsAppGatewayManager, cls).__new__(cls)
             cls._instance._init_state()
         return cls._instance
-        
+
     def _init_state(self):
-        self.status = "disconnected"  # disconnected, pairing, connected
-        self.connected_phone = None
-        self.connected_at = None
-        self.current_qr_data = None
-        self.current_qr_base64 = None
-        self.qr_generated_at = None
-        self.last_error = None
+        self.status = "manual_only"
+        self.connected_phone: Optional[str] = None
+        self.connected_at: Optional[str] = None
+        self.last_activity: Optional[str] = None
+        self.last_error: Optional[str] = None
         self.messages_sent_count = 0
+        self.messages_sent_today = 0
+        self._count_date: Optional[str] = None
         self._load_saved_session()
 
     def _load_saved_session(self):
-        """Carga la sesión persistente si existe en disco."""
+        """Loads persisted reference config if present on disk (never forces fake 'connected')."""
         try:
             if SESSION_FILE.exists():
                 with open(SESSION_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    if data.get("is_connected"):
-                        self.status = "connected"
-                        self.connected_phone = data.get("phone", "+1 (809) 555-0199")
-                        self.connected_at = data.get("connected_at", datetime.now().isoformat())
-                        self.messages_sent_count = data.get("messages_sent_count", 0)
+                    if isinstance(data, dict):
+                        phone = (data.get("phone") or "").strip() or None
+                        self.connected_phone = phone
+                        self.connected_at = data.get("connected_at")
+                        self.last_activity = data.get("last_activity") or data.get("updated_at")
+                        self.messages_sent_count = int(data.get("messages_sent_count") or 0)
+                        today_iso = date.today().isoformat()
+                        if data.get("count_date") == today_iso:
+                            self.messages_sent_today = int(data.get("messages_sent_today") or 0)
+                            self._count_date = today_iso
         except Exception as e:
-            print(f"[WhatsApp Gateway] Error al cargar sesión: {e}")
+            print(f"[WhatsApp 1-Clic] Aviso al cargar configuración: {e}")
 
     def _save_session(self):
-        """Guarda la sesión actual en disco."""
+        """Persists reference phone and honest manual_only mode on disk."""
         try:
             SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
             with open(SESSION_FILE, "w", encoding="utf-8") as f:
-                json.dump({
-                    "is_connected": (self.status == "connected"),
-                    "phone": self.connected_phone,
-                    "connected_at": self.connected_at,
-                    "messages_sent_count": self.messages_sent_count,
-                    "updated_at": datetime.now().isoformat()
-                }, f, indent=2)
+                json.dump(
+                    {
+                        "is_connected": False,
+                        "status": "manual_only",
+                        "mode": "wa_link",
+                        "phone": self.connected_phone,
+                        "connected_at": self.connected_at,
+                        "last_activity": self.last_activity,
+                        "messages_sent_count": self.messages_sent_count,
+                        "messages_sent_today": self.messages_sent_today,
+                        "count_date": self._count_date or date.today().isoformat(),
+                        "updated_at": datetime.now().isoformat(),
+                    },
+                    f,
+                    indent=2,
+                )
         except Exception as e:
-            print(f"[WhatsApp Gateway] Error al guardar sesión: {e}")
+            print(f"[WhatsApp 1-Clic] Aviso al guardar configuración: {e}")
 
     def get_status(self) -> Dict[str, Any]:
-        """Devuelve el estado actual de la conexión del Gateway."""
+        """Returns honest 1-Clic status (never claims simulated gateway delivery)."""
         return {
-            "status": self.status,
-            "is_connected": (self.status == "connected"),
+            "status": "manual_only",
+            "is_connected": False,
+            "mode": "wa_link",
+            "mode_label": "Modo 1-Clic Real (WhatsApp del Doctor)",
             "connected_phone": self.connected_phone,
             "connected_at": self.connected_at,
-            "has_active_qr": (self.status == "pairing" and self.current_qr_base64 is not None),
+            "has_active_qr": False,
             "messages_sent_count": self.messages_sent_count,
+            "messages_sent_today": self.messages_sent_today,
+            "last_activity": self.last_activity,
             "last_error": self.last_error,
-            "mode": "standalone_gateway",
-            "fallback_channel": "wa_me_direct"
+            "fallback_channel": "wa_me_direct",
         }
 
     def generate_pairing_qr(self, custom_phone: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Inicia el proceso de vinculación generando un código QR dinámico compatible con WhatsApp Web.
-        """
-        self.status = "pairing"
+        """In Option 1, QR gateway pairing is retired in favor of honest 1-Clic links."""
+        self.status = "manual_only"
         self.last_error = None
-        timestamp = int(datetime.now().timestamp())
-        
-        # Payload de vinculación seguro para el Gateway de SSCP
-        raw_qr_payload = f"SSCP-WA-GATEWAY:2@{timestamp},{custom_phone or 'clinica'}@c.us,secret-key-{timestamp}"
-        self.current_qr_data = raw_qr_payload
-        self.qr_generated_at = datetime.now()
-
-        # Generar imagen QR en memoria con ReportLab / Pillow
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_M,
-            box_size=8,
-            border=2,
-        )
-        qr.add_data(raw_qr_payload)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="#0f172a", back_color="#ffffff")
-
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        qr_bytes = buf.getvalue()
-        self.current_qr_base64 = f"data:image/png;base64,{base64.b64encode(qr_bytes).decode('utf-8')}"
-
-        return {
-            "status": self.status,
-            "qr_image_base64": self.current_qr_base64,
-            "qr_payload": raw_qr_payload,
-            "generated_at": self.qr_generated_at.isoformat()
-        }
-
-    def confirm_pairing(self, phone: str = "+1 (809) 555-0199") -> Dict[str, Any]:
-        """
-        Confirma la vinculación del dispositivo y activa el Gateway como conectado.
-        """
-        self.status = "connected"
-        self.connected_phone = phone
-        self.connected_at = datetime.now().strftime("%d/%m/%Y %H:%M")
-        self.current_qr_base64 = None
-        self.current_qr_data = None
-        self._save_session()
-
-        return {
-            "status": "connected",
-            "is_connected": True,
-            "phone": self.connected_phone,
-            "connected_at": self.connected_at
-        }
-
-    def disconnect(self) -> Dict[str, Any]:
-        """Cierra y resetea la sesión del Gateway."""
-        self.status = "disconnected"
-        self.connected_phone = None
-        self.connected_at = None
-        self.current_qr_base64 = None
-        self.current_qr_data = None
-        self._save_session()
-        return {"status": "disconnected", "is_connected": False}
-
-    def send_message(self, phone: str, message: str) -> Dict[str, Any]:
-        """
-        Despacha un mensaje de WhatsApp a través del Gateway autónomo.
-        """
-        if self.status != "connected":
-            return {
-                "success": False,
-                "error": "El Gateway de WhatsApp no se encuentra vinculado.",
-                "status": self.status
-            }
-
-        # Simulación de entrega exitosa por socket / driver local
-        self.messages_sent_count += 1
-        self._save_session()
-        
         return {
             "success": True,
-            "phone": phone,
-            "message_snippet": message[:60] + "..." if len(message) > 60 else message,
-            "dispatched_at": datetime.now().isoformat(),
-            "gateway_phone": self.connected_phone
+            "mode": "wa_link",
+            "status": "manual_only",
+            "is_connected": False,
+            "qr_image": None,
+            "qr_image_base64": None,
+            "detail": "SSCP opera en Modo 1-Clic Real desde el WhatsApp del propio doctor.",
         }
 
-# Instancia singleton accesible para toda la app
+    def confirm_pairing(self, phone: str = "") -> Dict[str, Any]:
+        """Stores the clinic/secretary reference phone under honest manual_only mode."""
+        cleaned = (phone or "").strip() or None
+        self.status = "manual_only"
+        self.connected_phone = cleaned
+        self.connected_at = datetime.now().strftime("%d/%m/%Y %H:%M") if cleaned else None
+        self.last_activity = datetime.now().isoformat()
+        self._save_session()
+
+        return {
+            "success": True,
+            "mode": "wa_link",
+            "status": "manual_only",
+            "is_connected": False,
+            "connected_phone": self.connected_phone,
+            "phone": self.connected_phone,
+            "connected_at": self.connected_at,
+        }
+
+    def record_confirmed_send(self) -> None:
+        """Tracks confirmed 1-Clic sends without affecting gateway connection honesty."""
+        today_iso = date.today().isoformat()
+        if self._count_date != today_iso:
+            self._count_date = today_iso
+            self.messages_sent_today = 0
+        self.messages_sent_today += 1
+        self.messages_sent_count += 1
+        self.last_activity = datetime.now().isoformat()
+        self._save_session()
+
+    def disconnect(self) -> Dict[str, Any]:
+        """Clears the stored reference clinic phone."""
+        self.status = "manual_only"
+        self.connected_phone = None
+        self.connected_at = None
+        self.last_activity = datetime.now().isoformat()
+        self._save_session()
+        return {
+            "success": True,
+            "mode": "wa_link",
+            "status": "manual_only",
+            "is_connected": False,
+            "connected_phone": None,
+        }
+
+    def send_message(self, phone: str, message: str) -> Dict[str, Any]:
+        """Unattended gateway sending is disabled in Option 1."""
+        return {
+            "success": False,
+            "mode": "wa_link",
+            "status": "manual_only",
+            "error": "El envío desatendido está deshabilitado. Utiliza el enlace WhatsApp 1-Clic.",
+        }
+
+
+# Singleton instance accessible across the app
 gateway_manager = WhatsAppGatewayManager()

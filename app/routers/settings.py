@@ -9,7 +9,7 @@ import os
 
 from app.database import get_db, DB_PATH
 from app.models.setting import Setting
-from app.core.deps import require_admin, require_current_user, require_permission
+from app.core.deps import require_admin, require_current_user, require_permission, require_ipc_or_permission
 from app.services.whatsapp_gateway import gateway_manager
 from app.services.whatsapp_service import (
     WhatsAppService,
@@ -56,11 +56,14 @@ def view_settings(
 ):
     setting = get_or_create_settings(db)
     gw_status = gateway_manager.get_status()
-    
-    # Sincronizar estado en DB si hubo cambios
+    if not gw_status.get("connected_phone") and (setting.whatsapp_connected_phone or setting.whatsapp_doctor_phone):
+        gw_status["connected_phone"] = setting.whatsapp_connected_phone or setting.whatsapp_doctor_phone
+
+    # Sincronizar estado honesto 1-Clic en DB sin perder número guardado
     if setting.whatsapp_gateway_status != gw_status["status"]:
         setting.whatsapp_gateway_status = gw_status["status"]
-        setting.whatsapp_connected_phone = gw_status["connected_phone"]
+        if gw_status.get("connected_phone"):
+            setting.whatsapp_connected_phone = gw_status["connected_phone"]
         db.commit()
 
     import socket
@@ -102,6 +105,10 @@ def view_settings(
             setting.tailscale_ip = tailscale_ip
             db.commit()
 
+    from app.services.supabase_sync_service import SupabaseSyncService
+    from app.version import APK_VERSION
+    bridge_cfg = SupabaseSyncService.get_bridge_config(db)
+
     return templates.TemplateResponse(
         request=request,
         name="settings/index.html",
@@ -111,6 +118,9 @@ def view_settings(
             "gateway_status": gw_status,
             "local_ip": local_ip,
             "tailscale_ip": tailscale_ip,
+            "bridge_cfg": bridge_cfg,
+            "bridge_error": SupabaseSyncService.get_last_error(),
+            "APK_VERSION": APK_VERSION,
             "saved": False
         }
     )
@@ -133,6 +143,8 @@ def update_settings(
     station_role: str = Form("doctor_principal"),
     central_station_url: str = Form(None),
     relay_channel_id: str = Form(None),
+    supabase_url: str = Form(None),
+    supabase_anon_key: str = Form(None),
     # Campos WhatsApp
     whatsapp_doctor_phone: str = Form(None),
     whatsapp_auto_send: bool = Form(False),
@@ -155,10 +167,12 @@ def update_settings(
     setting.address = address
     setting.currency = currency
     setting.sede_name = sede_name
-    setting.tailscale_ip = tailscale_ip
+    if tailscale_ip is not None:
+        setting.tailscale_ip = tailscale_ip
     setting.sync_interval_minutes = sync_interval_minutes
     setting.station_role = station_role or "doctor_principal"
-    setting.central_station_url = central_station_url.strip() if central_station_url else None
+    if central_station_url is not None:
+        setting.central_station_url = central_station_url.strip() or None
     
     # Canal Cloud Relay único del médico
     import unicodedata
@@ -172,6 +186,11 @@ def update_settings(
         setting.relay_channel_id = raw_slug if (raw_slug.startswith("dr_") or raw_slug.startswith("dra_")) else f"{prefix}{raw_slug}"
     else:
         setting.relay_channel_id = "consultorio_principal"
+
+    if supabase_url is not None:
+        setting.supabase_url = supabase_url.strip().rstrip("/") or None
+    if supabase_anon_key is not None:
+        setting.supabase_anon_key = supabase_anon_key.strip() or None
     
     # Guardar campos WhatsApp
     setting.whatsapp_doctor_phone = whatsapp_doctor_phone
@@ -188,7 +207,17 @@ def update_settings(
     setting.updated_at = datetime.utcnow()
     db.commit()
 
+    from app.services.supabase_sync_service import SupabaseSyncService, signal_supabase_sync
+    bridge_cfg = SupabaseSyncService.get_bridge_config(db)
+    if bridge_cfg.get("enabled"):
+        SupabaseSyncService.upsert_station(bridge_cfg, force=True, db=db)
+        SupabaseSyncService.register_keepalive_monitor(
+            bridge_cfg["clinic_id"], bridge_cfg["supabase_url"], bridge_cfg["supabase_anon_key"]
+        )
+    signal_supabase_sync()
+
     gw_status = gateway_manager.get_status()
+    from app.version import APK_VERSION
 
     return templates.TemplateResponse(
         request=request,
@@ -197,8 +226,28 @@ def update_settings(
             "user": current_user,
             "setting": setting,
             "gateway_status": gw_status,
+            "bridge_cfg": bridge_cfg,
+            "bridge_error": SupabaseSyncService.get_last_error(),
+            "APK_VERSION": APK_VERSION,
             "saved": True
         }
+    )
+
+
+@router.post("/supabase/provision")
+def provision_supabase_from_settings(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("settings")),
+):
+    """Provisiona automaticamente el esquema SQL y registra Keep-Alive en la cuenta Supabase del doctor."""
+    from app.services.supabase_sync_service import SupabaseSyncService
+    return SupabaseSyncService.provision_doctor_supabase(
+        db,
+        access_token=(payload or {}).get("access_token"),
+        project_ref=(payload or {}).get("project_ref"),
+        manual_url=(payload or {}).get("supabase_url"),
+        manual_anon_key=(payload or {}).get("supabase_anon_key"),
     )
 
 UPLOAD_DIR = BASE_DIR / "static" / "uploads"
@@ -285,90 +334,155 @@ async def upload_doctor_logo(
     return RedirectResponse(url="/settings?logo_saved=1", status_code=303)
 
 # ---------------------------------------------------------
-# ENDPOINTS ESPECÍFICOS DEL GATEWAY DE WHATSAPP
+# ENDPOINTS DE WHATSAPP (MODO 1-CLIC REAL) Y CREDENCIALES
 # ---------------------------------------------------------
+
+@router.get("/supabase/bridge-credentials")
+def get_supabase_bridge_credentials(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("settings")),
+):
+    """Retorna credenciales del puente Supabase bajo demanda autenticado (sin exponerlas en atributos HTML)."""
+    from app.services.supabase_sync_service import SupabaseSyncService
+
+    cfg = SupabaseSyncService.get_bridge_config(db)
+    return JSONResponse(content={
+        "channel": cfg.get("clinic_id") or "consultorio_principal",
+        "bkey": cfg.get("secret_hash") or "",
+        "supabase_url": cfg.get("supabase_url") or "",
+        "supabase_key": cfg.get("supabase_anon_key") or "",
+    })
+
 
 @router.get("/whatsapp/status")
 def get_whatsapp_gateway_status(
     db: Session = Depends(get_db),
     current_user = Depends(require_current_user)
 ):
-    """Retorna el estado de conexión actual del gateway y estadísticas."""
+    """Retorna el estado honesto de WhatsApp 1-Clic y estadísticas."""
     status = gateway_manager.get_status()
+    setting = get_or_create_settings(db)
+    if not status.get("connected_phone") and setting and (setting.whatsapp_connected_phone or setting.whatsapp_doctor_phone):
+        status["connected_phone"] = setting.whatsapp_connected_phone or setting.whatsapp_doctor_phone
     return JSONResponse(content=status)
+
 
 @router.post("/whatsapp/generate-qr")
 def generate_whatsapp_qr(
     phone: str = Form(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission("settings"))
 ):
-    """Genera un nuevo código QR dinámico para vinculación de WhatsApp."""
+    """Informa Modo 1-Clic Real (sin QR de emparejamiento falso)."""
     setting = get_or_create_settings(db)
     doctor_phone = phone or setting.whatsapp_doctor_phone or setting.phone
     qr_data = gateway_manager.generate_pairing_qr(custom_phone=doctor_phone)
-    
-    setting.whatsapp_gateway_status = "pairing"
+
+    setting.whatsapp_gateway_status = "manual_only"
     db.commit()
-    
+
     return JSONResponse(content=qr_data)
+
 
 @router.post("/whatsapp/confirm-pairing")
 def confirm_whatsapp_pairing(
-    phone: str = Form("+1 (809) 555-0199"),
+    phone: str = Form(...),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission("settings"))
 ):
-    """Confirma la vinculación del dispositivo (tras escanear el QR)."""
-    result = gateway_manager.confirm_pairing(phone=phone)
-    
+    """Valida y guarda el número WhatsApp de referencia del consultorio (Modo 1-Clic Real)."""
+    raw_phone = (phone or "").strip()
+    clean_phone = WhatsAppService.clean_phone_number(raw_phone)
+    if not clean_phone:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error": "Número telefónico inválido o incompleto (mínimo 10 dígitos, ej: 809-555-0199).",
+            },
+        )
+
+    result = gateway_manager.confirm_pairing(phone=raw_phone)
+
     setting = get_or_create_settings(db)
-    setting.whatsapp_gateway_status = "connected"
-    setting.whatsapp_connected_phone = phone
+    setting.whatsapp_doctor_phone = raw_phone
+    setting.whatsapp_gateway_status = "manual_only"
+    setting.whatsapp_connected_phone = raw_phone
+    setting.updated_at = datetime.utcnow()
     db.commit()
 
+    try:
+        from app.services.supabase_sync_service import signal_supabase_sync
+        signal_supabase_sync()
+    except Exception:
+        pass
+
     return JSONResponse(content=result)
+
 
 @router.post("/whatsapp/disconnect")
 def disconnect_whatsapp_gateway(
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission("settings"))
 ):
-    """Desvincula la sesión activa del Gateway de WhatsApp."""
+    """Limpia el número de referencia de WhatsApp del consultorio."""
     result = gateway_manager.disconnect()
-    
+
     setting = get_or_create_settings(db)
-    setting.whatsapp_gateway_status = "disconnected"
+    setting.whatsapp_gateway_status = "manual_only"
     setting.whatsapp_connected_phone = None
+    setting.updated_at = datetime.utcnow()
     db.commit()
 
     return JSONResponse(content=result)
 
+
 @router.post("/whatsapp/send-test")
 def send_whatsapp_test_message(
     phone: str = Form(...),
-    message: str = Form("Mensaje de prueba desde SSCP Desktop: La integración de WhatsApp está funcionando correctamente."),
+    message: str = Form("Mensaje de prueba desde SSCP Desktop: Enlace WhatsApp 1-Clic funcionando correctamente."),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission("settings"))
 ):
-    """Prueba el envío de un mensaje de WhatsApp (vía gateway o wa.me)."""
-    result = WhatsAppService.dispatch_message(phone=phone, message=message)
+    """Genera el enlace de prueba 1-Clic validando el formato del número telefónico."""
+    result = WhatsAppService.dispatch_message(phone=phone, message=message, force_manual=True)
+    if not result.get("success"):
+        return JSONResponse(status_code=400, content=result)
     return JSONResponse(content=result)
 
 @router.get("/backup/export")
 def export_backup(
     current_user = Depends(require_permission("settings"))
 ):
-    """Genera y descarga una copia de seguridad exacta de la base de datos SQLite."""
+    """Genera y descarga una copia de seguridad consistente vía sqlite3.backup()."""
     if not DB_PATH.exists():
         raise HTTPException(status_code=404, detail="Archivo de base de datos no encontrado.")
-    
+
+    import sqlite3
+    import tempfile
+    from starlette.background import BackgroundTask
+
+    tmp_fd, tmp_path = tempfile.mkstemp(prefix="sscp_backup_", suffix=".db")
+    os.close(tmp_fd)
+    src_conn = sqlite3.connect(str(DB_PATH))
+    dst_conn = sqlite3.connect(tmp_path)
+    try:
+        try:
+            src_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except Exception:
+            pass
+        src_conn.backup(dst_conn)
+    finally:
+        dst_conn.close()
+        src_conn.close()
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_filename = f"SSCP_Backup_{timestamp}.db"
     return FileResponse(
-        path=str(DB_PATH),
+        path=tmp_path,
         filename=backup_filename,
-        media_type="application/x-sqlite3"
+        media_type="application/x-sqlite3",
+        background=BackgroundTask(lambda p=tmp_path: os.path.exists(p) and os.remove(p)),
     )
 
 @router.post("/backup/restore")
@@ -454,7 +568,9 @@ async def restore_backup(
 
 
 @router.get("/print-config")
-def get_print_configuration():
+def get_print_configuration(
+    _auth = Depends(require_ipc_or_permission("settings")),
+):
     """Retorna la configuración activa de márgenes y calibración del talonario."""
     from app.services.print_config_service import get_print_config
     cfg = get_print_config()
@@ -462,7 +578,10 @@ def get_print_configuration():
 
 
 @router.post("/print-config")
-async def save_print_configuration(request: Request):
+async def save_print_configuration(
+    request: Request,
+    _auth = Depends(require_ipc_or_permission("settings")),
+):
     """Guarda y sincroniza los márgenes y coordenadas calibradas del talonario."""
     from app.services.print_config_service import save_print_config
     try:

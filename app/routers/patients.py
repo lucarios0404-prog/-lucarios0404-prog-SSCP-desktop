@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, func
 from pathlib import Path
 from datetime import datetime, date, timedelta, time
@@ -15,7 +16,7 @@ from app.models.consultation import Consultation
 from app.models.vital_sign import VitalSign
 from app.models.service import Service
 from app.models.user import User
-from app.core.deps import require_current_user
+from app.core.deps import require_current_user, require_permission
 from app.services.patient_service import PatientService
 from app.services.audit_service import AuditService
 
@@ -46,7 +47,8 @@ async def check_duplicate_patient(
         last_name=data.get("last_name", ""),
         document_id=data.get("document_id"),
         phone=data.get("phone"),
-        exclude_id=data.get("exclude_id")
+        exclude_id=data.get("exclude_id"),
+        doctor_id=resolve_current_doctor_id(db, current_user),
     )
     return {"has_duplicates": len(matches) > 0, "matches": matches}
 
@@ -70,12 +72,22 @@ def resolve_current_doctor_id(db: Session, user) -> Optional[int]:
         return station_doc.id if station_doc else None
     return None
 
+def assert_patient_access(db: Session, patient_id: int, current_user) -> Patient:
+    """Obtiene el paciente validando aislamiento estricto por doctor_id."""
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    doc_id = resolve_current_doctor_id(db, current_user)
+    if doc_id and patient.doctor_id is not None and patient.doctor_id != doc_id:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    return patient
+
 @router.get("/autocomplete")
 def autocomplete_patients(
     q: str = Query("", min_length=0),
     limit: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('patients'))
 ):
     """
     Búsqueda en tiempo real de pacientes para autocompletado rápido (Fase 2 v1.2.0).
@@ -89,9 +101,7 @@ def autocomplete_patients(
     doc_id = resolve_current_doctor_id(db, current_user)
     query = db.query(Patient).filter(Patient.is_active == True)
     if doc_id:
-        has_doc_patients = db.query(Patient.id).filter(Patient.is_active == True, Patient.doctor_id == doc_id).first() is not None
-        if has_doc_patients:
-            query = query.filter(Patient.doctor_id == doc_id)
+        query = query.filter(or_(Patient.doctor_id == doc_id, Patient.doctor_id.is_(None)))
 
     patients = query.filter(
         or_(
@@ -138,33 +148,25 @@ def list_patients(
     page: int = Query(1, ge=1),
     per_page: int = Query(15, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('patients'))
 ):
     is_admin = getattr(current_user, "role", "") == "admin"
     view_archived = (status == "archived") and is_admin
     doc_id = resolve_current_doctor_id(db, current_user)
-    
-    # Contadores para las pestañas de navegación (aislados por médico con fallback seguro)
-    has_doc_patients = False
-    if doc_id:
-        has_doc_patients = db.query(Patient.id).filter(
-            or_(Patient.is_active == True, Patient.is_active == None),
-            Patient.doctor_id == doc_id
-        ).first() is not None
 
     cnt_q = db.query(Patient).filter(or_(Patient.is_active == True, Patient.is_active == None))
-    if doc_id and has_doc_patients:
-        cnt_q = cnt_q.filter(Patient.doctor_id == doc_id)
+    if doc_id:
+        cnt_q = cnt_q.filter(or_(Patient.doctor_id == doc_id, Patient.doctor_id.is_(None)))
     active_count = cnt_q.count()
 
     arch_q = db.query(Patient).filter(Patient.is_active == False)
-    if doc_id and has_doc_patients:
-        arch_q = arch_q.filter(Patient.doctor_id == doc_id)
+    if doc_id:
+        arch_q = arch_q.filter(or_(Patient.doctor_id == doc_id, Patient.doctor_id.is_(None)))
     archived_count = arch_q.count() if is_admin else 0
 
     query = db.query(Patient)
-    if doc_id and has_doc_patients:
-        query = query.filter(Patient.doctor_id == doc_id)
+    if doc_id:
+        query = query.filter(or_(Patient.doctor_id == doc_id, Patient.doctor_id.is_(None)))
 
     if view_archived:
         query = query.filter(Patient.is_active == False)
@@ -272,7 +274,7 @@ def create_patient(
     appt_reason: Optional[str] = Form(None),
     payment_action: Optional[str] = Form("none"), # 'none', 'charge_now', 'pay_later'
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('patients'))
 ):
     dob = None
     if date_of_birth:
@@ -281,13 +283,14 @@ def create_patient(
         except ValueError:
             dob = None
 
+    clean_doc_id = (document_id or "").strip() or None
     pat_doc_id = resolve_current_doctor_id(db, current_user) or 1
 
     new_patient = Patient(
         doctor_id=pat_doc_id,
         first_name=first_name,
         last_name=last_name,
-        document_id=document_id,
+        document_id=clean_doc_id,
         date_of_birth=dob,
         gender=gender,
         phone=phone,
@@ -301,7 +304,14 @@ def create_patient(
         insurance_number=insurance_number
     )
     db.add(new_patient)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ya existe un paciente registrado con el documento '{clean_doc_id}'."
+        )
     db.refresh(new_patient)
 
     # Registrar en bitácora de auditoría médica (F13)
@@ -319,38 +329,48 @@ def create_patient(
     # ── Flujo Continuo de Recepción: Planificación de Cita & Cobro ──────────
     if schedule_action == "today":
         today = date.today()
-        now_time = datetime.now().time()
-        end_time_val = (datetime.now() + timedelta(minutes=30)).time()
-        next_q = assign_next_queue_number(db, today)
+        from app.routers.appointments import find_same_day_appointment
+        existing_same_day = find_same_day_appointment(db, new_patient.id, today)
+        if existing_same_day:
+            new_appt = existing_same_day
+            if existing_same_day.status != "En Espera":
+                existing_same_day.status = "En Espera"
+                if not existing_same_day.queue_number:
+                    existing_same_day.queue_number = assign_next_queue_number(db, today)
+                db.commit()
+        else:
+            now_time = datetime.now().time()
+            end_time_val = (datetime.now() + timedelta(minutes=30)).time()
+            next_q = assign_next_queue_number(db, today)
 
-        doctor = db.query(User).filter(User.role == "doctor", User.is_active == True).first()
-        doc_id = current_user.id if current_user.role == "doctor" else (doctor.id if doctor else 1)
+            doctor = db.query(User).filter(User.role == "doctor", User.is_active == True).first()
+            doc_id = current_user.id if current_user.role == "doctor" else (doctor.id if doctor else 1)
 
-        price = 0.0
-        svc = None
-        if service_id and service_id > 0:
-            svc = db.query(Service).filter(Service.id == service_id).first()
-            if svc:
-                price = float(svc.price or 0.0)
+            price = 0.0
+            svc = None
+            if service_id and service_id > 0:
+                svc = db.query(Service).filter(Service.id == service_id).first()
+                if svc:
+                    price = float(svc.price or 0.0)
 
-        reason_val = appt_reason or (svc.name if svc else "Consulta Médica General - Llegada presencial")
+            reason_val = appt_reason or (svc.name if svc else "Consulta Médica General - Llegada presencial")
 
-        new_appt = Appointment(
-            patient_id=new_patient.id,
-            doctor_id=doc_id,
-            date=today,
-            start_time=now_time,
-            end_time=end_time_val,
-            reason=reason_val,
-            notes=f"Llegada presencial registrada en recepción por {current_user.name}",
-            service_id=service_id if service_id and service_id > 0 else None,
-            price=price,
-            status="En Espera",
-            queue_number=next_q
-        )
-        db.add(new_appt)
-        db.commit()
-        db.refresh(new_appt)
+            new_appt = Appointment(
+                patient_id=new_patient.id,
+                doctor_id=doc_id,
+                date=today,
+                start_time=now_time,
+                end_time=end_time_val,
+                reason=reason_val,
+                notes=f"Llegada presencial registrada en recepción por {current_user.name}",
+                service_id=service_id if service_id and service_id > 0 else None,
+                price=price,
+                status="En Espera",
+                queue_number=next_q
+            )
+            db.add(new_appt)
+            db.commit()
+            db.refresh(new_appt)
 
         if payment_action == "charge_now":
             return RedirectResponse(
@@ -462,17 +482,35 @@ def view_patient(
     request: Request,
     patient_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('patients'))
 ):
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    patient = assert_patient_access(db, patient_id, current_user)
+
+    # Conciliar citas atendidas antes de consultar el historial/estado del paciente
+    try:
+        from app.services.appointment_reconciliation import reconcile_completed_appointments
+        if reconcile_completed_appointments(db, patient_id=patient_id) > 0:
+            db.commit()
+            try:
+                from app.services.supabase_sync_service import signal_supabase_sync
+                signal_supabase_sync()
+            except Exception:
+                pass
+    except Exception:
+        pass
 
     appointments = db.query(Appointment).filter(Appointment.patient_id == patient_id).order_by(Appointment.date.desc()).all()
-    consultations = db.query(Consultation).filter(Consultation.patient_id == patient_id).order_by(Consultation.created_at.desc()).all()
+    can_view_clinical = current_user.has_permission("consultations")
+    all_consultations = db.query(Consultation).filter(Consultation.patient_id == patient_id).order_by(Consultation.created_at.desc()).all()
+    consultations = all_consultations if can_view_clinical else []
+    prescription_history = [
+        {"id": c.id, "created_at": c.created_at}
+        for c in all_consultations
+        if c.prescription and c.prescription.strip()
+    ]
     payments = db.query(Payment).filter(Payment.patient_id == patient_id).order_by(Payment.created_at.desc()).all()
-    vitals = db.query(VitalSign).filter(VitalSign.patient_id == patient_id).order_by(VitalSign.recorded_at.asc()).all()
-    audit_logs = AuditService.get_logs_for_patient(db, patient_id, limit=25)
+    vitals = db.query(VitalSign).filter(VitalSign.patient_id == patient_id).order_by(VitalSign.recorded_at.asc()).all() if can_view_clinical else []
+    audit_logs = AuditService.get_logs_for_patient(db, patient_id, limit=25) if can_view_clinical else []
 
     # F8: Series de evolución de signos vitales para gráficas
     vitals_evolution = {
@@ -498,7 +536,7 @@ def view_patient(
     ).first()
 
     # Buscar la última consulta que tenga receta médica emitida
-    latest_prescription = next((c for c in consultations if c.prescription and c.prescription.strip()), None)
+    latest_prescription = next((c for c in all_consultations if c.prescription and c.prescription.strip()), None)
 
     return templates.TemplateResponse(
         request=request,
@@ -508,6 +546,7 @@ def view_patient(
             "patient": patient,
             "appointments": appointments,
             "consultations": consultations,
+            "prescription_history": prescription_history,
             "latest_prescription": latest_prescription,
             "payments": payments,
             "vitals": list(reversed(vitals)),
@@ -524,11 +563,10 @@ def edit_patient_form(
     request: Request,
     patient_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('patients'))
 ):
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    patient = assert_patient_access(db, patient_id, current_user)
+    from app.services.ars_service import get_all_ars
 
     return templates.TemplateResponse(
         request=request,
@@ -536,6 +574,7 @@ def edit_patient_form(
         context={
             "user": current_user,
             "patient": patient,
+            "ARS_LIST": get_all_ars(),
         }
     )
 
@@ -558,11 +597,9 @@ def edit_patient(
     insurance_name: str = Form("Privado / Particular"),
     insurance_number: str = Form(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('patients'))
 ):
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    patient = assert_patient_access(db, patient_id, current_user)
 
     dob = None
     if date_of_birth:
@@ -571,6 +608,7 @@ def edit_patient(
         except ValueError:
             dob = None
 
+    clean_doc_id = (document_id or "").strip() or None
     old_data = {
         "name": f"{patient.first_name} {patient.last_name}",
         "phone": patient.phone,
@@ -582,7 +620,7 @@ def edit_patient(
 
     patient.first_name = first_name
     patient.last_name = last_name
-    patient.document_id = document_id
+    patient.document_id = clean_doc_id
     patient.date_of_birth = dob
     patient.gender = gender
     patient.phone = phone
@@ -596,7 +634,14 @@ def edit_patient(
     patient.insurance_number = insurance_number
     patient.updated_at = datetime.utcnow()
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Otro paciente ya utiliza el número de documento '{clean_doc_id}'."
+        )
 
     # Registrar en bitácora de auditoría médica (F13)
     AuditService.log_change(
@@ -693,12 +738,54 @@ def restore_patient(
     return RedirectResponse(url=f"/patients/{patient.id}?restored=1", status_code=303)
 
 
+def _cascade_delete_patient(db: Session, patient: Patient, current_user) -> None:
+    """Elimina dependencias clínicas/financieras del paciente preservando trazabilidad en bitácora."""
+    from sqlalchemy import text
+    from app.models.medical_license import MedicalLicense
+    from app.models.medical_reference import MedicalReference
+    from app.models.lab_result import LabResult
+    from app.models.vaccine import VaccineRecord
+    from app.models.insurance_preauthorization import InsurancePreauthorization
+    from app.models.audit_log import ClinicalAuditLog
+
+    pid = patient.id
+    p_name = f"{patient.first_name} {patient.last_name}"
+
+    db.query(Appointment).filter(Appointment.patient_id == pid).delete(synchronize_session=False)
+    db.query(Consultation).filter(Consultation.patient_id == pid).delete(synchronize_session=False)
+    db.query(Payment).filter(Payment.patient_id == pid).delete(synchronize_session=False)
+    db.query(VitalSign).filter(VitalSign.patient_id == pid).delete(synchronize_session=False)
+    db.query(MedicalLicense).filter(MedicalLicense.patient_id == pid).delete(synchronize_session=False)
+    db.query(MedicalReference).filter(MedicalReference.patient_id == pid).delete(synchronize_session=False)
+    db.query(LabResult).filter(LabResult.patient_id == pid).delete(synchronize_session=False)
+    db.query(VaccineRecord).filter(VaccineRecord.patient_id == pid).delete(synchronize_session=False)
+    db.query(InsurancePreauthorization).filter(InsurancePreauthorization.patient_id == pid).delete(synchronize_session=False)
+    db.query(ClinicalAuditLog).filter(ClinicalAuditLog.patient_id == pid).update({"patient_id": None}, synchronize_session=False)
+    try:
+        db.execute(text("DELETE FROM mobile_sync_keys WHERE entity_type = 'patients' AND local_id = :pid"), {"pid": pid})
+    except Exception:
+        pass
+
+    db.delete(patient)
+    db.commit()
+
+    AuditService.log_change(
+        db=db,
+        entity_type="patient",
+        entity_id=pid,
+        action="delete",
+        summary=f"Expediente #{pid} ({p_name}) eliminado permanentemente.",
+        patient_id=None,
+        user_id=current_user.id if current_user else 1,
+    )
+
+
 @router.post("/{patient_id}/delete")
 def delete_patient(
     request: Request,
     patient_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('patients'))
 ):
     """
     Elimina un paciente y sus registros asociados.
@@ -707,25 +794,8 @@ def delete_patient(
     if getattr(current_user, "role", "") not in ["admin", "doctor"]:
         raise HTTPException(status_code=403, detail="Acceso restringido: Solo el Administrador o Doctor puede eliminar expedientes.")
 
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado")
-
-    from app.models.medical_license import MedicalLicense
-    from app.models.medical_reference import MedicalReference
-    from app.models.audit_log import ClinicalAuditLog
-
-    # Eliminación en cascada segura de tablas dependientes
-    db.query(Appointment).filter(Appointment.patient_id == patient_id).delete(synchronize_session=False)
-    db.query(Consultation).filter(Consultation.patient_id == patient_id).delete(synchronize_session=False)
-    db.query(Payment).filter(Payment.patient_id == patient_id).delete(synchronize_session=False)
-    db.query(VitalSign).filter(VitalSign.patient_id == patient_id).delete(synchronize_session=False)
-    db.query(MedicalLicense).filter(MedicalLicense.patient_id == patient_id).delete(synchronize_session=False)
-    db.query(MedicalReference).filter(MedicalReference.patient_id == patient_id).delete(synchronize_session=False)
-    db.query(ClinicalAuditLog).filter(ClinicalAuditLog.patient_id == patient_id).delete(synchronize_session=False)
-
-    db.delete(patient)
-    db.commit()
+    patient = assert_patient_access(db, patient_id, current_user)
+    _cascade_delete_patient(db, patient, current_user)
 
     referer = request.headers.get("referer", "/patients")
     if "/patients/" in referer and not referer.endswith("/patients"):
@@ -738,7 +808,7 @@ def permanent_delete_patient(
     patient_id: int,
     confirm_text: str = Form("ELIMINAR"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('patients'))
 ):
     """
     Elimina físicamente un paciente y sus registros dependientes en cascada.
@@ -750,24 +820,7 @@ def permanent_delete_patient(
     if confirm_text.strip().upper() != "ELIMINAR":
         raise HTTPException(status_code=400, detail="Debe escribir exactamente 'ELIMINAR' para confirmar la eliminación permanente.")
 
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado")
-
-    from app.models.medical_license import MedicalLicense
-    from app.models.medical_reference import MedicalReference
-    from app.models.audit_log import ClinicalAuditLog
-
-    # Eliminación en cascada segura de tablas dependientes
-    db.query(Appointment).filter(Appointment.patient_id == patient_id).delete(synchronize_session=False)
-    db.query(Consultation).filter(Consultation.patient_id == patient_id).delete(synchronize_session=False)
-    db.query(Payment).filter(Payment.patient_id == patient_id).delete(synchronize_session=False)
-    db.query(VitalSign).filter(VitalSign.patient_id == patient_id).delete(synchronize_session=False)
-    db.query(MedicalLicense).filter(MedicalLicense.patient_id == patient_id).delete(synchronize_session=False)
-    db.query(MedicalReference).filter(MedicalReference.patient_id == patient_id).delete(synchronize_session=False)
-    db.query(ClinicalAuditLog).filter(ClinicalAuditLog.patient_id == patient_id).delete(synchronize_session=False)
-
-    db.delete(patient)
-    db.commit()
+    patient = assert_patient_access(db, patient_id, current_user)
+    _cascade_delete_patient(db, patient, current_user)
 
     return RedirectResponse(url="/patients?deleted=1", status_code=303)

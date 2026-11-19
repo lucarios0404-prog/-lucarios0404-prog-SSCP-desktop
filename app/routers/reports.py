@@ -52,13 +52,31 @@ def parse_date_range(start_date: str = None, end_date: str = None):
             e_clean = ""
     return start_dt, end_dt, s_clean, e_clean
 
+from app.routers.payments import is_paid_payment, normalize_payment_method
+
+def _safe_csv_cell(val) -> str:
+    if val is None:
+        return ""
+    s = str(val)
+    if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + s
+    return s
+
+_PAYMENT_DISPLAY_LABELS = {
+    "cash": "Efectivo",
+    "card": "Tarjeta",
+    "transfer": "Transferencia",
+    "insurance": "Seguro Médico",
+    "copay": "Copago ARS",
+}
+
 @router.get("/")
 def reports_dashboard(
     request: Request,
     start_date: str = Query(None),
     end_date: str = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('reports'))
 ):
     """
     Panel de Inteligencia Clínica y Estadísticas Médicas (F14) con filtro dinámico por rango de fechas.
@@ -91,8 +109,8 @@ def reports_dashboard(
         p_query = p_query.filter(Payment.created_at <= end_dt)
     payments = p_query.all()
     total_payments = len(payments)
-    total_collected = sum(p.total for p in payments if p.status == "paid")
-    total_pending = sum(p.total for p in payments if p.status == "pending")
+    total_collected = sum((p.total if p.total is not None else (p.amount or 0.0)) for p in payments if is_paid_payment(p.status))
+    total_pending = sum((p.total if p.total is not None else (p.amount or 0.0)) for p in payments if p.status == "pending")
 
     # 4. Pacientes
     total_patients = db.query(Patient).count()
@@ -178,7 +196,7 @@ def export_executive_pdf(
     start_date: str = Query(None),
     end_date: str = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(require_current_user)
+    current_user = Depends(require_permission('reports'))
 ):
     """
     Exportación del Reporte Ejecutivo Clínico completo a PDF con membrete y logo del doctor, respetando el filtro de fechas.
@@ -203,8 +221,8 @@ def export_executive_pdf(
     if end_dt: p_query = p_query.filter(Payment.created_at <= end_dt)
     payments = p_query.all()
     total_payments = len(payments)
-    total_collected = sum(p.total for p in payments if p.status == "paid")
-    total_pending = sum(p.total for p in payments if p.status == "pending")
+    total_collected = sum((p.total if p.total is not None else (p.amount or 0.0)) for p in payments if is_paid_payment(p.status))
+    total_pending = sum((p.total if p.total is not None else (p.amount or 0.0)) for p in payments if p.status == "pending")
 
     total_patients = db.query(Patient).count()
 
@@ -277,6 +295,8 @@ def export_secretary_daily_pdf(
     """
     Exporta el Reporte de Entrada y Recepción Diaria de la Secretaría a PDF con membrete y logo del doctor.
     """
+    if not (current_user.has_permission("reports") or current_user.has_permission("payments")):
+        raise HTTPException(status_code=403, detail="Acceso restringido: requiere permiso de reportes o caja.")
     if report_date:
         try:
             target_date = datetime.strptime(report_date, "%Y-%m-%d").date()
@@ -319,8 +339,8 @@ def export_secretary_daily_pdf(
         Payment.created_at <= end_dt
     ).all()
 
-    total_collected = sum(p.total for p in payments_records if p.status == "paid")
-    total_pending = sum(p.total for p in payments_records if p.status == "pending")
+    total_collected = sum((p.total if p.total is not None else (p.amount or 0.0)) for p in payments_records if is_paid_payment(p.status))
+    total_pending = sum((p.total if p.total is not None else (p.amount or 0.0)) for p in payments_records if p.status == "pending")
 
     pm_breakdown = {}
     payments_by_patient = {}
@@ -329,9 +349,11 @@ def export_secretary_daily_pdf(
             payments_by_patient[p.patient_id] = []
         payments_by_patient[p.patient_id].append(p)
 
-        if p.status == "paid":
-            meth = p.payment_method or "Efectivo"
-            pm_breakdown[meth] = pm_breakdown.get(meth, 0.0) + p.total
+        if is_paid_payment(p.status):
+            canon = normalize_payment_method(p.payment_method)
+            meth = _PAYMENT_DISPLAY_LABELS.get(canon, p.payment_method or "Efectivo")
+            amt = p.total if p.total is not None else (p.amount or 0.0)
+            pm_breakdown[meth] = pm_breakdown.get(meth, 0.0) + amt
 
     # 5. Construir registros del día cronológicamente
     entries = []
@@ -449,7 +471,7 @@ def export_secretary_daily_pdf(
             })
 
     waiting_count = sum(1 for a in appointments if a.status == "En Espera")
-    attended_count = sum(1 for a in appointments if a.status == "Atendida")
+    attended_count = sum(1 for a in appointments if a.status in ("Atendida", "Completada"))
 
     kpis = {
         "total_patients_admitted": len(processed_patient_ids),
@@ -510,23 +532,23 @@ def export_patients_csv(
     for p in q.order_by(Patient.id).all():
         writer.writerow([
             p.id,
-            p.first_name,
-            p.last_name,
-            p.document_id or "",
-            p.phone or "",
-            p.email or "",
+            _safe_csv_cell(p.first_name),
+            _safe_csv_cell(p.last_name),
+            _safe_csv_cell(p.document_id or ""),
+            _safe_csv_cell(p.phone or ""),
+            _safe_csv_cell(p.email or ""),
             p.date_of_birth.strftime("%Y-%m-%d") if p.date_of_birth else "",
-            p.gender or "",
-            p.blood_type or "",
-            p.allergies or "Ninguna",
-            getattr(p, "insurance_name", "") or "Privado",
-            getattr(p, "insurance_number", "") or "",
-            p.emergency_contact_name or "",
-            p.emergency_contact_phone or "",
+            _safe_csv_cell(p.gender or ""),
+            _safe_csv_cell(p.blood_type or ""),
+            _safe_csv_cell(p.allergies or "Ninguna"),
+            _safe_csv_cell(getattr(p, "insurance_name", "") or "Privado"),
+            _safe_csv_cell(getattr(p, "insurance_number", "") or ""),
+            _safe_csv_cell(p.emergency_contact_name or ""),
+            _safe_csv_cell(p.emergency_contact_phone or ""),
             p.created_at.strftime("%Y-%m-%d %H:%M") if p.created_at else ""
         ])
 
-    csv_data = "\ufeff" + output.getvalue()
+    csv_data = output.getvalue()
     filename = f"pacientes_sscp_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
     return Response(
         content=csv_data.encode("utf-8-sig"),
@@ -565,16 +587,16 @@ def export_consultations_csv(
         writer.writerow([
             c.id,
             c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "",
-            p_name,
-            doc_id,
-            c.reason or "",
-            c.diagnosis or "",
-            (c.prescription or c.treatment or "").replace("\n", " | "),
+            _safe_csv_cell(p_name),
+            _safe_csv_cell(doc_id),
+            _safe_csv_cell(c.reason or ""),
+            _safe_csv_cell(c.diagnosis or ""),
+            _safe_csv_cell((c.prescription or c.treatment or "").replace("\n", " | ")),
             "SÍ" if getattr(c, "is_first_visit", False) else "NO",
-            c.sede_origen or "local"
+            _safe_csv_cell(c.sede_origen or "local")
         ])
 
-    csv_data = "\ufeff" + output.getvalue()
+    csv_data = output.getvalue()
     filename = f"consultas_sscp_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
     return Response(
         content=csv_data.encode("utf-8-sig"),
@@ -611,18 +633,18 @@ def export_financial_csv(
         p_name = f"{pay.patient.first_name} {pay.patient.last_name}" if pay.patient else "N/D"
         writer.writerow([
             pay.id,
-            pay.receipt_number or f"REC-{pay.id:04d}",
+            _safe_csv_cell(pay.receipt_number or f"REC-{pay.id:04d}"),
             pay.created_at.strftime("%Y-%m-%d %H:%M") if pay.created_at else "",
-            p_name,
-            pay.service_name or "Consulta Médica",
+            _safe_csv_cell(p_name),
+            _safe_csv_cell(pay.service_name or "Consulta Médica"),
             pay.amount,
             pay.discount,
             pay.total,
-            "PAGADO" if pay.status == "paid" else "PENDIENTE",
-            pay.payment_method or "Efectivo"
+            "PAGADO" if is_paid_payment(pay.status) else "PENDIENTE",
+            _safe_csv_cell(normalize_payment_method(pay.payment_method))
         ])
 
-    csv_data = "\ufeff" + output.getvalue()
+    csv_data = output.getvalue()
     filename = f"reporte_financiero_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
     return Response(
         content=csv_data.encode("utf-8-sig"),

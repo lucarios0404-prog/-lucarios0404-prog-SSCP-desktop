@@ -23,6 +23,9 @@ class Setting(Base):
     # Rol de Estación y Topología de Red (v1.2.0)
     station_role = Column(String, default="doctor_principal")  # doctor_principal, secretaria
     central_station_url = Column(String, nullable=True)        # URL / IP del nodo central o Tailscale
+    station_secret = Column(String, nullable=True)             # Secreto aleatorio por estación/doctor
+    supabase_url = Column(String, default=None, nullable=True)
+    supabase_anon_key = Column(String, default=None, nullable=True)
     relay_channel_id = Column(String, default=None, nullable=True) # Canal único de Buzón Cloud Relay
 
 

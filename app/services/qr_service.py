@@ -51,7 +51,7 @@ def generate_qr_code_image_bytes(text_data: str) -> bytes:
     )
     qr.add_data(text_data)
     qr.make(fit=True)
-    img = qr.make_image(fill_color="#0284c7", back_color="#ffffff")
+    img = qr.make_image(fill_color="#0f172a", back_color="#ffffff")
     buffer = io.BytesIO()
     img.save(buffer, format="PNG")
     return buffer.getvalue()

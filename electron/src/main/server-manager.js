@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const net = require('net');
+const crypto = require('crypto');
 const { migrateLegacyData, protectDataOnUpgrade } = require('./data-migrator');
 
 class ServerManager {
@@ -11,6 +12,7 @@ class ServerManager {
     this.process = null;
     this.port = null;
     this.baseUrl = null;
+    this.ipcSecret = crypto.randomBytes(32).toString('hex');
   }
 
   // Comprueba si un puerto está disponible
@@ -168,10 +170,46 @@ class ServerManager {
     return false;
   }
 
+  // Verifica si un puerto ya está atendido por ESTA misma versión de SSCP Desktop
+  async isSscpServerAlive(port) {
+    return new Promise((resolve) => {
+      const req = http.get(
+        {
+          host: '127.0.0.1',
+          port: port,
+          path: '/api/mobile/ping',
+          timeout: 1200
+        },
+        (res) => {
+          let body = '';
+          res.setEncoding('utf8');
+          res.on('data', (c) => (body += c));
+          res.on('end', () => {
+            if (res.statusCode !== 200) return resolve(false);
+            try {
+              const j = JSON.parse(body);
+              const expectedVer = this.config && this.config.version ? String(this.config.version) : '';
+              const matchesApp = j && j.app === 'SSCP Desktop & Mobile Gateway';
+              const matchesVer = !expectedVer || !j.version || String(j.version) === expectedVer;
+              resolve(Boolean(matchesApp && matchesVer));
+            } catch {
+              resolve(false);
+            }
+          });
+        }
+      );
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => {
+        req.destroy();
+        resolve(false);
+      });
+    });
+  }
+
   // Inicia el backend de FastAPI
   async start() {
     const defaultPort = this.config.defaultPort || 8080;
-    const isDefaultRunning = await this.pingServer(defaultPort);
+    const isDefaultRunning = await this.isSscpServerAlive(defaultPort);
     if (isDefaultRunning) {
       this.port = defaultPort;
       this.baseUrl = `http://127.0.0.1:${this.port}`;
@@ -182,7 +220,7 @@ class ServerManager {
     this.port = await this.findAvailablePort(defaultPort);
     this.baseUrl = `http://127.0.0.1:${this.port}`;
 
-    const isAlreadyRunning = await this.pingServer(this.port);
+    const isAlreadyRunning = await this.isSscpServerAlive(this.port);
     if (isAlreadyRunning) {
       console.log(`[ServerManager] Servidor ya activo en ${this.baseUrl}`);
       return this.baseUrl;
@@ -250,6 +288,7 @@ class ServerManager {
       SSCP_DATA_DIR: dataDir,
       SSCP_HOST: process.env.SSCP_HOST || '0.0.0.0',
       SSCP_PORT: String(this.port),
+      SSCP_IPC_SECRET: this.ipcSecret,
       PYTHONIOENCODING: 'utf-8',
       PYTHONUNBUFFERED: '1'
     };
@@ -305,32 +344,59 @@ class ServerManager {
     return this.baseUrl;
   }
 
-  // Detiene el proceso limpiamente en Windows
+  // Detiene el proceso ordenadamente (WAL checkpoint) antes de recurrir a terminación forzada
   stop() {
-    if (this.process && this.process.pid) {
-      console.log(`[ServerManager] Cerrando subproceso Python (PID: ${this.process.pid})...`);
-      const pid = this.process.pid;
+    const proc = this.process;
+    if (proc && proc.pid) {
+      console.log(`[ServerManager] Cerrando subproceso Python (PID: ${proc.pid})...`);
+      const pid = proc.pid;
+      const port = this.port;
       this.process = null;
 
-      if (process.platform === 'win32') {
-        try {
-          execFile('taskkill', ['/pid', String(pid), '/T', '/F'], (err) => {
-            if (err) {
-              console.warn(`[ServerManager] Nota al terminar proceso: ${err.message}`);
-            } else {
-              console.log('[ServerManager] Proceso terminado limpiamente.');
-            }
-          });
-        } catch (e) {
-          console.error('[ServerManager] Error en taskkill:', e);
+      let exited = false;
+      try {
+        proc.once('exit', () => { exited = true; });
+      } catch {}
+
+      const forceKill = () => {
+        if (exited) return;
+        if (process.platform === 'win32') {
+          try {
+            execFile('taskkill', ['/pid', String(pid), '/T', '/F'], (err) => {
+              if (err) {
+                console.warn(`[ServerManager] Nota al terminar proceso: ${err.message}`);
+              } else {
+                console.log('[ServerManager] Proceso terminado limpiamente.');
+              }
+            });
+          } catch (e) {
+            console.error('[ServerManager] Error en taskkill:', e);
+          }
+        } else {
+          try { process.kill(pid, 'SIGTERM'); } catch {}
         }
-      } else {
+      };
+
+      if (port) {
         try {
-          process.kill(pid, 'SIGTERM');
-        } catch (e) {
-          // Ignorado
-        }
+          const req = http.request(
+            {
+              host: '127.0.0.1',
+              port,
+              path: '/api/internal/graceful-shutdown',
+              method: 'POST',
+              headers: { 'X-SSCP-IPC-Secret': this.ipcSecret },
+              timeout: 2200
+            },
+            () => { setTimeout(forceKill, 1200); }
+          );
+          req.on('error', forceKill);
+          req.on('timeout', () => { req.destroy(); forceKill(); });
+          req.end();
+          return;
+        } catch {}
       }
+      forceKill();
     }
   }
 }

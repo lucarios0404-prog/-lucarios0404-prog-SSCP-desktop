@@ -172,8 +172,10 @@
                                     <span><i class="fas fa-id-card mr-1 text-slate-400"></i> DNI: <strong>{{ patient.document_id or 'N/D' }}</strong></span>
                                     <span>
                                         <i class="fas fa-phone mr-1 text-slate-400"></i> {{ patient.phone or 'Sin teléfono' }}
-                                        {% if patient.phone %}
-                                        <a href="https://wa.me/{{ patient.phone|replace('-', '')|replace(' ', '')|replace('+', '')|replace('(', '')|replace(')', '') }}?text=Estimado(a)%20{{ patient.first_name }}%20{{ patient.last_name }},%20le%20saludamos%20desde%20el%20consultorio%20m%C3%A9dico." target="_blank" class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors" title="Abrir chat de WhatsApp">
+                                        {% set clean_wa = patient.phone | wa_phone if patient.phone else '' %}
+                                        {% if clean_wa %}
+                                        {% set greeting_msg = 'Estimado(a) ' ~ patient.first_name ~ ' ' ~ patient.last_name ~ ', le saludamos desde el consultorio médico.' %}
+                                        <a href="{{ patient.phone | wa_link(greeting_msg) }}" target="_blank" rel="noopener noreferrer" class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors" title="Abrir chat de WhatsApp (1-Clic)">
                                             <i class="fab fa-whatsapp mr-1 text-emerald-600"></i> WhatsApp
                                         </a>
                                         {% endif %}
@@ -269,7 +271,9 @@
                             </button>
                             {% endif %}
                             {% if user.role in ['admin', 'doctor'] %}
-                            <form method="post" action="/patients/{{ patient.id }}/delete" class="inline" onsubmit="return confirm('¿Está seguro de ELIMINAR definitivamente el expediente de {{ patient.first_name }} {{ patient.last_name }} y todos sus datos? Esta acción no se puede deshacer.')">
+                            <form method="post" action="/patients/{{ patient.id }}/delete" class="inline"
+                                  data-patient-name="{{ patient.first_name }} {{ patient.last_name }}"
+                                  onsubmit="return confirm('¿Está seguro de ELIMINAR definitivamente el expediente de ' + this.dataset.patientName + ' y todos sus datos? Esta acción no se puede deshacer.')">
                                 <button type="submit" class="inline-flex items-center px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold border border-rose-200 transition-all" title="Eliminar paciente erróneo">
                                     <i class="fas fa-trash mr-1.5 text-rose-600"></i> Eliminar
                                 </button>
@@ -298,6 +302,7 @@
                             {% endif %}
                         </div>
                         <div class="flex-1 flex flex-col">
+                            {% if user.has_permission('consultations') %}
                             {% if consultations %}
                             <div class="space-y-3 overflow-y-auto max-h-[360px] pr-1">
                                 {% for c in consultations %}
@@ -307,11 +312,9 @@
                                             <i class="far fa-calendar-alt text-violet-500 mr-1.5"></i>
                                             {{ c.created_at.strftime("%d/%m/%Y") if c.created_at else "—" }}
                                         </span>
-                                        {% if user.has_permission('consultations') or user.has_permission('print_prescriptions') %}
                                         <a href="/consultations/{{ c.id }}" class="text-xs text-violet-600 font-bold group-hover:translate-x-0.5 transition-transform flex items-center">
                                             Ver Ficha <i class="fas fa-arrow-right ml-1 text-[10px]"></i>
                                         </a>
-                                        {% endif %}
                                     </div>
                                     <p class="text-xs font-medium text-slate-700 mt-2 leading-snug">{{ c.reason }}</p>
                                     {% if c.diagnosis %}
@@ -340,11 +343,35 @@
                                 </div>
                                 <p class="text-sm font-bold text-slate-700">Sin historias clínicas aún</p>
                                 <p class="text-xs text-slate-400 mt-1 max-w-[200px]">Registra la primera consulta, evolución o diagnóstico médico.</p>
-                                {% if user.has_permission('consultations') %}
                                 <a href="/consultations/create?patient_id={{ patient.id }}" class="mt-3.5 inline-flex items-center px-3.5 py-1.5 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 text-xs font-semibold transition-all">
                                     <i class="fas fa-plus mr-1.5"></i> Registrar Consulta
                                 </a>
-                                {% endif %}
+                            </div>
+                            {% endif %}
+                            {% elif user.has_permission('print_prescriptions') %}
+                            {% if prescription_history %}
+                            <div class="space-y-2.5 overflow-y-auto max-h-[360px] pr-1">
+                                <p class="text-[11px] text-slate-500 mb-2"><i class="fas fa-shield-alt text-teal-600 mr-1"></i> Notas y diagnósticos protegidos por secreto médico. Solo impresión de recetas:</p>
+                                {% for rx in prescription_history %}
+                                <div class="p-3 rounded-xl border border-teal-100 bg-teal-50/40 flex items-center justify-between">
+                                    <span class="text-xs font-bold text-slate-700">
+                                        <i class="far fa-calendar-alt text-teal-600 mr-1.5"></i>
+                                        {{ rx.created_at.strftime("%d/%m/%Y") if rx.created_at else "—" }}
+                                    </span>
+                                    <a href="/consultations/{{ rx.id }}/prescription/pdf" target="_blank" class="inline-flex items-center px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all shadow-xs">
+                                        <i class="fas fa-print mr-1"></i> Imprimir Receta
+                                    </a>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="flex-1 flex flex-col items-center justify-center text-center py-6">
+                                <p class="text-xs text-slate-400">No hay recetas médicas emitidas para imprimir.</p>
+                            </div>
+                            {% endif %}
+                            {% else %}
+                            <div class="flex-1 flex flex-col items-center justify-center text-center py-6">
+                                <p class="text-xs text-slate-400"><i class="fas fa-lock mr-1"></i> Información clínica restringida al médico.</p>
                             </div>
                             {% endif %}
                         </div>

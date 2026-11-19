@@ -1,3 +1,4 @@
+import os
 import sys
 import shutil
 import subprocess
@@ -17,17 +18,31 @@ def build():
     print(" 🛠️  SSCP Desktop - Compilación de Ejecutable Portable (.exe)")
     print("================================================================")
 
-    pyinstaller_bin = BASE_DIR / "venv" / "Scripts" / "pyinstaller.exe"
-    if not pyinstaller_bin.exists():
-        pyinstaller_bin = "pyinstaller"
-
     spec_file = BASE_DIR / "sscp_desktop.spec"
     assert spec_file.exists(), f"No se encontró el archivo de especificación {spec_file}"
 
-    # 1. Ejecutar PyInstaller
-    cmd = [str(pyinstaller_bin), str(spec_file), "--noconfirm"]
+    env = os.environ.copy()
+    venv_site = BASE_DIR / "venv" / "Lib" / "site-packages"
+    extra_paths = [str(BASE_DIR)]
+    if venv_site.exists():
+        for sub in [venv_site, venv_site / "win32", venv_site / "win32" / "lib", venv_site / "Pythonwin", venv_site / "pywin32_system32"]:
+            if sub.exists():
+                extra_paths.append(str(sub))
+        pywin32_sys = venv_site / "pywin32_system32"
+        if pywin32_sys.exists():
+            env["PATH"] = os.pathsep.join([str(pywin32_sys), env.get("PATH", "")])
+    existing_pp = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = os.pathsep.join(extra_paths + ([existing_pp] if existing_pp else []))
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "PyInstaller",
+        str(spec_file),
+        "--noconfirm",
+    ]
     print(f"\n[1/3] Ejecutando PyInstaller con {spec_file.name}...")
-    result = subprocess.run(cmd, cwd=str(BASE_DIR))
+    result = subprocess.run(cmd, cwd=str(BASE_DIR), env=env)
     if result.returncode != 0:
         print("❌ Error durante la compilación con PyInstaller.")
         sys.exit(result.returncode)

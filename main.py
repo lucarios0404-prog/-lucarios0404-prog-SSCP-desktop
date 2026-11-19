@@ -69,39 +69,32 @@ async def run_peer_continuous_sync():
 
 
 def _execute_relay_sync_cycle():
-    """Ejecuta un ciclo de sincronización en hilo de fondo para no bloquear el bucle de eventos asyncio."""
-    from app.services.relay_service import RelayService
-    with SessionLocal() as db:
-        clinic_id = RelayService.get_clinic_id(db)
-        # 1. Absorber deltas pendientes desde el Cloud Relay público (Internet sin importar la red)
-        try:
-            RelayService.pull_from_cloud(db, clinic_id=clinic_id)
-        except Exception:
-            pass
-        # 2. Absorber desde el buzón local
-        try:
-            messages = RelayService.pull_messages(db, clinic_id=clinic_id, exclude_device_id="pc_doctor", limit=50)
-            for m in messages:
-                payload = m.get("payload", {})
-                RelayService.reconcile_incoming_delta(db, payload)
-        except Exception:
-            pass
-        # 3. Publicar snapshot actualizado de citas y pacientes al Cloud Relay
-        try:
-            RelayService.push_snapshot_to_cloud(db, clinic_id=clinic_id)
-        except Exception:
-            pass
-        # 4. Publicar perfil de estación con IP local para auto-descubrimiento
-        try:
-            RelayService.sync_station_profile_to_cloud(db, clinic_id=clinic_id)
-        except Exception:
-            pass
+    """Ejecuta un ciclo de sincronización incremental con Supabase en hilo de fondo sin bloquear la UI."""
+    from app.services.supabase_sync_service import SupabaseSyncService
+    from app.services.license_service import check_license, LicenseStatus
+    try:
+        if check_license().status != LicenseStatus.ACTIVE:
+            return
+        SupabaseSyncService.run_incremental_cycle()
+    except Exception:
+        pass
+
 
 async def run_relay_continuous_sync():
-    """Tarea en segundo plano: mantiene sincronizado bidireccionalmente el Buzón Relay (Cloud y Local) cada 15s sin bloquear."""
+    """Tarea en segundo plano: mantiene sincronizado incrementalmente SQLite y el Puente Supabase cada 20s o al guardar cambios."""
+    from app.services.supabase_sync_service import wait_for_sync_signal
+    # Ejecutar primer ciclo rapido al iniciar para publicar IP actual y absorber pendientes
+    try:
+        await asyncio.sleep(2)
+        await asyncio.to_thread(_execute_relay_sync_cycle)
+    except asyncio.CancelledError:
+        return
+    except Exception:
+        pass
+
     while True:
         try:
-            await asyncio.sleep(15)
+            await asyncio.to_thread(wait_for_sync_signal, 20.0)
             await asyncio.to_thread(_execute_relay_sync_cycle)
         except asyncio.CancelledError:
             break
@@ -169,6 +162,12 @@ def ensure_schema_migrations(engine):
                 conn.execute(text("ALTER TABLE settings ADD COLUMN central_station_url TEXT"))
             if "relay_channel_id" not in s_cols:
                 conn.execute(text("ALTER TABLE settings ADD COLUMN relay_channel_id TEXT"))
+            if "station_secret" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN station_secret TEXT"))
+            if "supabase_url" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN supabase_url TEXT"))
+            if "supabase_anon_key" not in s_cols:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN supabase_anon_key TEXT"))
 
 
             # 3. Migraciones en appointments (Turnos, Servicios, WhatsApp, Doctor)
@@ -219,8 +218,36 @@ def ensure_schema_migrations(engine):
 
 _last_whatsapp_cron_day = None
 
+
+def check_pending_daily_whatsapp_reminders(target_date=None) -> int:
+    """
+    Revisa recordatorios pendientes del día siguiente sin marcar envíos falsos.
+    En Modo 1-Clic Real solo el usuario confirma el envío real desde WhatsApp.
+    """
+    from sqlalchemy import or_
+    from app.models.appointment import Appointment
+
+    if target_date is None:
+        target_date = datetime.now().date() + timedelta(days=1)
+
+    with SessionLocal() as db:
+        count = (
+            db.query(Appointment)
+            .filter(
+                Appointment.date == target_date,
+                Appointment.status.in_(["Pendiente", "Confirmada"]),
+                or_(
+                    Appointment.whatsapp_reminder_sent == False,
+                    Appointment.whatsapp_reminder_sent == None,
+                ),
+            )
+            .count()
+        )
+    return int(count)
+
+
 async def run_whatsapp_scheduled_reminders():
-    """Tarea en segundo plano: envía recordatorios automáticos de WhatsApp a la hora configurada."""
+    """Tarea en segundo plano: registra en log cuántos recordatorios están pendientes para la Cola 1-Clic."""
     global _last_whatsapp_cron_day
     while True:
         try:
@@ -231,51 +258,46 @@ async def run_whatsapp_scheduled_reminders():
 
             with SessionLocal() as db:
                 from app.models.setting import Setting
-                from app.models.appointment import Appointment
-                from app.services.whatsapp_service import WhatsAppService
 
                 setting = db.query(Setting).first()
-                if not setting or not setting.whatsapp_auto_send:
-                    continue
+                scheduled_time = ((setting.whatsapp_auto_hour if setting else None) or "08:30").strip()
 
-                scheduled_time = (setting.whatsapp_auto_hour or "08:30").strip()
-
-                if current_time_str == scheduled_time and _last_whatsapp_cron_day != today_str:
-                    _last_whatsapp_cron_day = today_str
-                    print(f"[WhatsApp Scheduler] Disparando recordatorios automáticos de las {scheduled_time}...")
-                    
-                    target_date = now.date() + timedelta(days=1)
-                    appts = db.query(Appointment).filter(
-                        Appointment.date == target_date,
-                        Appointment.status.in_(["Pendiente", "Confirmada"]),
-                        Appointment.whatsapp_reminder_sent == False
-                    ).all()
-
-                    sent = 0
-                    for a in appts:
-                        info = WhatsAppService.get_appointment_reminder(db, a)
-                        if info["clean_phone"]:
-                            WhatsAppService.dispatch_message(info["clean_phone"], info["message"])
-                            a.whatsapp_reminder_sent = True
-                            a.whatsapp_reminder_sent_at = datetime.utcnow()
-                            sent += 1
-
-                    db.commit()
-                    print(f"[WhatsApp Scheduler] Recordatorios enviados con éxito: {sent}/{len(appts)} citas.")
+            if current_time_str == scheduled_time and _last_whatsapp_cron_day != today_str:
+                _last_whatsapp_cron_day = today_str
+                tomorrow = now.date() + timedelta(days=1)
+                pending_count = check_pending_daily_whatsapp_reminders(tomorrow)
+                if pending_count > 0:
+                    print(
+                        f"[WhatsApp 1-Clic] {pending_count} recordatorios pendientes para mañana ({tomorrow}). "
+                        "Ábrelos desde Citas -> Cola WhatsApp."
+                    )
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"[WhatsApp Scheduler] Aviso no crítico: {e}")
+            print(f"[WhatsApp 1-Clic] Aviso no crítico: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Asegurar creación de tablas e inicialización de catálogo oficial CIE-10
-    try:
-        from app.database import Base, engine, SessionLocal
+    # Asegurar integridad de SQLite, creación de tablas e inicialización de catálogo oficial CIE-10
+    def _init_and_seed_db():
+        from app.database import Base, engine, SessionLocal, DB_PATH, repair_sqlite_if_malformed
+        repair_sqlite_if_malformed(DB_PATH, reset_if_unrecoverable=True)
         import app.models # Registrar todos los modelos
-        Base.metadata.create_all(bind=engine)
-        ensure_schema_migrations(engine)
-        
+        try:
+            Base.metadata.create_all(bind=engine)
+            ensure_schema_migrations(engine)
+        except Exception as init_exc:
+            if "malformed" in str(init_exc).lower() or "databaseerror" in str(init_exc).lower():
+                try:
+                    engine.dispose()
+                except Exception:
+                    pass
+                repair_sqlite_if_malformed(DB_PATH, reset_if_unrecoverable=True)
+                Base.metadata.create_all(bind=engine)
+                ensure_schema_migrations(engine)
+            else:
+                raise
+
         from app.data.cie10_catalog import seed_cie10_catalog
         with SessionLocal() as db:
             seed_cie10_catalog(db)
@@ -285,6 +307,9 @@ async def lifespan(app: FastAPI):
             seed_initial_data_if_empty(db)
             from app.data.services_catalog import seed_services_if_empty
             seed_services_if_empty(db)
+
+    try:
+        _init_and_seed_db()
     except Exception as e:
         print(f"[Startup Database] Aviso: {e}")
 
@@ -307,6 +332,14 @@ async def lifespan(app: FastAPI):
         await wa_task
     except asyncio.CancelledError:
         pass
+    try:
+        from sqlalchemy import text
+        from app.database import engine
+        with engine.connect() as conn:
+            conn.execute(text("PRAGMA wal_checkpoint(TRUNCATE)"))
+        engine.dispose()
+    except Exception:
+        pass
 
 from app.version import SUITE_VERSION
 app = FastAPI(title="SSCP Desktop", version=SUITE_VERSION, lifespan=lifespan)
@@ -319,7 +352,7 @@ from app.routers import mobile_api
 # Evita que sitios web de terceros en el navegador puedan sondear la API local del consultorio
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+|100\.\d+\.\d+\.\d+|.*\.laxarusdevs\.com)(:\d+)?|https?://appassets\.androidplatform\.net|app://.*|capacitor://.*|file://.*|null)$",
+    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+|100\.\d+\.\d+\.\d+|.*\.laxarusdevs\.com)(:\d+)?|https?://appassets\.androidplatform\.net|app://.*|capacitor://.*|file://.*)$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
@@ -426,7 +459,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.middleware("http")
 async def license_gate_middleware(request: Request, call_next):
     # Rutas publicas exentas de validacion de licencia
-    exempt_prefixes = ("/activate", "/static", "/favicon.ico", "/docs", "/openapi.json", "/api/mobile/ping", "/download/apk", "/mobile")
+    exempt_prefixes = ("/activate", "/static", "/favicon.ico", "/docs", "/openapi.json", "/api/mobile/ping", "/api/internal/graceful-shutdown", "/download/apk", "/mobile")
     if any(request.url.path.startswith(p) for p in exempt_prefixes):
         return await call_next(request)
 
@@ -448,6 +481,44 @@ async def license_gate_middleware(request: Request, call_next):
 
     return await call_next(request)
 
+@app.post("/api/internal/graceful-shutdown")
+def internal_graceful_shutdown(request: Request):
+    """Ejecuta sync final, checkpoint WAL limpio y finaliza el backend ante cierre desde Electron."""
+    import hmac
+    import os
+    client_host = request.client.host if request.client else ""
+    if client_host not in ("127.0.0.1", "::1", "localhost"):
+        return JSONResponse(status_code=403, content={"detail": "Solo permitido desde localhost."})
+    expected_ipc = os.environ.get("SSCP_IPC_SECRET", "").strip()
+    if expected_ipc:
+        provided_ipc = request.headers.get("X-SSCP-IPC-Secret", "").strip()
+        if not provided_ipc or not hmac.compare_digest(provided_ipc, expected_ipc):
+            return JSONResponse(status_code=403, content={"detail": "Secreto IPC inválido."})
+    try:
+        from app.database import SessionLocal
+        from app.services.supabase_sync_service import SupabaseSyncService
+        db = SessionLocal()
+        try:
+            cfg = SupabaseSyncService.get_bridge_config(db)
+            if cfg.get("enabled"):
+                SupabaseSyncService.run_incremental_cycle(db)
+        finally:
+            db.close()
+    except Exception:
+        pass
+    try:
+        from sqlalchemy import text
+        from app.database import engine
+        with engine.connect() as conn:
+            conn.execute(text("PRAGMA wal_checkpoint(TRUNCATE)"))
+        engine.dispose()
+    except Exception:
+        pass
+    import threading
+    threading.Timer(0.15, lambda: os._exit(0)).start()
+    return {"ok": True}
+
+
 @app.get("/download/apk")
 def download_mobile_apk():
     """Descarga directa del paquete APK compilado para Android."""
@@ -468,6 +539,14 @@ def download_mobile_apk():
         status_code=404,
         content={"error": "El instalador APK de Android se encuentra en proceso de compilación o empaquetado."}
     )
+
+@app.get("/mobile/chart.min.js")
+def mobile_chart_js():
+    """Sirve chart.min.js localmente para la vista /mobile sin depender de CDN externo."""
+    chart_path = BASE_DIR / "static" / "js" / "chart.min.js"
+    if chart_path.exists():
+        return FileResponse(path=str(chart_path), media_type="application/javascript")
+    return JSONResponse(status_code=404, content={"error": "chart.min.js no encontrado"})
 
 @app.get("/mobile")
 def mobile_web_view(request: Request):
@@ -495,29 +574,23 @@ async def root(request: Request, db: Session = Depends(get_db), current_user = D
 
 @app.get("/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    if not current_user:
+    if not current_user or not current_user.is_active:
         return RedirectResponse(url="/")
         
     from app.routers.patients import resolve_current_doctor_id
     doc_id = resolve_current_doctor_id(db, current_user)
     today = date.today()
 
-    # Auto-reconciliación: Si un paciente ya tuvo consulta médica posterior al registro de su cita, marcar la cita como Completada
+    # Auto-reconciliación: Si un paciente ya tuvo consulta médica asociada o del día, marcar la cita como Completada
     try:
-        pending_candidates = db.query(Appointment).filter(
-            Appointment.status.in_(["Pendiente", "Confirmada"])
-        ).all()
-        reconciled = False
-        for cand in pending_candidates:
-            has_consultation = db.query(Consultation).filter(
-                Consultation.patient_id == cand.patient_id,
-                Consultation.created_at >= cand.created_at
-            ).first()
-            if has_consultation:
-                cand.status = "Completada"
-                reconciled = True
-        if reconciled:
+        from app.services.appointment_reconciliation import reconcile_completed_appointments
+        if reconcile_completed_appointments(db) > 0:
             db.commit()
+            try:
+                from app.services.supabase_sync_service import signal_supabase_sync
+                signal_supabase_sync()
+            except Exception:
+                pass
     except Exception:
         pass
 
