@@ -28,7 +28,7 @@ Var SupaLine3
 ; Definiciones Generales
 !define PRODUCT_NAME "SSCP Desktop"
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "1.8.7-supabase"
+  !define PRODUCT_VERSION "1.8.8-supabase"
 !endif
 !define PRODUCT_PUBLISHER "SSCP Medical Systems"
 !define PRODUCT_WEB_SITE "https://sscp.laxarusdevs.com"
