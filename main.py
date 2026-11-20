@@ -613,10 +613,11 @@ async def dashboard(request: Request, db: Session = Depends(get_db), current_use
     pending_payments = db.query(Payment).filter(Payment.status == "pending").all()
     total_pending_debt = sum(p.total for p in pending_payments)
 
-    # Próximas Citas: solo citas pendientes/confirmadas desde hoy en adelante
+    # Próximas Citas: solo citas futuras pendientes/confirmadas (sin mezclar con sala de espera de hoy)
+    tomorrow = today + timedelta(days=1)
     recent_appts_q = db.query(Appointment).filter(
-        Appointment.status.in_(["Pendiente", "Confirmada", "En Espera", "En espera", "en espera"]),
-        Appointment.date >= today
+        Appointment.status.in_(["Pendiente", "Confirmada", "Reagendada"]),
+        Appointment.date >= tomorrow
     )
     if doc_id:
         recent_appts_q = recent_appts_q.filter(or_(Appointment.doctor_id == doc_id, Appointment.doctor_id == None))

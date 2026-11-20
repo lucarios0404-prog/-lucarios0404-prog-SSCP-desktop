@@ -90,13 +90,15 @@ def reception_agenda(
         all_appts_q = all_appts_q.filter(Appointment.doctor_id == doc_id)
     all_appts_count = all_appts_q.count()
 
-    # Mapear citas con atributos visuales
+    # Mapear citas con atributos visuales y recordatorios reales
+    from app.services.whatsapp_service import WhatsAppService
     agenda_items = []
     for appt in appointments:
         time_str = appt.start_time.strftime("%H:%M") if appt.start_time else "--:--"
         p_name = f"{appt.patient.first_name} {appt.patient.last_name}" if appt.patient else "Paciente sin registro"
         p_phone = appt.patient.phone if appt.patient else ""
         color = get_reason_color(appt.reason)
+        wa_info = WhatsAppService.get_appointment_reminder(db, appt)
 
         agenda_items.append({
             "id": appt.id,
@@ -109,6 +111,34 @@ def reception_agenda(
             "color": color,
             "price": appt.price or 0.0,
             "queue_number": appt.queue_number,
+            "whatsapp_reminder_sent": bool(appt.whatsapp_reminder_sent),
+            "wa_reminder_text": wa_info.get("message", ""),
+            "wa_link": wa_info.get("wa_link") or "",
+        })
+
+    # Recordatorios de mañana pendientes para la Secretaría
+    tomorrow_date = date.today() + timedelta(days=1)
+    tmr_q = db.query(Appointment).filter(
+        Appointment.date == tomorrow_date,
+        Appointment.status.in_(["Pendiente", "Confirmada", "Reagendada"]),
+        or_(Appointment.whatsapp_reminder_sent == False, Appointment.whatsapp_reminder_sent == None),
+    )
+    if doc_id:
+        tmr_q = tmr_q.filter(Appointment.doctor_id == doc_id)
+    tmr_appts = tmr_q.order_by(Appointment.start_time.asc()).all()
+    tomorrow_reminders = []
+    for ta in tmr_appts:
+        tw_info = WhatsAppService.get_appointment_reminder(db, ta)
+        tp_name = f"{ta.patient.first_name} {ta.patient.last_name}".strip() if ta.patient else "Paciente"
+        tomorrow_reminders.append({
+            "id": ta.id,
+            "patient_name": tp_name,
+            "time": ta.start_time.strftime("%I:%M %p") if ta.start_time else "Por definir",
+            "phone": ta.patient.phone if ta.patient else "",
+            "status": ta.status or "Pendiente",
+            "wa_reminder_text": tw_info.get("message", ""),
+            "wa_link": tw_info.get("wa_link") or "",
+            "valid_phone": bool(tw_info.get("valid_phone")),
         })
 
     # Cargar lista de pacientes activos para agendar rápido (aislado estrictamente por médico)
@@ -130,6 +160,8 @@ def reception_agenda(
             "next_date": next_date,
             "today_str": today_str,
             "agenda_items": agenda_items,
+            "tomorrow_unsent_count": len(tomorrow_reminders),
+            "tomorrow_reminders": tomorrow_reminders,
             "total_citas": len(agenda_items),
             "all_appts_count": all_appts_count,
             "patients": patients,
@@ -291,8 +323,17 @@ def update_appointment_status(
     if not appt:
         return JSONResponse({"success": False, "error": "Cita no encontrada"}, status_code=404)
 
+    if appt.status in ("En Espera", "En Consulta") and status in ("Confirmada", "Pendiente"):
+        return JSONResponse(
+            {"success": False, "error": "La paciente ya está en Sala de Espera o En Consulta. Usa 'Sacar de fila' si deseas quitarle el turno."},
+            status_code=409
+        )
+
     appt.status = status
-    if status in ["Pendiente", "Cancelada", "canceled", "cancelled"]:
+    if status == "En Espera" and not appt.queue_number:
+        from app.routers.appointments import assign_next_queue_number
+        appt.queue_number = assign_next_queue_number(db, appt.date)
+    elif status in ["Pendiente", "Cancelada", "canceled", "cancelled"]:
         appt.queue_number = None
     appt.updated_at = datetime.utcnow()
     db.commit()

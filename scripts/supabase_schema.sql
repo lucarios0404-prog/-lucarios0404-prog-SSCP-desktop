@@ -502,6 +502,10 @@ BEGIN
                     'cancelada', 'anulada', 'canceled', 'cancelled', 'no_show', 'no asistió'
                 )
                 THEN sync_appointments.status
+                WHEN lower(trim(coalesce(sync_appointments.status, ''))) IN ('en espera', 'en consulta')
+                     AND lower(trim(coalesce(EXCLUDED.status, ''))) IN ('pendiente', 'confirmada', 'reagendada')
+                     AND EXCLUDED.queue_number IS NOT NULL
+                THEN sync_appointments.status
                 ELSE coalesce(EXCLUDED.status, sync_appointments.status)
             END,
             queue_number              = coalesce(EXCLUDED.queue_number, sync_appointments.queue_number),

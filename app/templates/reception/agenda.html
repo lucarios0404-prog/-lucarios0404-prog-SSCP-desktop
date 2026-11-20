@@ -35,6 +35,49 @@
         </a>
     </div>
 
+    <!-- Alerta Proactiva de Recordatorios de Mañana (Secretaría) -->
+    {% if tomorrow_unsent_count and tomorrow_unsent_count > 0 %}
+    <div id="reception-reminders-banner" class="bg-gradient-to-r from-amber-50 via-orange-50 to-white border border-amber-200 rounded-xl p-3 sm:p-4 shadow-sm space-y-2.5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                    <i class="fab fa-whatsapp"></i>
+                </span>
+                <div>
+                    <h4 class="text-xs sm:text-sm font-extrabold text-amber-950">Recordatorios de Citas para Mañana (<span id="rem-banner-count">{{ tomorrow_unsent_count }}</span> pendientes)</h4>
+                    <p class="text-[11px] text-amber-800">Envía el recordatorio por WhatsApp o copia el texto listo con un clic</p>
+                </div>
+            </div>
+            <a href="/appointments?status=pendientes" class="text-xs font-bold text-amber-900 bg-white hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-lg transition">
+                Ver Agenda Completa →
+            </a>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {% for rem in tomorrow_reminders[:6] %}
+            <div id="rem-card-{{ rem.id }}" class="bg-white rounded-lg border border-amber-200/80 p-2.5 flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                    <div class="text-xs font-bold text-slate-900 truncate">{{ rem.patient_name }} <span class="text-indigo-700 font-mono">· {{ rem.time }}</span></div>
+                    <div class="text-[11px] text-slate-500 font-mono truncate">{{ rem.phone or 'Sin teléfono' }}</div>
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                    <button type="button" data-msg="{{ rem.wa_reminder_text }}" onclick="copyReminderMsg(this.dataset.msg)" class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold" title="Copiar texto del recordatorio">
+                        Copiar
+                    </button>
+                    {% if rem.wa_link %}
+                    <a href="{{ rem.wa_link }}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold" title="Abrir WhatsApp">
+                        WS
+                    </a>
+                    {% endif %}
+                    <button type="button" onclick="markReceptionReminderSent({{ rem.id }})" class="px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold" title="Marcar recordatorio enviado">
+                        ✓ Enviado
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Indicador de Citas del Día -->
     <div class="flex items-center justify-between px-1">
         <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -77,19 +120,23 @@
                 <!-- Botones de Acción Táctiles Rápidos -->
                 <div class="flex items-center gap-1.5 shrink-0">
                     <!-- Selector de Estado con 1 toque -->
-                    <select onchange="updateStatus({{ item.id }}, this.value)" class="text-xs font-semibold rounded-lg border border-slate-200 px-2 py-1.5 bg-slate-50 text-slate-700 cursor-pointer focus:ring-1 focus:ring-sky-500">
+                    <select data-prev-status="{{ item.status }}" onchange="updateStatus({{ item.id }}, this.value, this)" class="text-xs font-semibold rounded-lg border border-slate-200 px-2 py-1.5 bg-slate-50 text-slate-700 cursor-pointer focus:ring-1 focus:ring-sky-500">
                         <option value="Pendiente" {% if item.status == 'Pendiente' %}selected{% endif %}>⏳ Pendiente</option>
+                        <option value="Confirmada" {% if item.status == 'Confirmada' %}selected{% endif %}>✅ Confirmada</option>
                         <option value="En Espera" {% if item.status == 'En Espera' %}selected{% endif %}>🪑 En Espera</option>
                         <option value="En Consulta" {% if item.status == 'En Consulta' %}selected{% endif %}>🩺 En Consulta</option>
                         <option value="Completada" {% if item.status == 'Completada' %}selected{% endif %}>✓ Completada</option>
                         <option value="Cancelada" {% if item.status == 'Cancelada' %}selected{% endif %}>✕ Cancelada</option>
                     </select>
 
+                    <!-- Copiar texto del recordatorio -->
+                    <button type="button" data-msg="{{ item.wa_reminder_text }}" onclick="copyReminderMsg(this.dataset.msg)" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center transition-colors text-xs font-bold" title="Copiar texto del recordatorio">
+                        <i class="fas fa-copy"></i>
+                    </button>
+
                     <!-- Botón WhatsApp si tiene teléfono válido -->
-                    {% set clean_wa = item.phone | wa_phone if item.phone else '' %}
-                    {% if clean_wa %}
-                    {% set agenda_msg = 'Hola ' ~ (item.patient_name or '') ~ ', le recordamos su cita en el consultorio médico.' %}
-                    <a href="{{ item.phone | wa_link(agenda_msg) }}" target="_blank" rel="noopener noreferrer" class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors" title="Avisar por WhatsApp (1-Clic)">
+                    {% if item.wa_link %}
+                    <a href="{{ item.wa_link }}" target="_blank" rel="noopener noreferrer" class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors" title="Avisar por WhatsApp (1-Clic)">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.007c.106.005.249-.04.39.299.144.347.491 1.2.534 1.288.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.087-.179.182-.077.357.101.174.452.746.97 1.208.667.594 1.229.778 1.403.865.174.087.275.072.376-.043.101-.116.433-.506.549-.679.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.043.073.043.419-.101.824z"/></svg>
                     </a>
                     {% endif %}
@@ -182,7 +229,55 @@
         document.getElementById('quickModal').classList.add('hidden');
     }
 
-    async function updateStatus(appointmentId, newStatus) {
+    async function copyReminderMsg(text) {
+        if (!text) return;
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+                showToast('✓ Texto del recordatorio copiado', true);
+                return;
+            }
+        } catch (_) {}
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        showToast('✓ Texto del recordatorio copiado', true);
+    }
+
+    async function markReceptionReminderSent(apptId) {
+        const formData = new FormData();
+        formData.append('confirm_sent', 'true');
+        try {
+            const resp = await fetch(`/appointments/${apptId}/whatsapp-send`, { method: 'POST', body: formData });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                const card = document.getElementById(`rem-card-${apptId}`);
+                if (card) card.remove();
+                const cntEl = document.getElementById('rem-banner-count');
+                if (cntEl) {
+                    const nextVal = Math.max(0, parseInt(cntEl.textContent || '1', 10) - 1);
+                    cntEl.textContent = nextVal;
+                    if (nextVal === 0) {
+                        const b = document.getElementById('reception-reminders-banner');
+                        if (b) b.remove();
+                    }
+                }
+                showToast('✓ Recordatorio marcado como enviado', true);
+            } else {
+                showToast(data.error || 'No se pudo marcar como enviado', false);
+            }
+        } catch (_) {
+            showToast('Error de conexión con el servidor', false);
+        }
+    }
+
+    async function updateStatus(appointmentId, newStatus, selectEl = null) {
+        const prevStatus = selectEl ? (selectEl.dataset.prevStatus || '') : '';
         const formData = new FormData();
         formData.append('status', newStatus);
 
@@ -192,12 +287,15 @@
                 body: formData
             });
             const data = await resp.json();
-            if (data.success) {
+            if (resp.ok && data.success) {
+                if (selectEl) selectEl.dataset.prevStatus = newStatus;
                 showToast(`Estado cambiado a "${newStatus}"`, true);
             } else {
+                if (selectEl && prevStatus) selectEl.value = prevStatus;
                 showToast(data.error || 'Error al actualizar estado', false);
             }
         } catch (e) {
+            if (selectEl && prevStatus) selectEl.value = prevStatus;
             showToast('Error de conexión con el servidor', false);
         }
     }

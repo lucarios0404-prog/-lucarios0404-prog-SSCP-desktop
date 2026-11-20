@@ -680,9 +680,13 @@ class SupabaseSyncService:
 
             if appt:
                 locally_completed = is_completed_appointment_status(appt.status) or has_consultation_for_appointment(db, appt)
+                locally_in_queue = str(appt.status or "").strip().lower() in ("en espera", "en consulta")
+                remote_downgrades_queue = str(target_status or "").strip().lower() in ("confirmada", "pendiente", "reagendada") and row.get("queue_number") is not None
                 if locally_completed and is_active_appointment_status(target_status):
                     appt.status = "Completada"
                     appt.updated_at = compute_monotonic_sync_utc(db)
+                elif locally_in_queue and remote_downgrades_queue:
+                    appt.updated_at = datetime.utcnow()
                 else:
                     appt.status = target_status
                     appt.updated_at = datetime.utcnow()

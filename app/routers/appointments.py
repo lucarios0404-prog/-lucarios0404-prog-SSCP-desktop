@@ -428,6 +428,8 @@ def update_appointment_status(
                 status_code=403,
                 detail="Solo el médico tratante puede completar o cerrar una consulta clínica."
             )
+        if appt.status in ("En Espera", "En Consulta") and new_status in ("Confirmada", "Pendiente"):
+            return RedirectResponse(url="/appointments?error=in_queue", status_code=303)
         # Al marcar como En Espera (llegada del paciente), asignar Turno correlativo diario si aún no tiene
         if new_status == "En Espera" and not appt.queue_number:
             appt.queue_number = assign_next_queue_number(db, appt.date)

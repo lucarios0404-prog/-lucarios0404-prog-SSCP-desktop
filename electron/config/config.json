@@ -1,6 +1,6 @@
 {
   "appName": "SSCP Desktop (Electron)",
-  "version": "1.8.8-supabase",
+  "version": "1.8.9-supabase",
   "backendDir": "../",
   "pythonExe": "venv/Scripts/python.exe",
   "defaultPort": 8080,

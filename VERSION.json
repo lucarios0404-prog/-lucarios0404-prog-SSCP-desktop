@@ -1,7 +1,7 @@
 {
-  "suite": "1.8.8-supabase",
-  "apk": "2.0.5-supabase",
-  "apk_code": 76,
+  "suite": "1.8.9-supabase",
+  "apk": "2.0.6-supabase",
+  "apk_code": 77,
   "nube_apk": "1.0.5",
   "mac": "1.2.2"
 }

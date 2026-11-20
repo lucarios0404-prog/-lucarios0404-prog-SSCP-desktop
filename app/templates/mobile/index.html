@@ -190,7 +190,7 @@
             </div>
             <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-2">
                 <span>SSCP Móvil</span>
-                <span class="text-xs font-black bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full shadow-2xs">v2.0.5-supabase</span>
+                <span class="text-xs font-black bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full shadow-2xs">v2.0.6-supabase</span>
             </h1>
             <p class="text-xs font-medium text-slate-500 mt-1">Terminal de Consulta y Recepción Clínica</p>
             <div id="login-clinic-banner" class="mt-2 inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-700 text-[11px] font-bold rounded-full">
@@ -374,7 +374,7 @@
                 </div>
 
                 <div class="flex items-center space-x-1.5">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">v2.0.5-supabase</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">v2.0.6-supabase</span>
                     <button onclick="loadDashboardData()" title="Actualizar" 
                             class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition active:rotate-180">
                         <i class="fas fa-sync-alt text-xs"></i>
@@ -489,12 +489,16 @@
                         <span>Seguros / ARS</span>
                     </button>
                     <button onclick="openUpcomingModal()" type="button"
-                            class="col-span-2 sm:col-span-1 py-2.5 px-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1 shadow-sm active:scale-95 transition"
+                            class="relative col-span-2 sm:col-span-1 py-2.5 px-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1 shadow-sm active:scale-95 transition"
                             title="Seguimiento de próximas citas agendadas y recordatorios WhatsApp">
                         <i class="fas fa-calendar-alt text-xs"></i>
                         <span>Próximas Citas</span>
+                        <span id="upcoming-reminders-nav-badge" class="hidden ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white shadow-xs">0</span>
                     </button>
                 </div>
+
+                <!-- PANEL PROACTIVO DE RECORDATORIOS DE CITAS (SECRETARÍA) -->
+                <div id="secretary-due-reminders-panel" class="hidden bg-gradient-to-br from-amber-50 via-orange-50/70 to-white border border-amber-200 rounded-2xl p-3.5 shadow-sm space-y-2.5"></div>
 
                 <!-- SECCIÓN EN VIVO: DOCTOR ATENDIENDO PACIENTE AHORA MISMO (VISIBLE EN TODAS LAS VISTAS) -->
                 <div id="active-consultation-container" class="space-y-2"></div>
@@ -2540,7 +2544,7 @@
             </div>
 
             <!-- Filtros de Rango Temporal (Chips Táctiles) -->
-            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0 no-scrollbar">
+            <div class="flex flex-wrap items-center gap-1.5 pb-1 shrink-0">
                 <button type="button" onclick="setUpcomingRange('today')" id="chip-upcoming-today"
                         class="px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 bg-white text-slate-700 border border-slate-200 shrink-0">
                     Hoy
@@ -2574,6 +2578,7 @@
                 <select id="upcoming-status-filter" onchange="onUpcomingStatusFilterChange(this.value)"
                         class="bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 px-2 py-2 focus:ring-2 focus:ring-amber-500 shadow-2xs">
                     <option value="all">Todos los estados</option>
+                    <option value="unsent_wa">📩 Sin Enviar WA</option>
                     <option value="unconfirmed">⏳ Sin Confirmar</option>
                     <option value="confirmed">✅ Confirmadas</option>
                 </select>
@@ -2709,14 +2714,30 @@
                     if (!res || !res.ok) {
                         throw new Error('No se pudo registrar la confirmación');
                     }
-                    if (typeof rawUpcomingAppointments !== 'undefined' && Array.isArray(rawUpcomingAppointments)) {
-                        const item = rawUpcomingAppointments.find(x => String(x.id) === String(apptId));
+                    const nowIso = new Date().toISOString();
+                    [allUpcomingAppointmentsRaw, rawUpcomingAppointments].forEach(arr => {
+                        if (!Array.isArray(arr)) return;
+                        const item = arr.find(x => String(x.id) === String(apptId));
                         if (item) {
                             item.whatsapp_reminder_sent = true;
-                            item.whatsapp_reminder_sent_at = new Date().toISOString();
-                            if (typeof renderUpcomingAppointments === 'function') renderUpcomingAppointments();
+                            item.whatsapp_reminder_sent_at = nowIso;
+                        }
+                    });
+                    if (window.lastDashboardData) {
+                        if (Array.isArray(window.lastDashboardData.appointments)) {
+                            const dItem = window.lastDashboardData.appointments.find(x => String(x.id) === String(apptId));
+                            if (dItem) {
+                                dItem.whatsapp_reminder_sent = true;
+                                dItem.whatsapp_reminder_sent_at = nowIso;
+                            }
+                        }
+                        if (window.lastDashboardData.due_reminders && Array.isArray(window.lastDashboardData.due_reminders.items)) {
+                            window.lastDashboardData.due_reminders.items = window.lastDashboardData.due_reminders.items.filter(x => String(x.id) !== String(apptId));
+                            window.lastDashboardData.due_reminders.total_due = window.lastDashboardData.due_reminders.items.length;
+                            if (typeof renderDashboard === 'function') renderDashboard(window.lastDashboardData);
                         }
                     }
+                    if (typeof renderUpcomingAppointmentsList === 'function') renderUpcomingAppointmentsList();
                     bar.remove();
                     if (typeof showSyncToast === 'function') showSyncToast('✓ Recordatorio de WhatsApp confirmado.');
                 } catch (e) {
@@ -2743,6 +2764,50 @@
             const s = String(v).trim();
             if (!s || s === 'null' || s === 'undefined') return null;
             return /^\d+$/.test(s) ? parseInt(s, 10) : s;
+        }
+        function addDaysLocalStr(baseDate, days) {
+            const d = baseDate instanceof Date ? baseDate : new Date();
+            const target = new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
+            return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
+        }
+        function buildUpcomingReminderText(patientName, dateStr, timeStr) {
+            let fechaTexto = dateStr || '';
+            try {
+                const parts = String(dateStr || '').slice(0, 10).split('-');
+                if (parts.length === 3) {
+                    const dObj = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                    fechaTexto = `${days[dObj.getDay()]} ${parts[2]} de ${months[dObj.getMonth()]}`;
+                }
+            } catch (_) {}
+            const doctorName = localStorage.getItem('sscp_doctor_name') || (typeof currentClinic !== 'undefined' && currentClinic && currentClinic.doctor_name) || 'Dr. Especialista';
+            return `Estimada/o *${patientName || 'Paciente'}*, le saludamos del consultorio médico del *${doctorName}*.\n\nLe recordamos su cita programada para el *${fechaTexto}* a las *${timeStr || 'hora coordinada'}*.\n\n📌 *Indicaciones importantes para su consulta:*\n• Favor presentarse 15 minutos antes de su hora acordada.\n• Traer su documento de identidad (cédula) y carnet de seguro médico (ARS).\n\n¿Nos confirma su asistencia a la consulta? ¡Le esperamos!`;
+        }
+        async function copyReminderText(text) {
+            if (!text) return false;
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    if (typeof showSyncToast === 'function') showSyncToast('✓ Texto del recordatorio copiado.');
+                    return true;
+                }
+            } catch (_) {}
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                const ok = document.execCommand('copy');
+                ta.remove();
+                if (ok && typeof showSyncToast === 'function') showSyncToast('✓ Texto del recordatorio copiado.');
+                return ok;
+            } catch (_) {
+                return false;
+            }
         }
         function toLocalDateStr(val) {
             if (val !== undefined && val !== null) {
@@ -2810,33 +2875,42 @@
         function filterUpcomingAppointments(list, { range = 'all', status = 'all', search = '' } = {}) {
             const nowDt = new Date();
             const todayStr = toLocalDateStr(nowDt);
-            const tmrStr = toLocalDateStr(new Date(nowDt.getTime() + 86400000));
-            const weekEndStr = toLocalDateStr(new Date(nowDt.getTime() + 7 * 86400000));
-            const days15EndStr = toLocalDateStr(new Date(nowDt.getTime() + 15 * 86400000));
+            const tmrStr = addDaysLocalStr(nowDt, 1);
+            const weekEndStr = addDaysLocalStr(nowDt, 7);
+            const days15EndStr = addDaysLocalStr(nowDt, 15);
             const q = String(search || '').trim().toLowerCase();
 
             return (Array.isArray(list) ? list : []).filter(a => {
                 const aDate = String(a.date || '').slice(0, 10);
                 if (!aDate || aDate < todayStr) return false;
-                const stLower = String(a.status || '').toLowerCase();
-                if (['cancelada', 'anulada', 'completada', 'atendida'].includes(stLower)) return false;
+                const stLower = String(a.status || '').trim().toLowerCase();
+                if (['cancelada', 'anulada', 'canceled', 'cancelled', 'completada', 'atendida', 'listo'].includes(stLower)) return false;
 
-                if (range === 'today' && aDate !== todayStr) return false;
-                if (range === 'tomorrow' && aDate !== tmrStr) return false;
-                if (range === 'this_week' && (aDate < todayStr || aDate > weekEndStr)) return false;
-                if (range === 'next_15_days' && (aDate < todayStr || aDate > days15EndStr)) return false;
+                // Rangos futuros ("Mañana", "Esta Semana", "Próx. 15 Días", "Todas Futuras") excluyen estrictamente Hoy
+                if (range === 'today') {
+                    if (aDate !== todayStr) return false;
+                } else {
+                    if (['en espera', 'en consulta', 'waiting', 'in_consultation', 'consulting'].includes(stLower)) return false;
+                    if (aDate < tmrStr) return false;
+                    if (range === 'tomorrow' && aDate !== tmrStr) return false;
+                    if (range === 'this_week' && aDate > weekEndStr) return false;
+                    if (range === 'next_15_days' && aDate > days15EndStr) return false;
+                }
 
                 if (status === 'unconfirmed') {
-                    if (a.status && a.status !== 'Pendiente' && a.status !== 'Sin Confirmar') return false;
+                    if (stLower && !['pendiente', 'sin confirmar', 'reagendada'].includes(stLower)) return false;
                 } else if (status === 'confirmed') {
-                    if (a.status !== 'Confirmada') return false;
+                    if (stLower !== 'confirmada') return false;
+                } else if (status === 'unsent_wa') {
+                    if (a.whatsapp_reminder_sent) return false;
                 }
 
                 if (q) {
                     const name = String(a.patient_name || '').toLowerCase();
                     const doc = String(a.patient_document_id || '').toLowerCase();
                     const phone = String(a.patient_phone || '').toLowerCase();
-                    if (!name.includes(q) && !doc.includes(q) && !phone.includes(q)) return false;
+                    const reason = String(a.reason || '').toLowerCase();
+                    if (!name.includes(q) && !doc.includes(q) && !phone.includes(q) && !reason.includes(q)) return false;
                 }
                 return true;
             });
@@ -4274,10 +4348,46 @@
                             payment_method: payInfo ? payInfo.payment_method : null,
                             payment_amount: payInfo ? payInfo.payment_amount : null,
                             payment_status: isPaid ? 'paid' : 'pending',
+                            whatsapp_reminder_sent: Boolean(a.whatsapp_reminder_sent),
+                            whatsapp_reminder_sent_at: a.whatsapp_reminder_sent_at || null,
                             notes: a.notes || ''
                         };
                     })
                     .sort((x, y) => String(x.start_time || '').localeCompare(String(y.start_time || '')));
+
+                const nowDt = new Date();
+                const todayStr = toLocalDateStr(nowDt);
+                const tmrStr = addDaysLocalStr(nowDt, 1);
+                const weekEndStr = addDaysLocalStr(nowDt, 7);
+                const dueItems = appts
+                    .filter(a => {
+                        const dStr = String(a.date || '').slice(0, 10);
+                        const st = String(a.status || 'Pendiente').trim().toLowerCase();
+                        return dStr >= todayStr && dStr <= weekEndStr && ['pendiente', 'confirmada', 'reagendada'].includes(st) && !a.whatsapp_reminder_sent;
+                    })
+                    .map(a => {
+                        const pat = patMap.get(String(a.patient_uuid || '')) || patMap.get(String(a.patient_local_id || ''));
+                        const pName = a.patient_name || (pat ? pat.name : 'Paciente');
+                        const pPhone = pat ? (pat.phone || '') : '';
+                        const dStr = String(a.date || '').slice(0, 10);
+                        const tStr = String(a.start_time || '').slice(0, 5) || 'Por Definir';
+                        const rText = buildUpcomingReminderText(pName, dStr, tStr);
+                        const cleanPh = formatWhatsAppPhone(pPhone);
+                        return {
+                            id: a.local_id || a.client_uuid,
+                            patient_id: a.patient_local_id || a.patient_uuid,
+                            patient_name: pName,
+                            patient_phone: pPhone,
+                            date: dStr,
+                            start_time: tStr,
+                            reason: a.reason || 'Consulta General',
+                            status: a.status || 'Pendiente',
+                            whatsapp_reminder_sent: false,
+                            reminder_text: rText,
+                            wa_link: cleanPh ? `https://wa.me/${cleanPh}?text=${encodeURIComponent(rText)}` : ''
+                        };
+                    })
+                    .sort((x, y) => `${x.date} ${x.start_time}`.localeCompare(`${y.date} ${y.start_time}`));
 
                 return {
                     date: targetDate,
@@ -4291,6 +4401,13 @@
                         in_consultation: dayAppts.filter(a => isConsultingStatus(a.status)).length,
                         completed: dayAppts.filter(a => isCompletedStatus(a.status)).length,
                         pending: dayAppts.filter(a => ['pendiente', 'confirmada'].includes(String(a.status || '').trim().toLowerCase())).length
+                    },
+                    due_reminders: {
+                        tomorrow_unsent: dueItems.filter(x => x.date === tmrStr).length,
+                        today_unsent: dueItems.filter(x => x.date === todayStr).length,
+                        upcoming_unsent: dueItems.length,
+                        total_due: dueItems.length,
+                        items: dueItems.slice(0, 15)
                     },
                     appointments: dayAppts
                 };
@@ -4531,6 +4648,11 @@
                         target.status = (body.mode === 'unqueue') ? 'Pendiente' : 'Cancelada';
                         target.queue_number = null;
                     } else if (action === 'status') {
+                        const curLower = String(target.status || '').trim().toLowerCase();
+                        const nextLower = String(body.status || '').trim().toLowerCase();
+                        if (['en espera', 'en consulta'].includes(curLower) && ['confirmada', 'pendiente'].includes(nextLower)) {
+                            return this._jsonResponse({ detail: "La paciente ya se encuentra en Sala de Espera o En Consulta. Usa 'Sacar de fila' para revertir su turno." }, 409);
+                        }
                         target.status = body.status || target.status;
                         if (['Pendiente', 'Cancelada', 'cancelada'].includes(target.status)) target.queue_number = null;
                     } else if (action === 'reschedule') {
@@ -4722,20 +4844,29 @@
                     });
                     const todayDt = new Date();
                     const todayStr = toLocalDateStr(todayDt);
-                    const tmrStr = toLocalDateStr(new Date(todayDt.getTime() + 86400000));
+                    const tmrStr = addDaysLocalStr(todayDt, 1);
                     const mappedUpcoming = rawAppts
-                        .filter(a => String(a.date || '').slice(0, 10) >= todayStr && !['cancelada', 'anulada', 'completada', 'atendida'].includes(String(a.status || '').toLowerCase()))
+                        .filter(a => String(a.date || '').slice(0, 10) >= todayStr && !['cancelada', 'anulada', 'canceled', 'cancelled', 'completada', 'atendida', 'listo'].includes(String(a.status || '').toLowerCase()))
                         .map(a => {
                             const pat = patMap.get(String(a.patient_uuid || '')) || patMap.get(String(a.patient_local_id || ''));
+                            const pName = a.patient_name || (pat ? pat.name : 'Paciente');
+                            const pPhone = pat ? (pat.phone || '') : '';
+                            const dStr = String(a.date || '').slice(0, 10);
+                            const tStr = String(a.start_time || '').slice(0, 5);
+                            const rText = buildUpcomingReminderText(pName, dStr, tStr);
+                            const cleanPh = formatWhatsAppPhone(pPhone);
                             return {
                                 ...a,
                                 id: a.local_id || a.client_uuid,
-                                patient_name: a.patient_name || (pat ? pat.name : 'Paciente'),
-                                patient_phone: pat ? (pat.phone || '') : '',
+                                patient_name: pName,
+                                patient_phone: pPhone,
                                 patient_document_id: pat ? (pat.document_id || '') : '',
                                 insurance_name: pat ? (pat.insurance_name || 'Privado') : 'Privado',
-                                date: String(a.date || '').slice(0, 10),
-                                start_time: String(a.start_time || '').slice(0, 5)
+                                date: dStr,
+                                start_time: tStr,
+                                whatsapp_reminder_sent: Boolean(a.whatsapp_reminder_sent),
+                                reminder_text: rText,
+                                wa_link: cleanPh ? `https://wa.me/${cleanPh}?text=${encodeURIComponent(rText)}` : ''
                             };
                         })
                         .sort((x, y) => `${x.date} ${x.start_time}`.localeCompare(`${y.date} ${y.start_time}`));
@@ -4743,6 +4874,7 @@
                     const rangeParam = params.get('range') || 'all';
                     const statusParam = params.get('status') || 'all';
                     const searchParam = params.get('search') || '';
+                    const futureAll = filterUpcomingAppointments(mappedUpcoming, { range: 'all', status: 'all', search: '' });
                     const filteredAppts = filterUpcomingAppointments(mappedUpcoming, {
                         range: rangeParam,
                         status: statusParam,
@@ -4754,9 +4886,11 @@
                         range: rangeParam,
                         count: filteredAppts.length,
                         appointments: filteredAppts,
-                        all_appointments: mappedUpcoming,
-                        tomorrow_count: mappedUpcoming.filter(a => a.date === tmrStr).length,
-                        unconfirmed_count: mappedUpcoming.filter(a => a.status !== 'Confirmada').length
+                        all_appointments: futureAll,
+                        tomorrow_count: futureAll.filter(a => a.date === tmrStr).length,
+                        tomorrow_unsent_count: futureAll.filter(a => a.date === tmrStr && !a.whatsapp_reminder_sent).length,
+                        unsent_reminders_count: futureAll.filter(a => !a.whatsapp_reminder_sent).length,
+                        unconfirmed_count: futureAll.filter(a => !['confirmada'].includes(String(a.status || '').trim().toLowerCase())).length
                     });
                 }
 
@@ -4944,7 +5078,7 @@
 
                 if (cleanUrl === '/api/mobile/close-day' && method === 'POST') {
                     const todayStr = toLocalDateStr();
-                    const appts = (await SSCPStorage.getCollection('appointments')).filter(a => String(a.date || '').slice(0, 10) === todayStr && ['En Espera', 'En Consulta', 'Pendiente'].includes(a.status));
+                    const appts = (await SSCPStorage.getCollection('appointments')).filter(a => String(a.date || '').slice(0, 10) === todayStr && ['En Espera', 'En Consulta', 'Pendiente', 'Confirmada'].includes(a.status));
                     const nowIso = new Date().toISOString();
                     appts.forEach(a => { a.status = 'Completada'; a.queue_number = null; a.source_device = 'mobile_apk'; a.updated_at = nowIso; });
                     if (appts.length) {
@@ -6112,6 +6246,9 @@
 
             window.qaPatientsList = [];
             window.lastDashboardData = null;
+            if (typeof allUpcomingAppointmentsRaw !== 'undefined') {
+                allUpcomingAppointmentsRaw = [];
+            }
             if (typeof rawUpcomingAppointments !== 'undefined') {
                 rawUpcomingAppointments = [];
             }
@@ -7126,10 +7263,101 @@
             return v === 'cancelada' || v === 'canceled' || v === 'cancelled' || v === 'anulada' || v === 'no_show' || v === 'no asistió';
         }
 
+        function isConfirmedStatus(s) {
+            return String(s || '').trim().toLowerCase() === 'confirmada';
+        }
+
+        function renderSecretaryRemindersBanner(dueData, isDoctor) {
+            const panel = document.getElementById('secretary-due-reminders-panel');
+            const badge = document.getElementById('upcoming-reminders-nav-badge');
+            const totalDue = dueData && Number(dueData.total_due || 0);
+            if (badge) {
+                if (totalDue > 0) {
+                    badge.textContent = totalDue;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+            if (!panel) return;
+            if (isDoctor || !dueData || !Array.isArray(dueData.items) || dueData.items.length === 0) {
+                panel.classList.add('hidden');
+                panel.innerHTML = '';
+                return;
+            }
+            panel.classList.remove('hidden');
+            const previewItems = dueData.items.slice(0, 3);
+            const tmrCnt = Number(dueData.tomorrow_unsent || 0);
+            const tdCnt = Number(dueData.today_unsent || 0);
+            const summaryParts = [];
+            if (tmrCnt > 0) summaryParts.push(`Mañana: ${tmrCnt}`);
+            if (tdCnt > 0) summaryParts.push(`Hoy: ${tdCnt}`);
+            if (totalDue > tmrCnt + tdCnt) summaryParts.push(`Próx. días: ${totalDue - tmrCnt - tdCnt}`);
+
+            let cardsHtml = '';
+            previewItems.forEach(item => {
+                const msgText = item.reminder_text || buildUpcomingReminderText(item.patient_name, item.date, item.start_time);
+                const msgId = `sec-rem-msg-${String(item.id).replace(/[^a-zA-Z0-9_-]/g, '')}`;
+                const cleanWa = formatWhatsAppPhone(item.patient_phone || '');
+                const safeIdArg = `'${escapeJsString(item.id)}'`;
+                const safeNameArg = `'${escapeJsString(item.patient_name || 'Paciente')}'`;
+                const safeDateArg = `'${escapeJsString(item.date || '')}'`;
+                const safeTimeArg = `'${escapeJsString(item.start_time || '')}'`;
+                cardsHtml += `
+                    <div class="bg-white rounded-xl p-2.5 border border-amber-200/80 shadow-2xs space-y-1.5">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="min-w-0">
+                                <p class="text-xs font-extrabold text-slate-900 truncate">${escapeHtml(item.patient_name || 'Paciente')}</p>
+                                <p class="text-[11px] text-slate-500 font-mono truncate">${escapeHtml(item.date || '')} · ${escapeHtml(item.start_time || '')} ${item.patient_phone ? '· ' + escapeHtml(item.patient_phone) : ''}</p>
+                            </div>
+                            <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold shrink-0">${escapeHtml(item.status || 'Pendiente')}</span>
+                        </div>
+                        <textarea id="${msgId}" class="hidden">${escapeHtml(msgText)}</textarea>
+                        <div class="flex items-center gap-1.5">
+                            ${cleanWa ? `
+                            <button type="button" onclick="sendUpcomingWhatsApp('${escapeJsString(cleanWa)}', ${safeNameArg}, ${safeDateArg}, ${safeTimeArg}, ${safeIdArg}, document.getElementById('${msgId}')?.value || '')"
+                                    class="flex-1 py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 active:scale-95 transition">
+                                <i class="fab fa-whatsapp"></i><span>Enviar WS</span>
+                            </button>` : ''}
+                            <button type="button" onclick="copyReminderText(document.getElementById('${msgId}')?.value || '')"
+                                    class="flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 border border-slate-200 active:scale-95 transition">
+                                <i class="fas fa-copy text-[10px]"></i><span>Copiar Texto</span>
+                            </button>
+                            <button type="button" onclick="markUpcomingWaSent(${safeIdArg})"
+                                    class="py-1.5 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-[11px] font-bold active:scale-95 transition"
+                                    title="Marcar recordatorio enviado sin quitar turno">
+                                ✓ Enviado
+                            </button>
+                        </div>
+                    </div>`;
+            });
+
+            panel.innerHTML = `
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center text-sm shrink-0 shadow-xs">
+                            <i class="fab fa-whatsapp"></i>
+                        </span>
+                        <div class="min-w-0">
+                            <h4 class="text-xs font-black text-amber-950 truncate">Recordatorios de Citas por Enviar (${totalDue})</h4>
+                            <p class="text-[11px] text-amber-800 truncate">${escapeHtml(summaryParts.join(' · ') || 'Citas próximas sin recordatorio')}</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="openUpcomingRemindersView()"
+                            class="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[11px] font-bold shrink-0 shadow-xs active:scale-95 transition">
+                        Ver todos (${totalDue})
+                    </button>
+                </div>
+                <div class="space-y-2">${cardsHtml}</div>
+            `;
+        }
+
         function renderDashboard(data) {
             window.lastDashboardData = data;
             const todayStr = data.date || toLocalDateStr();
             document.getElementById('today-date-str').textContent = data.date || todayStr;
+            const isDoctorRole = Boolean(currentUser && (currentUser.role === 'doctor' || currentUser.role === 'admin'));
+            renderSecretaryRemindersBanner(data.due_reminders || null, isDoctorRole);
 
             // Filtrar citas activas del día de hoy (excluyendo canceladas/anuladas)
             const allAppts = data.appointments || [];
@@ -7282,7 +7510,7 @@
                 });
             }
 
-            // Renderizar Todas las Citas
+            // Renderizar Todas las Citas separadas por renglones/secciones claras
             if (otherAppts.length === 0) {
                 allContainer.innerHTML = `
                     <div class="bg-white p-6 rounded-2xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
@@ -7290,10 +7518,22 @@
                     </div>
                 `;
             } else {
-                otherAppts.forEach(a => {
-                    const card = createAppointmentCard(a, false);
-                    allContainer.appendChild(card);
-                });
+                const pendingGroup = otherAppts.filter(a => !isWaitingStatus(a.status) && !isConsultingStatus(a.status) && !isCompletedStatus(a.status) && !isConfirmedStatus(a.status));
+                const confirmedGroup = otherAppts.filter(a => isConfirmedStatus(a.status));
+                const activeAndDoneGroup = otherAppts.filter(a => isWaitingStatus(a.status) || isConsultingStatus(a.status) || isCompletedStatus(a.status));
+
+                const appendAgendaGroup = (title, badgeCls, list) => {
+                    if (!list.length) return;
+                    const hdr = document.createElement('div');
+                    hdr.className = 'flex items-center justify-between px-1 pt-2 pb-0.5';
+                    hdr.innerHTML = `<span class="text-[11px] font-black uppercase tracking-wider text-slate-600">${escapeHtml(title)}</span><span class="px-2 py-0.5 rounded-full text-[10px] font-black ${badgeCls}">${list.length}</span>`;
+                    allContainer.appendChild(hdr);
+                    list.forEach(a => allContainer.appendChild(createAppointmentCard(a, false)));
+                };
+
+                appendAgendaGroup('Por Confirmar / Pendientes', 'bg-amber-100 text-amber-800', pendingGroup);
+                appendAgendaGroup('Citas Confirmadas (Por Llegar)', 'bg-teal-100 text-teal-800', confirmedGroup);
+                appendAgendaGroup('En Sala de Espera / En Consulta / Atendidas', 'bg-emerald-100 text-emerald-800', activeAndDoneGroup);
             }
         }
 
@@ -7304,12 +7544,14 @@
             let statusBadge = '';
             if (a.is_offline || a.pending_sync) {
                 statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300"><i class="fas fa-cloud-arrow-up mr-1 text-amber-700 animate-pulse"></i>En Celular (Pendiente)</span>';
-            } else if (a.status === 'En Espera') {
+            } else if (isWaitingStatus(a.status)) {
                 statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">En Sala de Espera</span>';
-            } else if (a.status === 'En Consulta') {
+            } else if (isConsultingStatus(a.status)) {
                 statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">En Consulta</span>';
             } else if (isCompletedStatus(a.status)) {
                 statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-800 border border-violet-200"><i class="fas fa-check-double mr-1 text-violet-600"></i>Listo</span>';
+            } else if (isConfirmedStatus(a.status)) {
+                statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200"><i class="fas fa-check-circle mr-1 text-teal-600"></i>Confirmada</span>';
             } else {
                 statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Pendiente</span>';
             }
@@ -7463,6 +7705,9 @@
                             <button onclick="sendWhatsAppReminder('${escapeJsString(validWaPhone)}', '${safePatientName}', '${escapeJsString(a.start_time || '')}', ${aIdArg})" class="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-xl text-xs transition" title="Enviar recordatorio WhatsApp (1-Clic)">
                                 <i class="fab fa-whatsapp text-sm"></i>
                             </button>` : ''}
+                            <button type="button" onclick="copyReminderText(buildUpcomingReminderText('${safePatientName}', '${escapeJsString(a.date || '')}', '${escapeJsString(a.start_time || '')}'))" class="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold rounded-xl text-xs transition" title="Copiar texto del recordatorio">
+                                <i class="fas fa-copy text-xs"></i>
+                            </button>
                             <button type="button" onclick="openRemoveFromQueueModal(${aIdArg}, '${safePatientName}', ${a.is_offline ? 'true' : 'false'}, '${safeUuid}', true)" class="px-2.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs transition" title="Anular cita creada por error">
                                 <i class="fas fa-times"></i>
                             </button>
@@ -9094,8 +9339,10 @@
         let currentUpcomingRange = 'all';
         let currentUpcomingStatus = 'all';
         let currentUpcomingSearch = '';
+        let allUpcomingAppointmentsRaw = [];
         let rawUpcomingAppointments = [];
         let upcomingSearchDebounce = null;
+        let upcomingRequestSeq = 0;
 
         async function openUpcomingModal() {
             const modal = document.getElementById('modal-upcoming-appointments');
@@ -9103,7 +9350,23 @@
             await loadUpcomingAppointments();
         }
 
+        async function openUpcomingRemindersView() {
+            currentUpcomingRange = 'all';
+            currentUpcomingStatus = 'unsent_wa';
+            const sel = document.getElementById('upcoming-status-filter');
+            if (sel) sel.value = 'unsent_wa';
+            ['today', 'tomorrow', 'this_week', 'next_15_days', 'all'].forEach(r => {
+                const btn = document.getElementById(`chip-upcoming-${r}`);
+                if (!btn) return;
+                btn.className = (r === 'all')
+                    ? 'px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 bg-amber-600 text-white shadow-xs shrink-0'
+                    : 'px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 bg-white text-slate-700 border border-slate-200 shrink-0';
+            });
+            await openUpcomingModal();
+        }
+
         async function loadUpcomingAppointments() {
+            const reqSeq = ++upcomingRequestSeq;
             const listEl = document.getElementById('upcoming-appointments-list');
             if (listEl) {
                 listEl.innerHTML = '<div class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin text-2xl text-amber-600 mb-2"></i><p class="text-xs font-bold">Cargando próximas citas...</p></div>';
@@ -9115,26 +9378,28 @@
                     url += `&status=${encodeURIComponent(currentUpcomingStatus)}`;
                 }
                 const res = await apiFetch(url);
+                if (reqSeq !== upcomingRequestSeq) return;
                 if (res && res.ok) {
                     const data = await res.json();
-                    rawUpcomingAppointments = filterUpcomingAppointments(data.appointments || [], {
-                        range: currentUpcomingRange,
-                        status: currentUpcomingStatus,
-                        search: currentUpcomingSearch
-                    });
+                    if (reqSeq !== upcomingRequestSeq) return;
+                    if (Array.isArray(data.all_appointments)) {
+                        allUpcomingAppointmentsRaw = data.all_appointments;
+                    } else if (currentUpcomingRange === 'all' && (!currentUpcomingStatus || currentUpcomingStatus === 'all')) {
+                        allUpcomingAppointmentsRaw = data.appointments || [];
+                    }
+                    rawUpcomingAppointments = (Array.isArray(data.appointments) ? data.appointments : allUpcomingAppointmentsRaw);
                     const tEl = document.getElementById('upcoming-stat-tomorrow');
                     const uEl = document.getElementById('upcoming-stat-unconfirmed');
-                    const totEl = document.getElementById('upcoming-stat-total');
                     if (tEl) tEl.textContent = data.tomorrow_count ?? 0;
                     if (uEl) uEl.textContent = data.unconfirmed_count ?? 0;
-                    if (totEl) totEl.textContent = rawUpcomingAppointments.length;
-                    if (currentUpcomingRange === 'all' && (!currentUpcomingStatus || currentUpcomingStatus === 'all')) {
-                        localStorage.setItem('sscp_mobile_cached_upcoming', JSON.stringify(data));
-                    } else if (Array.isArray(data.all_appointments)) {
+
+                    if (Array.isArray(data.all_appointments)) {
                         localStorage.setItem('sscp_mobile_cached_upcoming', JSON.stringify({
                             ...data,
                             appointments: data.all_appointments
                         }));
+                    } else if (currentUpcomingRange === 'all' && (!currentUpcomingStatus || currentUpcomingStatus === 'all')) {
+                        localStorage.setItem('sscp_mobile_cached_upcoming', JSON.stringify(data));
                     }
                     renderUpcomingAppointmentsList();
                     return;
@@ -9143,21 +9408,21 @@
                 console.warn('Fallo al obtener próximas citas de red, intentando caché local:', err);
             }
 
-            // Fallback a caché local si está offline (aplicando el rango/estado activo)
+            if (reqSeq !== upcomingRequestSeq) return;
+
+            // Fallback a caché local si está offline (recalculando contadores y filtros con la fecha local actual)
             try {
                 const cached = JSON.parse(localStorage.getItem('sscp_mobile_cached_upcoming') || 'null');
                 if (cached && Array.isArray(cached.appointments)) {
-                    rawUpcomingAppointments = filterUpcomingAppointments(cached.appointments, {
-                        range: currentUpcomingRange,
-                        status: currentUpcomingStatus,
-                        search: currentUpcomingSearch
-                    });
+                    const nowDt = new Date();
+                    const tmrStr = addDaysLocalStr(nowDt, 1);
+                    const futurePool = filterUpcomingAppointments(cached.appointments, { range: 'all', status: 'all', search: '' });
+                    allUpcomingAppointmentsRaw = cached.appointments;
+                    rawUpcomingAppointments = cached.appointments;
                     const tEl = document.getElementById('upcoming-stat-tomorrow');
                     const uEl = document.getElementById('upcoming-stat-unconfirmed');
-                    const totEl = document.getElementById('upcoming-stat-total');
-                    if (tEl) tEl.textContent = cached.tomorrow_count ?? 0;
-                    if (uEl) uEl.textContent = cached.unconfirmed_count ?? 0;
-                    if (totEl) totEl.textContent = rawUpcomingAppointments.length;
+                    if (tEl) tEl.textContent = futurePool.filter(a => String(a.date || '').slice(0, 10) === tmrStr).length;
+                    if (uEl) uEl.textContent = futurePool.filter(a => ['pendiente', 'sin confirmar', 'reagendada', ''].includes(String(a.status || '').trim().toLowerCase())).length;
                     renderUpcomingAppointmentsList();
                     return;
                 }
@@ -9195,153 +9460,255 @@
             }, 250);
         }
 
+        function _renderUpcomingAppointmentCardHtml(a) {
+            const stLower = String(a.status || '').trim().toLowerCase();
+            const isConfirmed = stLower === 'confirmada';
+            const inQueueOrConsult = ['en espera', 'en consulta', 'waiting', 'consulting', 'in_consultation'].includes(stLower);
+            const statusBadge = inQueueOrConsult
+                ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-800 border border-indigo-200"><i class="fas fa-chair mr-1"></i>${stLower === 'en consulta' ? 'En Consulta' : (a.queue_number ? 'En Sala • Turno #' + escapeHtml(a.queue_number) : 'En Sala de Espera')}</span>`
+                : (isConfirmed
+                    ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200"><i class="fas fa-check-circle mr-1"></i>Confirmada</span>'
+                    : (stLower === 'reagendada'
+                        ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200"><i class="fas fa-arrows-rotate mr-1"></i>Reagendada</span>'
+                        : '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200"><i class="fas fa-hourglass-half mr-1"></i>Por Confirmar</span>'));
+
+            const rawPhoneDigits = (a.patient_phone || '').replace(/[^0-9]/g, '');
+            const waPhone = formatWhatsAppPhone(a.patient_phone || '');
+            const hasWaPhone = Boolean(waPhone);
+            const hasTelPhone = rawPhoneDigits.length >= 7;
+
+            let dateDisplay = a.date;
+            try {
+                const parts = String(a.date || '').split('-');
+                if (parts.length === 3) {
+                    const dObj = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+                    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                    dateDisplay = `${days[dObj.getDay()]} ${parts[2]} de ${months[dObj.getMonth()]}`;
+                }
+            } catch (_) {}
+
+            const safeName = escapeJsString(a.patient_name || 'Paciente');
+            const safeNameHtml = escapeHtml(a.patient_name || 'Paciente');
+            const waSentPill = a.whatsapp_reminder_sent
+                ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fab fa-whatsapp mr-1"></i>Enviado</span>'
+                : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Sin enviar WA</span>';
+
+            const reminderMsg = a.reminder_text || buildUpcomingReminderText(a.patient_name, a.date, a.start_time);
+            const msgDomId = `up-msg-${String(a.id).replace(/[^a-zA-Z0-9_-]/g, '')}`;
+
+            return `
+            <div class="bg-white rounded-2xl p-3.5 border ${inQueueOrConsult ? 'border-indigo-200 bg-indigo-50/20' : (isConfirmed ? 'border-emerald-200 bg-emerald-50/20' : 'border-slate-200')} shadow-2xs space-y-2.5 transition hover:border-amber-300">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div class="flex items-center gap-1.5 text-xs font-extrabold text-slate-900">
+                        <span class="w-2 h-2 rounded-full ${inQueueOrConsult ? 'bg-indigo-500' : (isConfirmed ? 'bg-emerald-500' : 'bg-amber-500')}"></span>
+                        <span>${escapeHtml(dateDisplay)}</span>
+                        <span class="text-slate-400 font-normal">•</span>
+                        <span class="text-indigo-600">${escapeHtml(a.start_time || 'Por definir')}</span>
+                    </div>
+                    <div class="flex items-center gap-1">${waSentPill}${statusBadge}</div>
+                </div>
+
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <h4 class="font-bold text-slate-900 text-sm leading-tight">${safeNameHtml}</h4>
+                        <p class="text-[11px] text-slate-400 mt-0.5">
+                            ${a.patient_document_id ? `<span class="mr-1.5"><i class="fas fa-id-card mr-1 text-slate-400"></i>${escapeHtml(a.patient_document_id)}</span>` : ''}
+                            ${a.patient_phone ? `<span><i class="fas fa-phone mr-1 text-slate-400"></i>${escapeHtml(a.patient_phone)}</span>` : '<span class="text-rose-400">Sin teléfono</span>'}
+                        </p>
+                    </div>
+                    <span class="px-2 py-0.5 bg-slate-100 text-slate-700 font-semibold text-[10px] rounded-lg border border-slate-200 shrink-0">
+                        ${escapeHtml(a.insurance_name || 'Privado')}
+                    </span>
+                </div>
+
+                ${a.reason ? `<div class="text-[11px] text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100"><i class="fas fa-stethoscope text-[10px] text-slate-400 mr-1"></i>${escapeHtml(a.reason)}</div>` : ''}
+                <textarea id="${msgDomId}" class="hidden">${escapeHtml(reminderMsg)}</textarea>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
+                    <button type="button" onclick="sendUpcomingWhatsApp('${escapeJsString(waPhone)}', '${safeName}', '${escapeJsString(a.date)}', '${escapeJsString(a.start_time)}', '${escapeJsString(a.id)}', document.getElementById('${msgDomId}')?.value || '')"
+                            ${!hasWaPhone ? 'disabled' : ''}
+                            class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition ${hasWaPhone ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}"
+                            title="${hasWaPhone ? 'Enviar mensaje de confirmación por WhatsApp (1-Clic)' : 'Teléfono inválido o menor de 10 dígitos'}">
+                        <i class="fab fa-whatsapp text-sm"></i>
+                        <span>WhatsApp</span>
+                    </button>
+
+                    <button type="button" onclick="copyReminderText(document.getElementById('${msgDomId}')?.value || '')"
+                            class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200"
+                            title="Copiar texto del recordatorio al portapapeles">
+                        <i class="fas fa-copy text-xs"></i>
+                        <span>Copiar Texto</span>
+                    </button>
+
+                    <button type="button" onclick="callUpcomingPatient('${escapeJsString(rawPhoneDigits)}')"
+                            ${!hasTelPhone ? 'disabled' : ''}
+                            class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition ${hasTelPhone ? 'bg-sky-600 hover:bg-sky-700 text-white' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}"
+                            title="Llamar a la paciente">
+                        <i class="fas fa-phone text-xs"></i>
+                        <span>Llamar</span>
+                    </button>
+
+                    ${!inQueueOrConsult ? `
+                    <button type="button" onclick="confirmUpcomingAppointment('${escapeJsString(a.id)}')"
+                            ${isConfirmed ? 'disabled' : ''}
+                            class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition ${isConfirmed ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default' : 'bg-teal-600 hover:bg-teal-700 text-white'}"
+                            title="${isConfirmed ? 'Cita ya confirmada' : 'Marcar como confirmada'}">
+                        <i class="fas fa-check text-xs"></i>
+                        <span>${isConfirmed ? 'Confirmada' : 'Confirmar'}</span>
+                    </button>` : `
+                    <div class="py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 bg-indigo-50 text-indigo-800 border border-indigo-200">
+                        <i class="fas fa-lock text-[10px]"></i>
+                        <span>Con Turno</span>
+                    </div>`}
+
+                    ${!a.whatsapp_reminder_sent ? `
+                    <button type="button" onclick="markUpcomingWaSent('${escapeJsString(a.id)}')"
+                            class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200"
+                            title="Marcar recordatorio como enviado">
+                        <i class="fas fa-check-double text-[10px]"></i>
+                        <span>Marcar Enviado</span>
+                    </button>` : `
+                    <div class="py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 bg-slate-50 text-emerald-700 border border-emerald-200">
+                        <i class="fab fa-whatsapp"></i>
+                        <span>WA Enviado</span>
+                    </div>`}
+
+                    <button type="button" onclick="openRescheduleUpcomingModal('${escapeJsString(a.id)}', '${safeName}', '${escapeJsString(a.date)}', '${escapeJsString(a.start_time)}')"
+                            class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition bg-purple-600 hover:bg-purple-700 text-white"
+                            title="Cambiar fecha u hora de la cita">
+                        <i class="fas fa-calendar-days text-xs"></i>
+                        <span>Reagendar</span>
+                    </button>
+                </div>
+            </div>`;
+        }
+
         function renderUpcomingAppointmentsList() {
             const listEl = document.getElementById('upcoming-appointments-list');
             if (!listEl) return;
 
-            const filtered = filterUpcomingAppointments(rawUpcomingAppointments, {
+            const sourcePool = (currentUpcomingRange === 'all' && (!currentUpcomingStatus || currentUpcomingStatus === 'all') && allUpcomingAppointmentsRaw.length > 0)
+                ? allUpcomingAppointmentsRaw
+                : (rawUpcomingAppointments.length > 0 ? rawUpcomingAppointments : allUpcomingAppointmentsRaw);
+
+            const filtered = filterUpcomingAppointments(sourcePool, {
                 range: currentUpcomingRange,
                 status: currentUpcomingStatus,
                 search: currentUpcomingSearch
             });
             const totEl = document.getElementById('upcoming-stat-total');
             if (totEl) totEl.textContent = filtered.length;
+            if (allUpcomingAppointmentsRaw.length > 0) {
+                const futurePool = filterUpcomingAppointments(allUpcomingAppointmentsRaw, { range: 'all', status: 'all', search: '' });
+                const uEl = document.getElementById('upcoming-stat-unconfirmed');
+                if (uEl) {
+                    uEl.textContent = futurePool.filter(a => ['pendiente', 'sin confirmar', 'reagendada', ''].includes(String(a.status || '').trim().toLowerCase())).length;
+                }
+            }
 
             if (filtered.length === 0) {
                 listEl.innerHTML = '<div class="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200"><i class="fas fa-calendar-check text-3xl text-emerald-500 mb-2"></i><p class="text-xs font-bold text-slate-600">No se encontraron citas con los filtros seleccionados.</p></div>';
                 return;
             }
 
-            let html = '';
+            const unconfirmedList = [];
+            const confirmedList = [];
+            const queueList = [];
+
             filtered.forEach(a => {
-                const isConfirmed = a.status === 'Confirmada';
-                const statusBadge = isConfirmed 
-                    ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200"><i class="fas fa-check-circle mr-1"></i>Confirmada</span>'
-                    : (a.status === 'Reagendada'
-                        ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200"><i class="fas fa-arrows-rotate mr-1"></i>Reagendada</span>'
-                        : '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200"><i class="fas fa-hourglass-half mr-1"></i>Por Confirmar</span>');
-
-                const rawPhoneDigits = (a.patient_phone || '').replace(/[^0-9]/g, '');
-                const waPhone = formatWhatsAppPhone(a.patient_phone || '');
-                const hasWaPhone = Boolean(waPhone);
-                const hasTelPhone = rawPhoneDigits.length >= 7;
-
-                let dateDisplay = a.date;
-                try {
-                    const parts = a.date.split('-');
-                    if (parts.length === 3) {
-                        const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                        const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-                        const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-                        dateDisplay = `${days[dObj.getDay()]} ${parts[2]} de ${months[dObj.getMonth()]}`;
-                    }
-                } catch (_) {}
-
-                const safeName = escapeJsString(a.patient_name || 'Paciente');
-                const safeNameHtml = escapeHtml(a.patient_name || 'Paciente');
-                const waSentPill = a.whatsapp_reminder_sent
-                    ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fab fa-whatsapp mr-1"></i>Enviado</span>'
-                    : '';
-
-                html += `
-                <div class="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs space-y-2.5 transition hover:border-amber-300">
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-2">
-                        <div class="flex items-center gap-1.5 text-xs font-extrabold text-slate-900">
-                            <span class="w-2 h-2 rounded-full ${isConfirmed ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
-                            <span>${escapeHtml(dateDisplay)}</span>
-                            <span class="text-slate-400 font-normal">•</span>
-                            <span class="text-indigo-600">${escapeHtml(a.start_time || 'Por definir')}</span>
-                        </div>
-                        <div class="flex items-center gap-1">${waSentPill}${statusBadge}</div>
-                    </div>
-
-                    <div class="flex items-start justify-between gap-2">
-                        <div>
-                            <h4 class="font-bold text-slate-900 text-sm leading-tight">${safeNameHtml}</h4>
-                            <p class="text-[11px] text-slate-400 mt-0.5">
-                                ${a.patient_document_id ? `<span class="mr-1.5"><i class="fas fa-id-card mr-1 text-slate-400"></i>${escapeHtml(a.patient_document_id)}</span>` : ''}
-                                ${a.patient_phone ? `<span><i class="fas fa-phone mr-1 text-slate-400"></i>${escapeHtml(a.patient_phone)}</span>` : '<span class="text-rose-400">Sin teléfono</span>'}
-                            </p>
-                        </div>
-                        <span class="px-2 py-0.5 bg-slate-100 text-slate-700 font-semibold text-[10px] rounded-lg border border-slate-200 shrink-0">
-                            ${escapeHtml(a.insurance_name || 'Privado')}
-                        </span>
-                    </div>
-
-                    ${a.reason ? `<div class="text-[11px] text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100"><i class="fas fa-stethoscope text-[10px] text-slate-400 mr-1"></i>${escapeHtml(a.reason)}</div>` : ''}
-
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
-                        <button type="button" onclick="sendUpcomingWhatsApp('${escapeJsString(waPhone)}', '${safeName}', '${escapeJsString(a.date)}', '${escapeJsString(a.start_time)}', '${escapeJsString(a.id)}')"
-                                ${!hasWaPhone ? 'disabled' : ''}
-                                class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition ${hasWaPhone ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}"
-                                title="${hasWaPhone ? 'Enviar mensaje de confirmación por WhatsApp (1-Clic)' : 'Teléfono inválido o menor de 10 dígitos'}">
-                            <i class="fab fa-whatsapp text-sm"></i>
-                            <span>WhatsApp</span>
-                        </button>
-
-                        <button type="button" onclick="callUpcomingPatient('${escapeJsString(rawPhoneDigits)}')"
-                                ${!hasTelPhone ? 'disabled' : ''}
-                                class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition ${hasTelPhone ? 'bg-sky-600 hover:bg-sky-700 text-white' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}"
-                                title="Llamar a la paciente">
-                            <i class="fas fa-phone text-xs"></i>
-                            <span>Llamar</span>
-                        </button>
-
-                        <button type="button" onclick="confirmUpcomingAppointment('${escapeJsString(a.id)}')"
-                                class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition ${isConfirmed ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-teal-600 hover:bg-teal-700 text-white'}"
-                                title="${isConfirmed ? 'Cita ya confirmada' : 'Marcar como confirmada'}">
-                            <i class="fas fa-check text-xs"></i>
-                            <span>${isConfirmed ? 'Confirmada' : 'Confirmar'}</span>
-                        </button>
-
-                        <button type="button" onclick="openRescheduleUpcomingModal('${escapeJsString(a.id)}', '${safeName}', '${escapeJsString(a.date)}', '${escapeJsString(a.start_time)}')"
-                                class="py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition bg-purple-600 hover:bg-purple-700 text-white"
-                                title="Cambiar fecha u hora de la cita">
-                            <i class="fas fa-calendar-days text-xs"></i>
-                            <span>Reagendar</span>
-                        </button>
-                    </div>
-                </div>`;
+                const stLower = String(a.status || '').trim().toLowerCase();
+                if (['en espera', 'en consulta', 'waiting', 'consulting', 'in_consultation'].includes(stLower)) {
+                    queueList.push(a);
+                } else if (stLower === 'confirmada') {
+                    confirmedList.push(a);
+                } else {
+                    unconfirmedList.push(a);
+                }
             });
+
+            let html = '';
+            if (unconfirmedList.length > 0) {
+                html += `<div id="upcoming-section-unconfirmed" class="space-y-2">
+                    <div class="flex items-center justify-between px-1 pt-1">
+                        <span class="text-[11px] font-black uppercase tracking-wider text-amber-800 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500"></span>Por Confirmar / Recordar</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800">${unconfirmedList.length}</span>
+                    </div>
+                    ${unconfirmedList.map(_renderUpcomingAppointmentCardHtml).join('')}
+                </div>`;
+            }
+            if (confirmedList.length > 0) {
+                html += `<div id="upcoming-section-confirmed" class="space-y-2 pt-2 border-t border-slate-200">
+                    <div class="flex items-center justify-between px-1 pt-1">
+                        <span class="text-[11px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Citas Confirmadas</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">${confirmedList.length}</span>
+                    </div>
+                    ${confirmedList.map(_renderUpcomingAppointmentCardHtml).join('')}
+                </div>`;
+            }
+            if (queueList.length > 0) {
+                html += `<div id="upcoming-section-queue" class="space-y-2 pt-2 border-t border-slate-200">
+                    <div class="flex items-center justify-between px-1 pt-1">
+                        <span class="text-[11px] font-black uppercase tracking-wider text-indigo-800 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-indigo-500"></span>Ya en Sala de Espera / Consulta Hoy</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-800">${queueList.length}</span>
+                    </div>
+                    ${queueList.map(_renderUpcomingAppointmentCardHtml).join('')}
+                </div>`;
+            }
 
             listEl.innerHTML = html;
         }
 
-        function sendUpcomingWhatsApp(phone, patientName, dateStr, timeStr, apptId) {
+        function sendUpcomingWhatsApp(phone, patientName, dateStr, timeStr, apptId, customMessage = '') {
             const targetPhone = formatWhatsAppPhone(phone);
             if (!targetPhone) {
                 alert('El número telefónico del paciente no es válido para WhatsApp (mínimo 10 dígitos).');
                 return;
             }
-
-            let fechaTexto = dateStr;
-            try {
-                const parts = dateStr.split('-');
-                if (parts.length === 3) {
-                    const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-                    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-                    fechaTexto = `${days[dObj.getDay()]} ${parts[2]} de ${months[dObj.getMonth()]}`;
-                }
-            } catch (_) {}
-
-            const doctorName = localStorage.getItem('sscp_doctor_name') || 'Dr. Especialista';
-
-            const msg = `Estimada/o *${patientName}*, le saludamos del consultorio médico del *${doctorName}*.
-
-Le recordamos su cita programada para el *${fechaTexto}* a las *${timeStr || 'hora coordinada'}*.
-
-📌 *Indicaciones importantes para su consulta:*
-• Favor presentarse 15 minutos antes de su hora acordada.
-• Traer su documento de identidad (cédula) y carnet de seguro médico (ARS).
-
-¿Nos confirma su asistencia a la consulta? ¡Le esperamos!`;
-
+            const msg = (customMessage && customMessage.trim())
+                ? customMessage.trim()
+                : buildUpcomingReminderText(patientName, dateStr, timeStr);
             const waUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}`;
             openExternalSafe(waUrl);
 
             if (apptId) {
                 showWaConfirmBanner(apptId, patientName);
+            }
+        }
+
+        async function markUpcomingWaSent(apptId) {
+            if (!apptId) return;
+            try {
+                const res = await apiFetch(`/api/mobile/appointments/${encodeURIComponent(apptId)}/whatsapp-sent`, { method: 'POST' });
+                if (!res || !res.ok) {
+                    throw new Error('No se pudo registrar el envío de recordatorio');
+                }
+                const nowIso = new Date().toISOString();
+                [allUpcomingAppointmentsRaw, rawUpcomingAppointments].forEach(arr => {
+                    const it = Array.isArray(arr) ? arr.find(x => String(x.id) === String(apptId)) : null;
+                    if (it) {
+                        it.whatsapp_reminder_sent = true;
+                        it.whatsapp_reminder_sent_at = nowIso;
+                    }
+                });
+                if (window.lastDashboardData) {
+                    if (Array.isArray(window.lastDashboardData.appointments)) {
+                        const dIt = window.lastDashboardData.appointments.find(x => String(x.id) === String(apptId));
+                        if (dIt) {
+                            dIt.whatsapp_reminder_sent = true;
+                            dIt.whatsapp_reminder_sent_at = nowIso;
+                        }
+                    }
+                    if (window.lastDashboardData.due_reminders && Array.isArray(window.lastDashboardData.due_reminders.items)) {
+                        window.lastDashboardData.due_reminders.items = window.lastDashboardData.due_reminders.items.filter(x => String(x.id) !== String(apptId));
+                        window.lastDashboardData.due_reminders.total_due = window.lastDashboardData.due_reminders.items.length;
+                        renderDashboard(window.lastDashboardData);
+                    }
+                }
+                renderUpcomingAppointmentsList();
+                if (typeof showSyncToast === 'function') showSyncToast('✓ Recordatorio marcado como enviado.');
+            } catch (err) {
+                if (typeof showSyncToast === 'function') showSyncToast(err?.message || 'Error al registrar envío.', 'warning');
             }
         }
 
@@ -9356,22 +9723,40 @@ Le recordamos su cita programada para el *${fechaTexto}* a las *${timeStr || 'ho
 
         async function confirmUpcomingAppointment(apptId) {
             try {
-                const res = await apiFetch(`/api/mobile/appointments/${apptId}/status`, {
+                const res = await apiFetch(`/api/mobile/appointments/${encodeURIComponent(apptId)}/status`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: 'Confirmada' })
                 });
                 if (res && res.ok) {
-                    if (typeof showSyncToast === 'function') showSyncToast('✓ Cita marcada como Confirmada');
-                    const item = rawUpcomingAppointments.find(a => a.id === apptId);
-                    if (item) item.status = 'Confirmada';
+                    if (typeof showSyncToast === 'function') showSyncToast('✓ Cita movida a Confirmadas');
+                    [allUpcomingAppointmentsRaw, rawUpcomingAppointments].forEach(arr => {
+                        const item = Array.isArray(arr) ? arr.find(a => String(a.id) === String(apptId)) : null;
+                        if (item) item.status = 'Confirmada';
+                    });
+                    if (window.lastDashboardData && Array.isArray(window.lastDashboardData.appointments)) {
+                        const dItem = window.lastDashboardData.appointments.find(a => String(a.id) === String(apptId));
+                        if (dItem && !isWaitingStatus(dItem.status) && !isConsultingStatus(dItem.status)) {
+                            dItem.status = 'Confirmada';
+                            renderDashboard(window.lastDashboardData);
+                        }
+                    }
                     renderUpcomingAppointmentsList();
+                    loadDashboardData();
+                } else if (res && res.status === 409) {
+                    const errData = await res.json().catch(() => ({}));
+                    alert('⚠️ ' + (errData.detail || 'Esta paciente ya está en Sala de Espera o Consulta y conserva su turno.'));
+                    loadUpcomingAppointments();
                 } else {
                     throw new Error('No se pudo actualizar');
                 }
             } catch (err) {
-                const item = rawUpcomingAppointments.find(a => a.id === apptId);
-                if (item) item.status = 'Confirmada';
+                [allUpcomingAppointmentsRaw, rawUpcomingAppointments].forEach(arr => {
+                    const item = Array.isArray(arr) ? arr.find(a => String(a.id) === String(apptId)) : null;
+                    if (item && !['en espera', 'en consulta'].includes(String(item.status || '').trim().toLowerCase())) {
+                        item.status = 'Confirmada';
+                    }
+                });
                 renderUpcomingAppointmentsList();
                 if (typeof showSyncToast === 'function') showSyncToast('📱 Cita confirmada (guardada localmente).', 'warning');
             }

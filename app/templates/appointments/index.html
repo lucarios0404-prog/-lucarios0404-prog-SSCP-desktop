@@ -484,6 +484,9 @@
                             <button type="button" onclick="closeSingleWaModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
                                 Cerrar
                             </button>
+                            <button type="button" onclick="copyDesktopWaMessage()" class="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl shadow-sm transition-all inline-flex items-center">
+                                <i class="fas fa-copy mr-1.5"></i> Copiar Texto
+                            </button>
                             <button type="button" id="single_wa_open_btn" onclick="openSingleWaExternal()" class="px-4 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl shadow-sm transition-all inline-flex items-center">
                                 <i class="fas fa-external-link-alt mr-1.5"></i> Abrir WhatsApp
                             </button>
@@ -612,6 +615,30 @@
 
                 function closeSingleWaModal() {
                     document.getElementById('singleWaModal').classList.add('hidden');
+                }
+
+                function copyDesktopReminderText(text) {
+                    if (!text) return;
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(() => {
+                            showSingleWaFeedback('✓ Texto copiado al portapapeles.', false);
+                        }).catch(() => {});
+                        return;
+                    }
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    ta.remove();
+                    showSingleWaFeedback('✓ Texto copiado al portapapeles.', false);
+                }
+
+                function copyDesktopWaMessage() {
+                    const txt = document.getElementById('single_wa_message')?.textContent || '';
+                    copyDesktopReminderText(txt);
                 }
 
                 function openSingleWaExternal() {
@@ -820,6 +847,19 @@
 
                         const actionsCol = document.createElement('div');
                         actionsCol.className = 'flex items-center gap-2 shrink-0';
+
+                        if (item.message) {
+                            const copyBtn = document.createElement('button');
+                            copyBtn.type = 'button';
+                            copyBtn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 inline-flex items-center gap-1';
+                            copyBtn.textContent = 'Copiar';
+                            copyBtn.addEventListener('click', () => {
+                                copyDesktopReminderText(item.message);
+                                copyBtn.textContent = '✓ Copiado';
+                                setTimeout(() => { copyBtn.textContent = 'Copiar'; }, 1800);
+                            });
+                            actionsCol.appendChild(copyBtn);
+                        }
 
                         if (item.valid_phone && item.wa_link) {
                             const openA = document.createElement('a');

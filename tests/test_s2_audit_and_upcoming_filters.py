@@ -96,23 +96,29 @@ def test_upcoming_appointments_filters_today_tomorrow_week_15days_all():
 
         r_week = client.get("/api/mobile/appointments/upcoming?range=this_week").json()
         week_reasons = {x["reason"] for x in r_week["appointments"]}
-        assert {"Hoy Activa", "Manana Confirmada", "Semana Cita"}.issubset(week_reasons)
+        assert {"Manana Confirmada", "Semana Cita"}.issubset(week_reasons)
+        assert "Hoy Activa" not in week_reasons
         assert "Quince Dias Cita" not in week_reasons
         assert "Veinticinco Dias Cita" not in week_reasons
 
         r_15 = client.get("/api/mobile/appointments/upcoming?range=next_15_days").json()
         d15_reasons = {x["reason"] for x in r_15["appointments"]}
-        assert {"Hoy Activa", "Manana Confirmada", "Semana Cita", "Quince Dias Cita"}.issubset(d15_reasons)
+        assert {"Manana Confirmada", "Semana Cita", "Quince Dias Cita"}.issubset(d15_reasons)
+        assert "Hoy Activa" not in d15_reasons
         assert "Veinticinco Dias Cita" not in d15_reasons
 
         r_all = client.get("/api/mobile/appointments/upcoming?range=all").json()
         all_reasons = {x["reason"] for x in r_all["appointments"]}
-        assert {"Hoy Activa", "Manana Confirmada", "Semana Cita", "Quince Dias Cita", "Veinticinco Dias Cita"}.issubset(all_reasons)
+        assert {"Manana Confirmada", "Semana Cita", "Quince Dias Cita", "Veinticinco Dias Cita"}.issubset(all_reasons)
+        assert "Hoy Activa" not in all_reasons
+        assert all("reminder_text" in x and "wa_link" in x for x in r_all["appointments"])
+        assert "all_appointments" in r_all
 
         r_conf = client.get("/api/mobile/appointments/upcoming?range=all&status=confirmed").json()
         conf_reasons = {x["reason"] for x in r_conf["appointments"]}
         assert "Manana Confirmada" in conf_reasons
         assert "Semana Cita" not in conf_reasons
+        assert "Hoy Activa" not in conf_reasons
     finally:
         with SessionLocal() as db:
             db.query(Appointment).filter(Appointment.id.in_(created_ids)).delete(synchronize_session=False)
@@ -426,3 +432,82 @@ def test_relay_service_skips_orphan_payments():
         )
         assert stats["processed_payments"] == 0
         assert db.query(Payment).count() == before_count
+
+
+def test_waiting_room_protected_against_confirm_and_due_reminders_exposed():
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+    created_ids = []
+    with SessionLocal() as db:
+        doc = db.query(User).filter(User.role == "doctor", User.is_active == True).first()
+        patient = db.query(Patient).first()
+        waiting_appt = Appointment(
+            patient_id=patient.id,
+            doctor_id=doc.id,
+            date=today,
+            start_time=time(9, 0),
+            end_time=time(9, 30),
+            reason="Turno Sala Hoy",
+            status="En Espera",
+            queue_number=4,
+            whatsapp_reminder_sent=False,
+        )
+        tmr_appt = Appointment(
+            patient_id=patient.id,
+            doctor_id=doc.id,
+            date=tomorrow,
+            start_time=time(11, 0),
+            end_time=time(11, 30),
+            reason="Recordatorio Manana WS",
+            status="Pendiente",
+            whatsapp_reminder_sent=False,
+        )
+        db.add_all([waiting_appt, tmr_appt])
+        db.flush()
+        created_ids.extend([waiting_appt.id, tmr_appt.id])
+        db.commit()
+        w_id, t_id = waiting_appt.id, tmr_appt.id
+
+    try:
+        sec_mobile = TestClient(app, headers=_bearer_headers_for("secretaria"))
+        # 1) Confirmar una cita ya En Espera debe devolver 409 y preservar turno #4
+        res_409 = sec_mobile.post(f"/api/mobile/appointments/{w_id}/status", json={"status": "Confirmada"})
+        assert res_409.status_code == 409
+        with SessionLocal() as db:
+            refreshed_w = db.query(Appointment).filter(Appointment.id == w_id).first()
+            assert refreshed_w.status == "En Espera"
+            assert refreshed_w.queue_number == 4
+
+        # 2) Recepción /reception/appointments/{id}/status tampoco puede degradar En Espera
+        sec_web = TestClient(app, cookies=_auth_cookies_for("secretaria"))
+        res_web_409 = sec_web.post(f"/reception/appointments/{w_id}/status", data={"status": "Confirmada"})
+        assert res_web_409.status_code == 409
+
+        # 3) Dashboard móvil expone due_reminders con recordatorio listo para copiar/WS (excluyendo En Espera)
+        dash = sec_mobile.get("/api/mobile/dashboard").json()
+        due = dash["due_reminders"]
+        assert due["tomorrow_unsent"] >= 1
+        due_ids = {item["id"] for item in due["items"]}
+        assert t_id in due_ids
+        assert w_id not in due_ids
+        tmr_item = next(item for item in due["items"] if item["id"] == t_id)
+        assert tmr_item["reminder_text"]
+
+        # 4) Filtro unsent_wa + confirmar cita futura sin afectar Sala de Espera
+        unsent = sec_mobile.get("/api/mobile/appointments/upcoming?range=tomorrow&status=unsent_wa").json()
+        assert any(a["id"] == t_id for a in unsent["appointments"])
+        ok_conf = sec_mobile.post(f"/api/mobile/appointments/{t_id}/status", json={"status": "Confirmada"})
+        assert ok_conf.status_code == 200
+        assert ok_conf.json()["new_status"] == "Confirmada"
+
+        # 5) Marcar whatsapp-sent deja intacto el status Confirmada
+        ok_wa = sec_mobile.post(f"/api/mobile/appointments/{t_id}/whatsapp-sent")
+        assert ok_wa.status_code == 200
+        with SessionLocal() as db:
+            refreshed_t = db.query(Appointment).filter(Appointment.id == t_id).first()
+            assert refreshed_t.status == "Confirmada"
+            assert refreshed_t.whatsapp_reminder_sent is True
+    finally:
+        with SessionLocal() as db:
+            db.query(Appointment).filter(Appointment.id.in_(created_ids)).delete(synchronize_session=False)
+            db.commit()

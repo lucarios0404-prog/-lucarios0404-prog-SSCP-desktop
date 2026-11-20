@@ -479,16 +479,67 @@ def mobile_dashboard(
             "payment_amount": (pay_obj.total or pay_obj.amount) if pay_obj else (a.price or 0.0),
             "payment_status": "paid" if is_paid else "pending",
             "patient_visit_count": patient_visit_count,
+            "whatsapp_reminder_sent": bool(a.whatsapp_reminder_sent),
+            "whatsapp_reminder_sent_at": a.whatsapp_reminder_sent_at.isoformat() if a.whatsapp_reminder_sent_at else None,
             "notes": a.notes or "",
         })
 
     if needs_commit:
         db.commit()
 
+    # Recordatorios proactivos de citas pendientes de enviar WhatsApp (hoy sin llegar + mañana + próximos 7 días)
+    from datetime import timedelta
+    rem_today = date.today()
+    tomorrow_date = rem_today + timedelta(days=1)
+    week_ahead = rem_today + timedelta(days=7)
+    rem_q = db.query(Appointment).filter(
+        Appointment.date >= rem_today,
+        Appointment.date <= week_ahead,
+        Appointment.status.in_(["Pendiente", "Confirmada", "Reagendada"]),
+        or_(Appointment.whatsapp_reminder_sent == False, Appointment.whatsapp_reminder_sent == None),
+    )
+    if doc_id:
+        rem_q = rem_q.filter(Appointment.doctor_id == doc_id)
+    due_appts = rem_q.order_by(Appointment.date.asc(), Appointment.start_time.asc()).limit(25).all()
+
+    from app.services.whatsapp_service import WhatsAppService
+    due_items = []
+    tomorrow_unsent = 0
+    today_unsent = 0
+    for ra in due_appts:
+        if ra.date == tomorrow_date:
+            tomorrow_unsent += 1
+        elif ra.date == rem_today:
+            today_unsent += 1
+        rp = ra.patient
+        rp_name = f"{rp.first_name} {rp.last_name}".strip() if rp else "Paciente"
+        rp_phone = rp.phone if rp else ""
+        wa_info = WhatsAppService.get_appointment_reminder(db, ra)
+        due_items.append({
+            "id": ra.id,
+            "patient_id": ra.patient_id,
+            "patient_name": rp_name,
+            "patient_phone": rp_phone,
+            "date": ra.date.isoformat() if ra.date else "",
+            "start_time": ra.start_time.strftime("%I:%M %p") if ra.start_time else "Por Definir",
+            "reason": ra.reason or "Consulta General",
+            "status": ra.status or "Pendiente",
+            "whatsapp_reminder_sent": False,
+            "reminder_text": wa_info.get("message", ""),
+            "wa_link": wa_info.get("wa_link") or "",
+        })
+
     return {
         "date": target_date.strftime("%Y-%m-%d"),
         "stats": stats,
         "appointments": appts_data,
+        "due_reminders": {
+            "tomorrow_unsent": tomorrow_unsent,
+            "today_unsent": today_unsent,
+            "upcoming_unsent": len(due_items),
+            "total_due": len(due_items),
+            "items": due_items[:15],
+        },
         "user_role": current_user.role,
         "user_name": current_user.name
     }
@@ -516,6 +567,12 @@ def update_appointment_status(
         )
 
     old_status = appt.status
+    if old_status in ("En Espera", "En Consulta") and payload.status in ("Confirmada", "Pendiente"):
+        raise HTTPException(
+            status_code=409,
+            detail="La paciente ya se encuentra en Sala de Espera o En Consulta. Usa 'Sacar de fila' si deseas quitarle el turno."
+        )
+
     if payload.status == "En Espera" and not appt.queue_number:
         from app.routers.appointments import assign_next_queue_number
         appt.queue_number = assign_next_queue_number(db, appt.date)
@@ -601,59 +658,86 @@ def get_upcoming_appointments(
     db: Session = Depends(get_db)
 ):
     from datetime import date, timedelta
+    from app.services.whatsapp_service import WhatsAppService
+
     today = date.today()
     tomorrow = today + timedelta(days=1)
 
     doc_id = resolve_current_doctor_id(db, current_user)
 
-    base_query = db.query(Appointment).filter(
-        Appointment.date >= today,
-        Appointment.status.notin_(["Cancelada", "cancelada", "Anulada", "anulada", "Atendida", "Completada"])
+    excluded_terminal = ["Cancelada", "cancelada", "Anulada", "anulada", "Atendida", "Completada"]
+    excluded_active_queue = excluded_terminal + ["En Espera", "en espera", "En Consulta", "en consulta"]
+
+    future_base_query = db.query(Appointment).filter(
+        Appointment.date >= tomorrow,
+        Appointment.status.notin_(excluded_active_queue),
     )
     if doc_id:
-        base_query = base_query.filter(Appointment.doctor_id == doc_id)
+        future_base_query = future_base_query.filter(Appointment.doctor_id == doc_id)
 
-    tomorrow_count = base_query.filter(Appointment.date == tomorrow).count()
-    unconfirmed_count = base_query.filter(
-        or_(Appointment.status.in_(["Pendiente", "Sin Confirmar"]), Appointment.status == None)
+    tomorrow_count = future_base_query.filter(Appointment.date == tomorrow).count()
+    tomorrow_unsent_count = future_base_query.filter(
+        Appointment.date == tomorrow,
+        or_(Appointment.whatsapp_reminder_sent == False, Appointment.whatsapp_reminder_sent == None),
+    ).count()
+    unsent_reminders_count = future_base_query.filter(
+        or_(Appointment.whatsapp_reminder_sent == False, Appointment.whatsapp_reminder_sent == None),
+    ).count()
+    unconfirmed_count = future_base_query.filter(
+        or_(Appointment.status.in_(["Pendiente", "Sin Confirmar", "Reagendada"]), Appointment.status == None)
     ).count()
 
-    query = base_query
     if range == "today":
-        query = query.filter(Appointment.date == today)
+        query = db.query(Appointment).filter(
+            Appointment.date == today,
+            Appointment.status.notin_(excluded_terminal),
+        )
+        if doc_id:
+            query = query.filter(Appointment.doctor_id == doc_id)
     elif range == "tomorrow":
-        query = query.filter(Appointment.date == tomorrow)
+        query = future_base_query.filter(Appointment.date == tomorrow)
     elif range == "this_week":
         end_week = today + timedelta(days=7)
-        query = query.filter(Appointment.date <= end_week)
+        query = future_base_query.filter(Appointment.date >= tomorrow, Appointment.date <= end_week)
     elif range == "next_15_days":
         end_15 = today + timedelta(days=15)
-        query = query.filter(Appointment.date <= end_15)
+        query = future_base_query.filter(Appointment.date >= tomorrow, Appointment.date <= end_15)
+    else:
+        query = future_base_query
 
     if status and status != "all":
         if status == "unconfirmed":
-            query = query.filter(or_(Appointment.status.in_(["Pendiente", "Sin Confirmar"]), Appointment.status == None))
+            query = query.filter(or_(Appointment.status.in_(["Pendiente", "Sin Confirmar", "Reagendada"]), Appointment.status == None))
         elif status == "confirmed":
             query = query.filter(Appointment.status == "Confirmada")
+        elif status == "unsent_wa":
+            query = query.filter(or_(Appointment.whatsapp_reminder_sent == False, Appointment.whatsapp_reminder_sent == None))
         else:
             query = query.filter(Appointment.status == status)
 
     appts = query.order_by(Appointment.date.asc(), Appointment.start_time.asc()).all()
+    all_future_appts = future_base_query.order_by(Appointment.date.asc(), Appointment.start_time.asc()).all()
 
-    items = []
-    for a in appts:
+    def _serialize_upcoming(a, apply_search: bool = False):
         p = a.patient
         p_name = f"{p.first_name} {p.last_name}" if p else "Paciente"
         p_doc = p.document_id if p else ""
         p_phone = p.phone if p else ""
         p_ins = p.insurance_name if p and p.insurance_name else "Privado / Particular"
+        reason_str = a.reason or "Consulta General"
 
-        if search:
+        if apply_search and search:
             s = search.lower().strip()
-            if s not in p_name.lower() and s not in (p_doc or "").lower() and s not in (p_phone or "").lower():
-                continue
+            if (
+                s not in p_name.lower()
+                and s not in (p_doc or "").lower()
+                and s not in (p_phone or "").lower()
+                and s not in reason_str.lower()
+            ):
+                return None
 
-        items.append({
+        wa_info = WhatsAppService.get_appointment_reminder(db, a)
+        return {
             "id": a.id,
             "patient_id": a.patient_id,
             "patient_name": p_name,
@@ -662,20 +746,29 @@ def get_upcoming_appointments(
             "insurance_name": p_ins,
             "date": a.date.isoformat() if a.date else "",
             "start_time": a.start_time.strftime("%I:%M %p") if a.start_time else "Por Definir",
-            "reason": a.reason or "Consulta General",
+            "reason": reason_str,
             "status": a.status or "Pendiente",
+            "queue_number": a.queue_number,
             "whatsapp_reminder_sent": bool(a.whatsapp_reminder_sent),
             "whatsapp_reminder_sent_at": a.whatsapp_reminder_sent_at.isoformat() if a.whatsapp_reminder_sent_at else None,
-            "notes": a.notes or ""
-        })
+            "reminder_text": wa_info.get("message", ""),
+            "wa_link": wa_info.get("wa_link") or "",
+            "notes": a.notes or "",
+        }
+
+    items = [item for a in appts if (item := _serialize_upcoming(a, apply_search=True)) is not None]
+    all_items = [item for a in all_future_appts if (item := _serialize_upcoming(a, apply_search=False)) is not None]
 
     return {
         "success": True,
         "range": range,
         "count": len(items),
         "tomorrow_count": tomorrow_count,
+        "tomorrow_unsent_count": tomorrow_unsent_count,
+        "unsent_reminders_count": unsent_reminders_count,
         "unconfirmed_count": unconfirmed_count,
-        "appointments": items
+        "appointments": items,
+        "all_appointments": all_items,
     }
 
 @router.post("/appointments/{appointment_id}/whatsapp-sent")
@@ -2898,8 +2991,11 @@ def mobile_sync_delta(
             "start_time": a.start_time.strftime("%H:%M") if a.start_time else "",
             "reason": a.reason or "Consulta General",
             "status": a.status or "Pendiente",
+            "queue_number": a.queue_number,
             "service_id": a.service_id,
-            "price": a.price or 0.0
+            "price": a.price or 0.0,
+            "whatsapp_reminder_sent": bool(a.whatsapp_reminder_sent),
+            "whatsapp_reminder_sent_at": a.whatsapp_reminder_sent_at.isoformat() if a.whatsapp_reminder_sent_at else None,
         })
 
     from app.models.service import Service
