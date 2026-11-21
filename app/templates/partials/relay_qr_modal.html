@@ -74,7 +74,13 @@
         navigator.clipboard.writeText(currentRelayCode).then(() => {
             alert('Código de enlace copiado: ' + currentRelayCode);
         }).catch(() => {
-            prompt('Copia este código de enlace:', currentRelayCode);
+            const tmp = document.createElement('textarea');
+            tmp.value = currentRelayCode;
+            document.body.appendChild(tmp);
+            tmp.select();
+            try { document.execCommand('copy'); } catch (e) {}
+            tmp.remove();
+            alert('Código de enlace: ' + currentRelayCode);
         });
     }
 

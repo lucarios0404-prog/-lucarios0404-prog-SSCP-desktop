@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from pathlib import Path
@@ -12,11 +12,294 @@ from app.models.lab_order import LabOrder
 from app.models.patient import Patient
 from app.models.setting import Setting
 from app.models.consultation import Consultation
+from app.models.template import ClinicalTemplate
 from app.core.deps import require_permission
 from app.services.pdf_service import generate_lab_order_pdf, generate_lab_order_talonario_pdf
 
 router = APIRouter(prefix="/lab-results", tags=["lab_results"])
 from app.core.templates import templates
+
+LAB_SEEDED_MARKER_CATEGORY = "lab_seeded_marker"
+
+DEFAULT_LAB_PRESETS = [
+    {
+        "title": "🩺 Rutina General",
+        "tests": [
+            "Hemograma Completo",
+            "Exámen de orina",
+            "Glicemia en ayuna",
+            "Creatinina",
+            "Colesterol Total",
+            "Trigliceridos",
+        ],
+    },
+    {
+        "title": "🤰 1er Trimestre",
+        "tests": [
+            "Hemograma Completo",
+            "Tipificación Sanguínea",
+            "Exámen de orina",
+            "Bun",
+            "Creatinina",
+            "Acido Urico",
+            "Glicemia en ayuna",
+            "Hemoglobina Glicosilada",
+            "Investigación de Células Falciformes (Falcemia)",
+            "TORCH IgG - IgM",
+            "Toxoplasmosis IgG - IgM",
+            "SGOT",
+            "SGPT",
+            "Bilirrubina",
+            "Fosfatasa Alcalina",
+            "Proteinas totales",
+            "Albumina",
+            "Colesterol Total",
+            "Trigliceridos",
+            "HDL",
+            "LDL",
+            "V.D.R.L.",
+            "HIV",
+            "Hepatitis B",
+            "Hepatitis C",
+            "Progesterona",
+            "T4 libre",
+            "TSH",
+            "Cultivo Secreción Vaginal",
+        ],
+    },
+    {
+        "title": "🤰 2do Trimestre",
+        "tests": [
+            "Hemograma Completo",
+            "Glicemia en ayuna",
+            "Exámen de orina",
+            "T3",
+            "T4",
+            "T4 libre",
+            "TSH",
+            "Cultivo Secreción Vaginal",
+            "V.D.R.L.",
+            "PT",
+            "TPT",
+        ],
+    },
+    {
+        "title": "🤰 Prenatal + Falcemia",
+        "tests": [
+            "Hemograma Completo",
+            "Tipificación Sanguínea",
+            "Exámen de orina",
+            "V.D.R.L.",
+            "HIV",
+            "Glicemia en ayuna",
+            "Toxoplasmosis IgG - IgM",
+            "Investigación de Células Falciformes (Falcemia)",
+        ],
+    },
+    {
+        "title": "🍬 Control Diabético",
+        "tests": [
+            "Glicemia en ayuna",
+            "Glicemia Post Pandrial",
+            "Hemoglobina Glicosilada",
+            "Exámen de orina",
+            "Creatinina",
+            "Albuminuria",
+        ],
+    },
+    {
+        "title": "🩸 Perfil Lipídico",
+        "tests": [
+            "Colesterol Total",
+            "HDL",
+            "LDL",
+            "VLDL",
+            "Trigliceridos",
+        ],
+    },
+    {
+        "title": "🦋 Perfil Tiroideo",
+        "tests": [
+            "TSH",
+            "T3 libre",
+            "T4 libre",
+            "T3",
+            "T4",
+        ],
+    },
+    {
+        "title": "🩹 Pre-Quirúrgico",
+        "tests": [
+            "Hemograma Completo",
+            "PT",
+            "TPT",
+            "Tipificación Sanguínea",
+            "Glicemia en ayuna",
+            "Exámen de orina",
+            "Creatinina",
+        ],
+    },
+    {
+        "title": "🧪 Hepático / Renal",
+        "tests": [
+            "SGOT",
+            "SGPT",
+            "Bilirrubina",
+            "Fosfatasa Alcalina",
+            "Proteinas totales",
+            "Albumina",
+            "Bun",
+            "Creatinina",
+            "Acido Urico",
+        ],
+    },
+    {
+        "title": "🦴 Reumatológico",
+        "tests": [
+            "P.C.R.",
+            "PCR",
+            "Eritrosedimentación",
+            "Factor Reumatoide",
+            "Acido Urico",
+            "ASO",
+        ],
+    },
+    {
+        "title": "🦠 Infeccioso / Febril",
+        "tests": [
+            "Hemograma Completo",
+            "Exámen de orina",
+            "Coprológico",
+            "Dengue IgG - IgM",
+            "Tipificación Sanguínea",
+        ],
+    },
+]
+
+
+def parse_lab_template_tests(content: str) -> list[str]:
+    """Convierte el contenido de una plantilla de laboratorio (JSON o líneas) en lista limpia de estudios."""
+    if not content:
+        return []
+    raw = content.strip()
+    items = []
+    if raw.startswith("["):
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                items = [str(x).strip() for x in parsed if str(x).strip()]
+        except Exception:
+            items = []
+    elif raw.startswith("{"):
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict) and isinstance(parsed.get("tests"), list):
+                items = [str(x).strip() for x in parsed["tests"] if str(x).strip()]
+        except Exception:
+            items = []
+    if not items:
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
+        if len(lines) == 1 and "," in lines[0] and not any(
+            known in lines[0] for known in ("IgG", "IgM", "1,25")
+        ):
+            items = [part.strip() for part in lines[0].split(",") if part.strip()]
+        else:
+            items = lines
+
+    deduped = []
+    seen = set()
+    for item in items:
+        clean = item.lstrip("-•* ").strip()
+        if not clean:
+            continue
+        key = clean.lower()
+        if key not in seen:
+            seen.add(key)
+            deduped.append(clean)
+    return deduped
+
+
+def serialize_lab_preset(tpl: ClinicalTemplate) -> dict:
+    tests = parse_lab_template_tests(tpl.content)
+    return {
+        "id": tpl.id,
+        "name": tpl.title,
+        "title": tpl.title,
+        "tests": tests,
+        "content": "\n".join(tests),
+        "is_factory": bool(tpl.is_global),
+    }
+
+
+def _ensure_lab_seed_marker(db: Session) -> None:
+    marker = (
+        db.query(ClinicalTemplate)
+        .filter(ClinicalTemplate.category == LAB_SEEDED_MARKER_CATEGORY)
+        .first()
+    )
+    if not marker:
+        db.add(
+            ClinicalTemplate(
+                doctor_id=None,
+                category=LAB_SEEDED_MARKER_CATEGORY,
+                title="__lab_presets_seeded_v1__",
+                content="seeded",
+                is_global=False,
+            )
+        )
+        db.commit()
+
+
+def ensure_default_lab_presets(db: Session, doctor_id: int | None = None) -> list[ClinicalTemplate]:
+    """
+    Siembra los perfiles de laboratorio por defecto en SQLite una sola vez.
+    Si el médico edita o elimina cualquiera de ellos, sus cambios persisten en la BD
+    y los eliminados no vuelven a recrearse salvo que solicite restaurarlos.
+    """
+    has_marker = (
+        db.query(ClinicalTemplate)
+        .filter(ClinicalTemplate.category == LAB_SEEDED_MARKER_CATEGORY)
+        .first()
+        is not None
+    )
+    existing_labs = (
+        db.query(ClinicalTemplate)
+        .filter(ClinicalTemplate.category == "lab")
+        .order_by(ClinicalTemplate.id.asc())
+        .all()
+    )
+
+    if not has_marker and not existing_labs:
+        for preset in DEFAULT_LAB_PRESETS:
+            db.add(
+                ClinicalTemplate(
+                    doctor_id=doctor_id,
+                    category="lab",
+                    title=preset["title"],
+                    content="\n".join(preset["tests"]),
+                    is_global=True,
+                )
+            )
+        db.add(
+            ClinicalTemplate(
+                doctor_id=None,
+                category=LAB_SEEDED_MARKER_CATEGORY,
+                title="__lab_presets_seeded_v1__",
+                content="seeded",
+                is_global=False,
+            )
+        )
+        db.commit()
+        existing_labs = (
+            db.query(ClinicalTemplate)
+            .filter(ClinicalTemplate.category == "lab")
+            .order_by(ClinicalTemplate.id.asc())
+            .all()
+        )
+    elif not has_marker and existing_labs:
+        _ensure_lab_seed_marker(db)
+
+    return existing_labs
 
 COMMON_TESTS = [
     {"name": "Hemograma Completo", "category": "Hematología"},
@@ -55,6 +338,11 @@ def lab_checklist_main(
                 selected_patient = consult.patient
             default_indication = consult.diagnosis or consult.reason or ""
 
+    lab_presets = [
+        serialize_lab_preset(t)
+        for t in ensure_default_lab_presets(db, getattr(current_user, "id", None))
+    ]
+
     return templates.TemplateResponse(
         request=request,
         name="labs/order_create.html",
@@ -64,10 +352,262 @@ def lab_checklist_main(
             "selected_patient": selected_patient,
             "consultation_id": consultation_id,
             "panels": LAB_PANELS,
+            "lab_presets": lab_presets,
             "default_indication": default_indication,
             "active_tab": "checklist",
         }
     )
+
+
+async def _extract_preset_payload(request: Request) -> dict:
+    """Extrae payload de plantilla de laboratorio tanto si viene en JSON como en Form."""
+    content_type = (request.headers.get("content-type") or "").lower()
+    if "application/json" in content_type:
+        try:
+            data = await request.json()
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+    form = await request.form()
+    tests_val = form.getlist("tests") if hasattr(form, "getlist") else []
+    if not tests_val and form.get("content"):
+        tests_val = parse_lab_template_tests(str(form.get("content") or ""))
+    return {
+        "name": form.get("name") or form.get("title") or "",
+        "title": form.get("title") or form.get("name") or "",
+        "tests": tests_val,
+        "content": form.get("content") or "",
+        "other_tests": form.get("other_tests") or "",
+        "is_factory": form.get("is_factory"),
+        "skip_if_exists": form.get("skip_if_exists"),
+    }
+
+
+def _collect_clean_tests(payload: dict) -> list[str]:
+    raw_tests = payload.get("tests")
+    collected: list[str] = []
+    if isinstance(raw_tests, list):
+        for item in raw_tests:
+            if isinstance(item, str):
+                collected.extend(parse_lab_template_tests(item))
+    elif isinstance(raw_tests, str) and raw_tests.strip():
+        collected.extend(parse_lab_template_tests(raw_tests))
+
+    if payload.get("content"):
+        collected.extend(parse_lab_template_tests(str(payload["content"])))
+    if payload.get("other_tests"):
+        collected.extend(parse_lab_template_tests(str(payload["other_tests"])))
+
+    return parse_lab_template_tests("\n".join(collected))
+
+
+@router.get("/presets")
+def list_lab_presets_api(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('labs'))
+):
+    """Devuelve todas las plantillas de laboratorio persistidas en SQLite."""
+    items = ensure_default_lab_presets(db, getattr(current_user, "id", None))
+    return JSONResponse({
+        "ok": True,
+        "presets": [serialize_lab_preset(t) for t in items],
+    })
+
+
+@router.post("/presets")
+async def create_lab_preset_api(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('labs'))
+):
+    """Crea y persiste una nueva plantilla de laboratorio en SQLite."""
+    ensure_default_lab_presets(db, getattr(current_user, "id", None))
+    payload = await _extract_preset_payload(request)
+    title = str(payload.get("name") or payload.get("title") or "").strip()
+    if not title:
+        return JSONResponse(
+            {"ok": False, "detail": "Debe ingresar un nombre para la plantilla de laboratorio."},
+            status_code=400,
+        )
+
+    clean_tests = _collect_clean_tests(payload)
+    if not clean_tests:
+        return JSONResponse(
+            {"ok": False, "detail": "Seleccione o escriba al menos un análisis para guardar la plantilla."},
+            status_code=400,
+        )
+
+    if payload.get("skip_if_exists"):
+        existing = (
+            db.query(ClinicalTemplate)
+            .filter(ClinicalTemplate.category == "lab", ClinicalTemplate.title == title)
+            .first()
+        )
+        if existing:
+            all_items = (
+                db.query(ClinicalTemplate)
+                .filter(ClinicalTemplate.category == "lab")
+                .order_by(ClinicalTemplate.id.asc())
+                .all()
+            )
+            return JSONResponse({
+                "ok": True,
+                "preset": serialize_lab_preset(existing),
+                "presets": [serialize_lab_preset(t) for t in all_items],
+            })
+
+    new_tpl = ClinicalTemplate(
+        doctor_id=getattr(current_user, "id", None),
+        category="lab",
+        title=title,
+        content="\n".join(clean_tests),
+        is_global=bool(payload.get("is_factory", False)),
+    )
+    db.add(new_tpl)
+    db.commit()
+    db.refresh(new_tpl)
+
+    all_items = (
+        db.query(ClinicalTemplate)
+        .filter(ClinicalTemplate.category == "lab")
+        .order_by(ClinicalTemplate.id.asc())
+        .all()
+    )
+    return JSONResponse({
+        "ok": True,
+        "preset": serialize_lab_preset(new_tpl),
+        "presets": [serialize_lab_preset(t) for t in all_items],
+    })
+
+
+@router.api_route("/presets/{preset_id}/edit", methods=["POST", "PUT"])
+@router.put("/presets/{preset_id}")
+async def update_lab_preset_api(
+    preset_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('labs'))
+):
+    """Edita el nombre y/o listado de análisis de una plantilla de laboratorio existente."""
+    tpl = (
+        db.query(ClinicalTemplate)
+        .filter(ClinicalTemplate.id == preset_id, ClinicalTemplate.category == "lab")
+        .first()
+    )
+    if not tpl:
+        return JSONResponse(
+            {"ok": False, "detail": "Plantilla de laboratorio no encontrada."},
+            status_code=404,
+        )
+
+    payload = await _extract_preset_payload(request)
+    title = str(payload.get("name") or payload.get("title") or "").strip()
+    if not title:
+        return JSONResponse(
+            {"ok": False, "detail": "El nombre de la plantilla no puede estar vacío."},
+            status_code=400,
+        )
+
+    clean_tests = _collect_clean_tests(payload)
+    if not clean_tests:
+        return JSONResponse(
+            {"ok": False, "detail": "La plantilla debe incluir al menos un análisis de laboratorio."},
+            status_code=400,
+        )
+
+    tpl.title = title
+    tpl.content = "\n".join(clean_tests)
+    db.commit()
+    db.refresh(tpl)
+
+    all_items = (
+        db.query(ClinicalTemplate)
+        .filter(ClinicalTemplate.category == "lab")
+        .order_by(ClinicalTemplate.id.asc())
+        .all()
+    )
+    return JSONResponse({
+        "ok": True,
+        "preset": serialize_lab_preset(tpl),
+        "presets": [serialize_lab_preset(t) for t in all_items],
+    })
+
+
+@router.api_route("/presets/{preset_id}/delete", methods=["POST", "DELETE"])
+@router.delete("/presets/{preset_id}")
+def delete_lab_preset_api(
+    preset_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('labs'))
+):
+    """Elimina permanentemente una plantilla de laboratorio (personalizada o de fábrica no deseada)."""
+    _ensure_lab_seed_marker(db)
+    tpl = (
+        db.query(ClinicalTemplate)
+        .filter(ClinicalTemplate.id == preset_id, ClinicalTemplate.category == "lab")
+        .first()
+    )
+    if not tpl:
+        return JSONResponse(
+            {"ok": False, "detail": "Plantilla de laboratorio no encontrada."},
+            status_code=404,
+        )
+
+    db.delete(tpl)
+    db.commit()
+
+    all_items = (
+        db.query(ClinicalTemplate)
+        .filter(ClinicalTemplate.category == "lab")
+        .order_by(ClinicalTemplate.id.asc())
+        .all()
+    )
+    return JSONResponse({
+        "ok": True,
+        "deleted_id": preset_id,
+        "presets": [serialize_lab_preset(t) for t in all_items],
+    })
+
+
+@router.post("/presets/restore-defaults")
+def restore_default_lab_presets_api(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission('labs'))
+):
+    """Restaura los perfiles de laboratorio de fábrica que hayan sido eliminados, conservando los personalizados."""
+    _ensure_lab_seed_marker(db)
+    existing_titles = {
+        (t.title or "").strip().lower()
+        for t in db.query(ClinicalTemplate).filter(ClinicalTemplate.category == "lab").all()
+    }
+    restored = 0
+    for preset in DEFAULT_LAB_PRESETS:
+        if preset["title"].strip().lower() not in existing_titles:
+            db.add(
+                ClinicalTemplate(
+                    doctor_id=getattr(current_user, "id", None),
+                    category="lab",
+                    title=preset["title"],
+                    content="\n".join(preset["tests"]),
+                    is_global=True,
+                )
+            )
+            restored += 1
+    if restored > 0:
+        db.commit()
+
+    all_items = (
+        db.query(ClinicalTemplate)
+        .filter(ClinicalTemplate.category == "lab")
+        .order_by(ClinicalTemplate.id.asc())
+        .all()
+    )
+    return JSONResponse({
+        "ok": True,
+        "restored": restored,
+        "presets": [serialize_lab_preset(t) for t in all_items],
+    })
 
 @router.get("/results")
 def list_lab_results_history(

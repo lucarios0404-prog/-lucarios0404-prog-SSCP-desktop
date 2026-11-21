@@ -28,7 +28,7 @@ Var SupaLine3
 ; Definiciones Generales
 !define PRODUCT_NAME "SSCP Desktop"
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "1.8.9-supabase"
+  !define PRODUCT_VERSION "1.8.10-supabase"
 !endif
 !define PRODUCT_PUBLISHER "SSCP Medical Systems"
 !define PRODUCT_WEB_SITE "https://sscp.laxarusdevs.com"
@@ -191,6 +191,8 @@ Section "MainSection" SEC01
   ; Crear Accesos Directos con icono oficial explícito
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${PRODUCT_EXE}" "" "$INSTDIR\app_icon.ico" 0
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Manual de Usuario - Doctor (PDF).lnk" "$INSTDIR\resources\backend\_internal\static\docs\Manual_Usuario_Doctor_SSCP.pdf" "" "$INSTDIR\app_icon.ico" 0
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Manual de Usuario - Secretaria (PDF).lnk" "$INSTDIR\resources\backend\_internal\static\docs\Manual_Usuario_Secretaria_SSCP.pdf" "" "$INSTDIR\app_icon.ico" 0
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Desinstalar ${PRODUCT_NAME}.lnk" "$INSTDIR\uninst.exe" "" "$INSTDIR\app_icon.ico" 0
   CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${PRODUCT_EXE}" "" "$INSTDIR\app_icon.ico" 0
 
@@ -212,6 +214,8 @@ Section Uninstall
   ; Eliminar accesos directos
   Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk"
+  Delete "$SMPROGRAMS\${PRODUCT_NAME}\Manual de Usuario - Doctor (PDF).lnk"
+  Delete "$SMPROGRAMS\${PRODUCT_NAME}\Manual de Usuario - Secretaria (PDF).lnk"
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\Desinstalar ${PRODUCT_NAME}.lnk"
   RMDir "$SMPROGRAMS\${PRODUCT_NAME}"
 

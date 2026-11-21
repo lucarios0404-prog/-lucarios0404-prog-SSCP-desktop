@@ -7,6 +7,12 @@ from pathlib import Path
 from app.database import get_db
 from app.models.template import ClinicalTemplate
 from app.core.deps import require_permission
+from app.routers.lab_results import (
+    LAB_SEEDED_MARKER_CATEGORY,
+    ensure_default_lab_presets,
+    parse_lab_template_tests,
+    _ensure_lab_seed_marker,
+)
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 from app.core.templates import templates
@@ -18,7 +24,8 @@ def list_templates(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('templates'))
 ):
-    query = db.query(ClinicalTemplate)
+    ensure_default_lab_presets(db, getattr(current_user, "id", None))
+    query = db.query(ClinicalTemplate).filter(ClinicalTemplate.category != LAB_SEEDED_MARKER_CATEGORY)
     if category:
         query = query.filter(ClinicalTemplate.category == category)
         
@@ -37,17 +44,24 @@ def list_templates(
 @router.post("/create")
 def create_template(
     title: str = Form(...),
-    category: str = Form(...), # "prescription", "consultation", "license", "reference"
+    category: str = Form(...), # "prescription", "consultation", "license", "reference", "lab"
     content: str = Form(...),
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('templates'))
 ):
+    clean_title = title.strip()
+    clean_content = content.strip()
+    if category == "lab":
+        _ensure_lab_seed_marker(db)
+        parsed_tests = parse_lab_template_tests(clean_content)
+        clean_content = "\n".join(parsed_tests) if parsed_tests else clean_content
+
     new_tpl = ClinicalTemplate(
         doctor_id=current_user.id,
         category=category,
-        title=title,
-        content=content,
-        is_global=True
+        title=clean_title,
+        content=clean_content,
+        is_global=(category != "lab")
     )
     db.add(new_tpl)
     db.commit()
@@ -62,12 +76,25 @@ def edit_template(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('templates'))
 ):
-    tpl = db.query(ClinicalTemplate).filter(ClinicalTemplate.id == template_id).first()
+    tpl = (
+        db.query(ClinicalTemplate)
+        .filter(
+            ClinicalTemplate.id == template_id,
+            ClinicalTemplate.category != LAB_SEEDED_MARKER_CATEGORY,
+        )
+        .first()
+    )
     if not tpl:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
-    tpl.title = title
+    clean_title = title.strip()
+    clean_content = content.strip()
+    if category == "lab":
+        _ensure_lab_seed_marker(db)
+        parsed_tests = parse_lab_template_tests(clean_content)
+        clean_content = "\n".join(parsed_tests) if parsed_tests else clean_content
+    tpl.title = clean_title
     tpl.category = category
-    tpl.content = content
+    tpl.content = clean_content
     db.commit()
     return RedirectResponse(url="/templates", status_code=303)
 
@@ -77,8 +104,17 @@ def delete_template(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('templates'))
 ):
-    tpl = db.query(ClinicalTemplate).filter(ClinicalTemplate.id == template_id).first()
+    tpl = (
+        db.query(ClinicalTemplate)
+        .filter(
+            ClinicalTemplate.id == template_id,
+            ClinicalTemplate.category != LAB_SEEDED_MARKER_CATEGORY,
+        )
+        .first()
+    )
     if tpl:
+        if tpl.category == "lab":
+            _ensure_lab_seed_marker(db)
         db.delete(tpl)
         db.commit()
     return RedirectResponse(url="/templates", status_code=303)
@@ -89,7 +125,8 @@ def api_get_templates(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission('templates'))
 ):
-    query = db.query(ClinicalTemplate)
+    ensure_default_lab_presets(db, getattr(current_user, "id", None))
+    query = db.query(ClinicalTemplate).filter(ClinicalTemplate.category != LAB_SEEDED_MARKER_CATEGORY)
     if category:
         query = query.filter(ClinicalTemplate.category == category)
     items = query.order_by(ClinicalTemplate.title).all()
